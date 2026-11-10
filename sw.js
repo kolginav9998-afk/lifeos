@@ -1,8 +1,8 @@
 // Офлайн-оболочка. При изменении файлов — поднять CACHE.
-const CACHE = 'lifeos-r2.2';
+const CACHE = 'lifeos-r2.3';
 const SHELL = ['./', 'index.html', 'style.css', 'manifest.webmanifest', 'icons/icon-192.png', 'icons/icon-512.png',
   'app.js', 'ui.js', 'prefs.js', 'store.js', 'db.js', 'vault.js', 'cryptoutil.js', 'backup.js', 'events.js', 'habits.js', 'money.js',
-  'notes.js', 'search.js', 'review.js', 'quick.js', 'export.js', 'platform.js', 'version.js', 'reminders.js', 'notify.js', 'journal.js',
+  'notes.js', 'search.js', 'review.js', 'quick.js', 'export.js', 'platform.js', 'version.js', 'reminders.js', 'notify.js', 'journal.js', 'errlog.js',
   'view-today.js', 'view-habits.js', 'view-money.js', 'view-notes.js', 'view-settings.js'];
 
 self.addEventListener('install', e => {

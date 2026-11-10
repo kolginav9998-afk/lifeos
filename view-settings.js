@@ -10,6 +10,7 @@ import { saveTextFile, isNative, platformName } from './platform.js';
 import { getPref, setPref } from './prefs.js';
 import { VERSION } from './version.js';
 import * as notify from './notify.js';
+import { log as errorLog } from './errlog.js';
 
 const TYPE_NAMES = { task: 'задачи', habit: 'привычки', habit_log: 'отметки привычек', expense: 'расходы', income: 'доходы', note: 'заметки' };
 const AUTOLOCK = [[0, 'сразу при сворачивании'], [1, 'через 1 минуту'], [5, 'через 5 минут'], [15, 'через 15 минут'], [60, 'через час'], [-1, 'никогда']];
@@ -55,6 +56,8 @@ export function createSettingsView({ lockNow, applyTheme, onVaultChange }) {
       const weak = vault.checkPassword(p1.value);
       if (weak) return toast(weak);
       if (!ack.checked) return toast('Подтверди галочкой, что понимаешь последствия');
+      if (!getPref('lastBackupAt') && store.state.events.length
+        && !confirm('Ты ещё не сохранял резервную копию. Если при шифровании что-то пойдёт не так, данные могут пропасть. Лучше сначала сохранить копию (раздел ниже). Включить защиту всё равно?')) return;
       setBusy(btn, true, 'Шифрую…');
       try {
         const n = await db.enableLock(p1.value);
@@ -233,6 +236,7 @@ export function createSettingsView({ lockNow, applyTheme, onVaultChange }) {
       `Защита от очистки: ${persisted}`,
       `Пароль: ${{ none: 'не задан', locked: 'задан (заблокировано)', unlocked: 'задан (открыто)' }[vault.status()]}`,
       db.state.idbOk === false ? `Ошибка IndexedDB: ${db.state.idbError}` : '',
+      ...(errorLog.length ? ['Последние ошибки:', ...errorLog] : []),
     ].filter(Boolean).join('\n');
   }
 

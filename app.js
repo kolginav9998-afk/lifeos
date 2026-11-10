@@ -1,4 +1,7 @@
+import { install as installErrLog } from './errlog.js';
 import { $, el, icon, toast } from './ui.js';
+
+installErrLog();
 import * as vault from './vault.js';
 import * as db from './db.js';
 import * as store from './store.js';

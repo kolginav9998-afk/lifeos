@@ -194,9 +194,14 @@ await page.selectOption('#theme-select', 'auto');
 assert.equal(await page.evaluate(() => document.documentElement.getAttribute('data-theme')), null);
 assert.match(await text('#stats'), /задачи|привычки/);
 assert.match(await text('#stats'), /расходы: 2/);
-assert.match(await text('#diag'), /Версия R2\.2/);
+assert.match(await text('#diag'), /Версия R2\.3/);
 assert.match(await text('#diag'), /Запуск №\d+/);
 assert.match(await text('#diag'), /Пароль: не задан/);
+assert.doesNotMatch(await text('#diag'), /Последние ошибки/, 'ошибок нет');
+await page.evaluate(() => window.dispatchEvent(new ErrorEvent('error', { message: 'тестовая ошибка' })));
+await tab(page, 'today'); await tab(page, 'more');
+await until(page, () => /тестовая ошибка/.test(document.getElementById('diag').textContent));
+assert.match(await text('#diag'), /Последние ошибки:[\s\S]*ошибка: тестовая ошибка/, 'ошибки попадают в диагностику');
 
 assert.match(await text('#remind-box'), /только в приложении для Android/, 'на сайте напоминания недоступны и это объяснено');
 assert.match(await text('#stats'), /Последняя копия: ещё не делал/);
