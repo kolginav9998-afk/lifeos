@@ -169,3 +169,32 @@ html.amounts-hidden .amount{letter-spacing:.1em}
 .sync-badge[data-state=idle]{color:var(--ok)}
 .sync-badge[data-state=error],.sync-badge[data-state=needs-login]{color:var(--danger);border-color:var(--danger)}
 .code{font:600 1.15rem/1.5 ui-monospace,monospace;letter-spacing:.06em;padding:14px;border:1px dashed var(--accent);border-radius:12px;text-align:center;user-select:all;overflow-wrap:anywhere}
+
+/* ---- дневник и здоровье ---- */
+.rating,.stepper{display:flex;flex-direction:column;gap:4px;margin:6px 0}
+.rating-label{font-size:.85rem;color:var(--muted)}
+.rate-btns{display:grid;grid-template-columns:repeat(5,1fr);gap:6px}
+.rate{min-height:44px;padding:0;border-radius:10px}
+.rate[aria-pressed=true]{background:var(--accent);border-color:transparent;color:#fff;font-weight:700}
+.step-ctl{display:grid;grid-template-columns:48px 1fr 48px;gap:6px;align-items:center}
+.step-btn{min-height:44px;padding:0;font-size:1.3rem}
+.step-val{text-align:center;font-weight:600}
+.grid2{display:grid;grid-template-columns:1fr 1fr;gap:8px 12px}
+.spark{display:block;max-width:100%}
+.spark-line{fill:none;stroke:var(--accent);stroke-width:2;stroke-linejoin:round;stroke-linecap:round}
+.spark-dot{fill:var(--accent)}
+.mood-strip{display:grid;grid-template-columns:repeat(14,1fr);gap:4px;margin:6px 0}
+.mood-dot{aspect-ratio:1;border-radius:4px;background:var(--line);border:0;padding:0;min-height:0}
+.mood-dot.m1{background:#ef4444}.mood-dot.m2{background:#f59e0b}.mood-dot.m3{background:#eab308}.mood-dot.m4{background:#84cc16}.mood-dot.m5{background:#22c55e}
+.mood-dot.sel{outline:2px solid var(--text);outline-offset:1px}
+.day-nav{display:flex;gap:6px;align-items:center}
+.day-nav input[type=date]{flex:1;width:auto}
+.hist{display:flex;flex-direction:column;gap:2px}
+.hist-row{display:grid;grid-template-columns:58px 40px 46px 1fr;gap:8px;align-items:baseline;text-align:left;border:0;background:none;justify-content:start;padding:8px 4px;width:100%;min-height:44px;border-radius:8px}
+.hist-row:active,.hist-row.sel{background:var(--soft)}
+.hist-snip{overflow:hidden;text-overflow:ellipsis;white-space:nowrap;color:var(--muted);font-size:.85rem}
+.mcard h4{margin:0;font-size:1rem}
+.mcard .big2{font-size:1.5rem;font-weight:700}
+.delta.up{color:var(--warn)}.delta.down{color:var(--ok)}
+.tags{display:flex;gap:6px;flex-wrap:wrap}
+.tag{font-size:.8rem;color:var(--accent)}

@@ -2,6 +2,7 @@
 import { todayStr } from './events.js';
 import { formatMoney } from './money.js';
 import { activeHabits } from './habits.js';
+import { formatMeasure } from './health.js';
 
 const esc = s => String(s).replace(/\r?\n/g, ' ');
 
@@ -31,5 +32,13 @@ export function toMarkdown(events, now = Date.now()) {
   const inc = events.filter(e => e.type === 'income').sort((a, b) => a.payload.date.localeCompare(b.payload.date));
   for (const e of inc) L.push(`- ${e.payload.date} — ${formatMoney(e.payload.amountMinor)} — ${esc(e.payload.category)}${e.payload.note ? ` (${esc(e.payload.note)})` : ''}`);
   if (!inc.length) L.push('_нет_');
+  L.push('', '## Дневник', '');
+  const dia = events.filter(e => e.type === 'diary').sort((a, b) => a.payload.date.localeCompare(b.payload.date));
+  for (const d of dia) { L.push(`### ${d.payload.date}`, ''); if (d.payload.highlight) L.push(`**Главное:** ${esc(d.payload.highlight)}`, ''); if (d.payload.text) L.push(d.payload.text, ''); if (d.payload.gratitude?.length) L.push('Благодарность: ' + d.payload.gratitude.map(esc).join('; '), ''); }
+  if (!dia.length) L.push('_нет_', '');
+  L.push('## Замеры', '');
+  const ms = events.filter(e => e.type === 'measure').sort((a, b) => a.payload.date.localeCompare(b.payload.date));
+  for (const m of ms) L.push(`- ${m.payload.date} — ${m.payload.kind === 'custom' ? esc(m.payload.name) : m.payload.kind}: ${formatMeasure(m.payload)}${m.payload.note ? ` (${esc(m.payload.note)})` : ''}`);
+  if (!ms.length) L.push('_нет_');
   return L.join('\n') + '\n';
 }

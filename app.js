@@ -15,6 +15,8 @@ import { createTodayView } from './view-today.js';
 import { createHabitsView } from './view-habits.js';
 import { createMoneyView } from './view-money.js';
 import { createNotesView } from './view-notes.js';
+import { createDiaryView } from './view-diary.js';
+import { createHealthView } from './view-health.js';
 import { createSettingsView } from './view-settings.js';
 import { createAccountView } from './view-account.js';
 import * as appSync from './app-sync.js';
@@ -23,6 +25,8 @@ import * as appSync from './app-sync.js';
 const DEFS = [
   { id: 'today', group: 'today', title: 'Сегодня', sub: 'Задачи', make: ctx => createTodayView(ctx) },
   { id: 'habits', group: 'today', title: 'Привычки', sub: 'Привычки', make: () => createHabitsView() },
+  { id: 'diary', group: 'diary', title: 'Дневник', sub: 'Дневник', make: () => createDiaryView() },
+  { id: 'health', group: 'diary', title: 'Здоровье', sub: 'Здоровье', make: () => createHealthView() },
   { id: 'notes', group: 'diary', title: 'Заметки', sub: 'Заметки', make: () => createNotesView() },
   { id: 'money', group: 'money', title: 'Деньги', sub: 'Деньги', make: ctx => createMoneyView(ctx) },
   { id: 'more', group: 'more', title: 'Настройки', sub: 'Настройки', make: ctx => createSettingsView(ctx) },
@@ -30,11 +34,11 @@ const DEFS = [
 ];
 const GROUPS = [
   { id: 'today', label: 'Сегодня', icon: 'tasks' },
-  { id: 'diary', label: 'Заметки', icon: 'notes' },
+  { id: 'diary', label: 'Дневник', icon: 'diary' },
   { id: 'money', label: 'Деньги', icon: 'money' },
   { id: 'more', label: 'Ещё', icon: 'more' },
 ];
-const FOCUS_TAB = { task: 'today', habit: 'habits', expense: 'money', note: 'notes' };
+const FOCUS_TAB = { task: 'today', habit: 'habits', expense: 'money', note: 'notes', diary: 'diary', measure: 'health' };
 
 // ---------- тема ----------
 function applyTheme() {
@@ -213,7 +217,7 @@ function handleUrlParams() {
   if (shared) {
     go('today'); views.today.prefill(shared);
     toast('Получено из другого приложения. Проверь текст и нажми «+».');
-  } else if (['task', 'habit', 'expense', 'note'].includes(add)) {
+  } else if (['task', 'habit', 'expense', 'note', 'diary', 'measure'].includes(add)) {
     go(FOCUS_TAB[add]); views[FOCUS_TAB[add]].focusAdd?.();
   }
   history.replaceState(null, '', location.pathname);       // не оставлять чужой текст в адресной строке

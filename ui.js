@@ -26,6 +26,8 @@ const ICONS = {
   search: ['M11 3a8 8 0 1 0 0 16 8 8 0 0 0 0-16z', 'M21 21l-4.35-4.35'],
   lock: ['M5 11h14a2 2 0 0 1 2 2v7a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-7a2 2 0 0 1 2-2z', 'M7 11V7a5 5 0 0 1 10 0v4'],
   eye: ['M1 12s4-8 11-8 11 8 11 8-4 8-11 8-11-8-11-8z', 'M12 9a3 3 0 1 0 0 6 3 3 0 0 0 0-6z'],
+  diary: ['M2 3h6a4 4 0 0 1 4 4v14a3 3 0 0 0-3-3H2z', 'M22 3h-6a4 4 0 0 0-4 4v14a3 3 0 0 1 3-3h7z'],
+  tests: ['M22 12h-4l-3 9L9 3l-3 9H2'],
 };
 export function icon(name, size = 22) {
   const s = document.createElementNS(SVG_NS, 'svg');
@@ -74,4 +76,55 @@ export function revealable(input) {
   const btn = el('button', { type: 'button', class: 'reveal', textContent: 'показать', 'aria-label': 'Показать или скрыть пароль' });
   btn.onclick = () => { const show = input.type === 'password'; input.type = show ? 'text' : 'password'; btn.textContent = show ? 'скрыть' : 'показать'; };
   return el('div', { class: 'pw-wrap' }, input, btn);
+}
+
+// Мини-график по ряду чисел (null — разрыв). Рисуется из DOM-узлов, без innerHTML.
+export function sparkline(values, { width = 140, height = 36 } = {}) {
+  const svg = document.createElementNS(SVG_NS, 'svg');
+  svg.setAttribute('viewBox', `0 0 ${width} ${height}`); svg.setAttribute('width', width); svg.setAttribute('height', height);
+  svg.setAttribute('class', 'spark'); svg.setAttribute('role', 'img'); svg.setAttribute('aria-label', 'График');
+  const nums = values.filter(v => Number.isFinite(v));
+  if (nums.length < 2) return svg;
+  const lo = Math.min(...nums), hi = Math.max(...nums), span = hi - lo || 1, pad = 3;
+  const x = i => pad + (i * (width - 2 * pad)) / Math.max(1, values.length - 1);
+  const y = v => height - pad - ((v - lo) / span) * (height - 2 * pad);
+  let seg = [];
+  const flush = () => {
+    if (seg.length > 1) { const p = document.createElementNS(SVG_NS, 'polyline'); p.setAttribute('points', seg.join(' ')); p.setAttribute('class', 'spark-line'); svg.append(p); }
+    seg = [];
+  };
+  values.forEach((v, i) => { if (Number.isFinite(v)) seg.push(`${x(i).toFixed(1)},${y(v).toFixed(1)}`); else flush(); });
+  flush();
+  const lastI = values.map(Number.isFinite).lastIndexOf(true);
+  const dot = document.createElementNS(SVG_NS, 'circle');
+  dot.setAttribute('cx', x(lastI).toFixed(1)); dot.setAttribute('cy', y(values[lastI]).toFixed(1)); dot.setAttribute('r', '2.5'); dot.setAttribute('class', 'spark-dot');
+  svg.append(dot);
+  return svg;
+}
+
+// Оценка 1–5 пятью кнопками.
+export function ratingRow(label, field, value, onChange) {
+  const wrap = el('div', { class: 'rating', dataset: { field } }, el('span', { class: 'rating-label', textContent: label }));
+  const btns = [1, 2, 3, 4, 5].map(v => el('button', { type: 'button', class: 'rate', dataset: { field, v: String(v) }, textContent: String(v), 'aria-pressed': String(value === v),
+    onclick: () => { const next = wrap.value === v ? null : v; wrap.setValue(next); onChange(next); } }));
+  wrap.value = value ?? null;
+  wrap.setValue = v => { wrap.value = v; btns.forEach((b, i) => b.setAttribute('aria-pressed', String(v === i + 1))); };
+  wrap.append(el('div', { class: 'rate-btns' }, ...btns));
+  return wrap;
+}
+
+// Число кнопками «−» и «+» с единицами измерения.
+export function stepper({ label, field, value = null, min, max, step, unit, start = step }, onChange) {
+  const out = el('span', { class: 'step-val', dataset: { field }, textContent: '—' });
+  const wrap = el('div', { class: 'stepper', dataset: { field } }, el('span', { class: 'rating-label', textContent: label }));
+  const fmt = v => (v === null ? '—' : `${String(v).replace('.', ',')}${unit ? ' ' + unit : ''}`);
+  const set = v => { wrap.value = v === null ? null : Math.min(max, Math.max(min, Math.round(v * 100) / 100)); out.textContent = fmt(wrap.value); };
+  const bump = d => { if (wrap.value === null) set(start); else set(wrap.value + d); onChange(wrap.value); };
+  wrap.setValue = set;
+  wrap.append(el('div', { class: 'step-ctl' },
+    el('button', { type: 'button', class: 'step-btn', 'aria-label': `${label}: меньше`, textContent: '−', onclick: () => { if (wrap.value === null) return; if (wrap.value <= min) { set(null); onChange(null); } else bump(-step); } }),
+    out,
+    el('button', { type: 'button', class: 'step-btn', 'aria-label': `${label}: больше`, textContent: '+', onclick: () => bump(step) })));
+  set(value);
+  return wrap;
 }

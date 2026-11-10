@@ -152,12 +152,13 @@ export function serialize(events, now = Date.now()) {
 
 // ---------- профиль ----------
 export const PROFILE_ID = 'profile';
-export function makeProfile(name, now = Date.now(), prev = null) {
-  const clean = String(name ?? '').trim().slice(0, 60);
+export function makeProfile(name, now = Date.now(), prev = null, extra = {}) {
+  const base = prev?.payload ?? {};
+  const clean = String(name ?? base.name ?? '').trim().slice(0, 60);
   return {
     id: PROFILE_ID, type: 'profile', ts: prev?.ts ?? now,
-    // accountId — задел под будущую синхронизацию/аккаунт на сервере; сейчас нигде не отправляется
-    payload: { name: clean, accountId: prev?.payload?.accountId || newId(), updatedAt: now },
+    // accountId — задел под будущую синхронизацию; сейчас нигде не отправляется. Поля здоровья (рост, цель сна…) сохраняются при правках.
+    payload: { ...base, ...extra, name: clean, accountId: base.accountId || newId(), updatedAt: now },
     source: 'manual', confidence: 1, evidence: [],
   };
 }
