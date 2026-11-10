@@ -1,7 +1,7 @@
-import { makeTask, toggleTask, splitTasks, serialize, parseImport } from './events.js';
+import { makeTask, completeTask, reopenTask, groupTasks, todayStr, dueLabel, repeatLabel, serialize, parseImport } from './events.js';
 import * as db from './db.js';
 
-const VERSION = 'R0.2.1';
+const VERSION = 'R1.0';
 const $ = id => document.getElementById(id);
 let events = [];
 
@@ -12,25 +12,50 @@ function el(tag, props = {}, ...kids) {
   return n;
 }
 
-function item(ev) {
-  const li = el('li', { className: 'item' + (ev.payload.done ? ' done' : '') });
-  const check = el('button', { className: 'check', type: 'button', textContent: ev.payload.done ? '✓' : '' });
-  check.setAttribute('aria-label', ev.payload.done ? 'Вернуть в работу' : 'Отметить сделанным');
-  check.onclick = async () => { await db.put(toggleTask(ev)); await refresh(); };
-  const text = el('span', { className: 'text', textContent: ev.payload.text });
+function item(ev, today) {
+  const p = ev.payload;
+  const lab = dueLabel(p.due, today);
+  const li = el('li', { className: 'item' + (p.done ? ' done' : '') + (lab.cls === 'overdue' && !p.done ? ' is-overdue' : '') });
+  const check = el('button', { className: 'check', type: 'button', textContent: p.done ? '✓' : '' });
+  check.setAttribute('aria-label', p.done ? 'Вернуть в работу' : 'Отметить сделанным');
+  check.onclick = async () => {
+    if (!p.done) {
+      const { updated, next } = completeTask(ev);
+      await db.put(updated);
+      if (next) await db.put(next);
+    } else {
+      const { updated, removeId } = reopenTask(ev);
+      await db.put(updated);
+      const nxt = removeId && events.find(e => e.id === removeId);
+      if (nxt && !nxt.payload.done) await db.remove(removeId);
+    }
+    await refresh();
+  };
+  const metaBits = [];
+  if (lab.text && !p.done) metaBits.push(el('span', { className: lab.cls, textContent: lab.text }));
+  const rep = repeatLabel(p.repeat);
+  if (rep) metaBits.push(document.createTextNode((metaBits.length ? ' · ' : '') + '↻ ' + rep));
+  const body = el('div', { className: 'body' }, el('span', { className: 'text', textContent: p.text }));
+  if (metaBits.length) body.append(el('span', { className: 'meta' }, ...metaBits));
   const del = el('button', { className: 'del', type: 'button', textContent: '✕' });
   del.setAttribute('aria-label', 'Удалить');
   del.onclick = async () => { await db.remove(ev.id); await refresh(); };
-  li.append(check, text, del);
+  li.append(check, body, del);
   return li;
 }
 
 function render() {
-  const { open, done } = splitTasks(events);
-  $('open-list').replaceChildren(...open.map(item));
-  $('done-list').replaceChildren(...done.map(item));
-  $('done-count').textContent = done.length;
-  $('empty').hidden = open.length > 0;
+  const today = todayStr();
+  $('date').textContent = new Date().toLocaleDateString('ru', { weekday: 'long', day: 'numeric', month: 'long' });
+  const g = groupTasks(events, today);
+  for (const key of ['overdue', 'today', 'upcoming', 'nodate']) {
+    const sec = $('g-' + key);
+    sec.hidden = g[key].length === 0;
+    sec.querySelector('ul').replaceChildren(...g[key].map(e => item(e, today)));
+  }
+  $('done-list').replaceChildren(...g.done.map(e => item(e, today)));
+  $('done-count').textContent = g.done.length;
+  $('empty').hidden = g.openCount > 0;
 }
 
 async function refresh() {
@@ -45,8 +70,12 @@ $('add-form').addEventListener('submit', async e => {
   const input = $('add-input');
   const text = input.value.trim();
   if (!text) return;
+  const due = $('add-due').value || null;
+  const repeat = $('add-repeat').value || null;
   input.value = '';            // чистим сразу, чтобы быстрый ввод не терялся
-  await db.put(makeTask(text));
+  $('add-due').value = '';
+  $('add-repeat').value = '';
+  await db.put(makeTask(text, Date.now(), { due, repeat }));
   await refresh().then(renderDiag);
 });
 
@@ -111,3 +140,5 @@ if ('serviceWorker' in navigator) {
 }
 
 refresh().then(renderDiag);
+// вернулись в приложение — пересчитать «сегодня» (мог смениться день)
+document.addEventListener('visibilitychange', () => { if (!document.hidden) refresh(); });

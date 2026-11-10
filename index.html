@@ -13,19 +13,36 @@
 <body>
 <main>
   <header>
-    <h1>Задачи</h1>
+    <div>
+      <h1>Сегодня</h1>
+      <div id="date" class="date"></div>
+    </div>
     <span id="status" class="status" title="Версия и режим"></span>
   </header>
 
   <form id="add-form" autocomplete="off">
-    <input id="add-input" type="text" placeholder="Что нужно сделать?" enterkeyhint="done" maxlength="500" required>
-    <button type="submit" aria-label="Добавить">+</button>
+    <div class="add-row">
+      <input id="add-input" type="text" placeholder="Что нужно сделать?" enterkeyhint="done" maxlength="500" required>
+      <button type="submit" aria-label="Добавить">+</button>
+    </div>
+    <div class="opts-row">
+      <label>Срок <input id="add-due" type="date"></label>
+      <label>Повтор
+        <select id="add-repeat">
+          <option value="">не повторять</option>
+          <option value="daily">каждый день</option>
+          <option value="weekly">каждую неделю</option>
+          <option value="monthly">каждый месяц</option>
+        </select>
+      </label>
+    </div>
   </form>
 
-  <section>
-    <ul id="open-list" class="list"></ul>
-    <p id="empty" class="muted" hidden>Пока пусто. Добавь первую задачу.</p>
-  </section>
+  <section id="g-overdue" hidden><h2 class="overdue">Просрочено</h2><ul class="list open"></ul></section>
+  <section id="g-today" hidden><h2>Сегодня</h2><ul class="list open"></ul></section>
+  <section id="g-upcoming" hidden><h2>Скоро</h2><ul class="list open"></ul></section>
+  <section id="g-nodate" hidden><h2>Без срока</h2><ul class="list open"></ul></section>
+  <p id="empty" class="muted" hidden>Пока пусто. Добавь первую задачу.</p>
 
   <details id="done-block">
     <summary>Сделано: <span id="done-count">0</span></summary>
