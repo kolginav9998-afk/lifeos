@@ -91,7 +91,7 @@ function showLock() {
   $('app').hidden = true;
   $('lock').hidden = false;
   document.body.classList.remove('privacy');
-  $('lock-input').value = '';
+  $('lock-input').value = ''; $('lock-input').type = 'password'; $('lock-reveal').textContent = 'показать';
   $('lock-msg').textContent = '';
   $('forgot').open = false; $('reset-confirm').value = ''; $('reset-btn').disabled = true;
   views.more?.reset();
@@ -137,6 +137,7 @@ $('lock-form').addEventListener('submit', async e => {
     if (vault.failState().waitMs === 0) $('lock-btn').disabled = false;
   }
 });
+$('lock-reveal').onclick = () => { const i = $('lock-input'), show = i.type === 'password'; i.type = show ? 'text' : 'password'; $('lock-reveal').textContent = show ? 'скрыть' : 'показать'; };
 $('reset-confirm').oninput = () => { $('reset-btn').disabled = $('reset-confirm').value.trim().toUpperCase() !== 'СТЕРЕТЬ'; };
 $('reset-btn').onclick = async () => { $('reset-btn').disabled = true; await db.wipeAll(); location.reload(); };
 

@@ -37,15 +37,8 @@ jobs:
               <color name="ic_launcher_background">#0F1115</color>
           </resources>
           XML
-      - name: "Приватность Android — запретить автоматическое облачное резервирование данных приложения"
-        run: |
-          grep -q 'android:allowBackup="true"' android/app/src/main/AndroidManifest.xml
-          sed -i 's/android:allowBackup="true"/android:allowBackup="false"/' android/app/src/main/AndroidManifest.xml
-          grep -n 'allowBackup' android/app/src/main/AndroidManifest.xml
-      - name: Стабильная подпись (иначе новую версию нельзя поставить поверх старой)
-        run: |
-          mkdir -p ~/.android
-          cp signing/debug.keystore ~/.android/debug.keystore
+      - name: "Правки Android-проекта: запрет облачного автобэкапа и постоянный ключ подписи"
+        run: python3 scripts/patch-android.py android
       - name: Собрать debug-APK
         working-directory: android
         run: ./gradlew --no-daemon assembleDebug
@@ -55,6 +48,14 @@ jobs:
           cp android/app/build/outputs/apk/debug/app-debug.apk out/lifeos.apk
           ls -l out
           keytool -printcert -jarfile out/lifeos.apk | grep -E 'Owner|SHA256' || true
+      - name: "Проверить, что подпись — наш постоянный ключ (иначе обновление поверх не поставится)"
+        run: |
+          EXPECTED='77:BC:5B:96:55:C2:65:E4:E6:6F:64:A6:60:79:CA:31:DB:C6:CC:76:1C:DF:CE:DB:71:F6:45:C1:65:99:A4:56'
+          ACTUAL=$(keytool -printcert -jarfile out/lifeos.apk | grep 'SHA256:' | head -1 | sed 's/.*SHA256: //')
+          echo "Ожидаемый отпечаток: $EXPECTED"
+          echo "Фактический отпечаток: $ACTUAL"
+          test "$ACTUAL" = "$EXPECTED"
+
       - uses: actions/upload-artifact@v4
         with:
           name: lifeos-apk

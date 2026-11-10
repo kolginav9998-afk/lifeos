@@ -41,6 +41,19 @@ await addNote(page, SECRET_NOTE);
 assert.ok((await diskText(page)).includes('секретная задача'), 'до включения защиты данные лежат открыто (ожидаемо)');
 
 await tab(page, 'more');
+// подсказка надёжности, «показать пароль», отказ от самых известных
+await page.fill('#pw1', 'password');
+assert.match(await text(page, '#pw-strength'), /Надёжность: очень слабый/);
+await page.fill('#pw2', 'password'); await page.check('#pw-ack'); await page.click('#pw-enable');
+await expectToast(page, /Слишком известный пароль/);
+await page.fill('#pw1', PW);
+assert.match(await text(page, '#pw-strength'), /Надёжность: (хороший|отличный)/);
+assert.equal(await page.getAttribute('#pw1', 'type'), 'password');
+await page.click('#pw-form .pw-wrap:first-of-type .reveal');
+assert.equal(await page.getAttribute('#pw1', 'type'), 'text', 'пароль показан');
+await page.click('#pw-form .pw-wrap:first-of-type .reveal');
+assert.equal(await page.getAttribute('#pw1', 'type'), 'password');
+await page.uncheck('#pw-ack');
 // проверки формы: слабый пароль, несовпадение, нет галочки
 await page.fill('#pw1', 'short'); await page.fill('#pw2', 'short'); await page.check('#pw-ack'); await page.click('#pw-enable');
 await expectToast(page, /не короче 8/);
@@ -77,8 +90,14 @@ assert.equal(await page.locator('#app').isVisible(), false);
 let body = await page.evaluate(() => document.body.textContent);
 assert.ok(!body.includes('секретная') && !body.includes('сейфа') && !body.includes('мысль'), 'в странице нет данных, пока заблокировано');
 
+await page.fill('#lock-input', 'проверка-показа');
+await page.click('#lock-reveal');
+assert.equal(await page.getAttribute('#lock-input', 'type'), 'text');
 await unlock(page, 'неверный-пароль-1');
 await until(page, () => document.getElementById('lock-msg').textContent === 'Неверный пароль');
+assert.equal(await page.getAttribute('#lock-input', 'type'), 'text', 'выбор «показать» сохраняется до новой блокировки');
+await page.click('#lock-reveal');
+assert.equal(await page.getAttribute('#lock-input', 'type'), 'password');
 assert.equal(await lockVisible(page), true);
 for (let i = 2; i <= 5; i++) { await until(page, () => !document.getElementById('lock-btn').disabled); await unlock(page, `неверный-пароль-${i}`); await page.waitForTimeout(150); }
 await until(page, () => /Слишком много попыток/.test(document.getElementById('lock-msg').textContent), null, 10000);

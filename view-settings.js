@@ -1,4 +1,4 @@
-import { el, toast, setBusy, agoText } from './ui.js';
+import { el, toast, setBusy, agoText, revealable } from './ui.js';
 import * as vault from './vault.js';
 import * as db from './db.js';
 import * as store from './store.js';
@@ -11,7 +11,7 @@ import { getPref, setPref } from './prefs.js';
 import { VERSION } from './version.js';
 import * as notify from './notify.js';
 
-const TYPE_NAMES = { task: 'задачи', habit: 'привычки', habit_log: 'отметки привычек', expense: 'расходы', note: 'заметки' };
+const TYPE_NAMES = { task: 'задачи', habit: 'привычки', habit_log: 'отметки привычек', expense: 'расходы', income: 'доходы', note: 'заметки' };
 const AUTOLOCK = [[0, 'сразу при сворачивании'], [1, 'через 1 минуту'], [5, 'через 5 минут'], [15, 'через 15 минут'], [60, 'через час'], [-1, 'никогда']];
 
 function card(title, ...kids) { return el('section', { class: 'card settings-card' }, el('h3', { textContent: title }), ...kids); }
@@ -38,11 +38,17 @@ export function createSettingsView({ lockNow, applyTheme, onVaultChange }) {
     const p1 = field('pw1', { type: 'password', autocomplete: 'new-password', placeholder: 'Пароль (не короче 8 символов)' });
     const p2 = field('pw2', { type: 'password', autocomplete: 'new-password', placeholder: 'Повтори пароль' });
     const ack = el('input', { id: 'pw-ack', type: 'checkbox' });
+    const meter = el('div', { id: 'pw-strength', class: 'strength', 'aria-live': 'polite' });
+    p1.addEventListener('input', () => {
+      const st = vault.passwordStrength(p1.value);
+      meter.className = 'strength s' + st.score;
+      meter.textContent = p1.value ? `Надёжность: ${st.label}` : '';
+    });
     const btn = el('button', { id: 'pw-enable', type: 'submit', class: 'primary', textContent: 'Включить защиту' });
     const form = el('form', { id: 'pw-form', class: 'form-stack' },
       el('p', { class: 'muted', textContent: 'Все данные на этом устройстве будут зашифрованы (AES-256, ключ из твоего пароля). Приложение будет просить пароль при открытии и блокироваться само.' }),
       el('p', { class: 'warn', textContent: 'Забытый пароль восстановить нельзя: у меня его нет и получить его неоткуда. Сначала сохрани резервную копию (раздел ниже).' }),
-      p1, p2, el('label', { class: 'check-label' }, ack, ' Я понимаю: без пароля данные не открыть'), btn);
+      revealable(p1), meter, revealable(p2), el('label', { class: 'check-label' }, ack, ' Я понимаю: без пароля данные не открыть'), btn);
     form.onsubmit = async e => {
       e.preventDefault();
       if (p1.value !== p2.value) return toast('Пароли не совпадают');
@@ -70,7 +76,7 @@ export function createSettingsView({ lockNow, applyTheme, onVaultChange }) {
     const n1 = field('pw-new1', { type: 'password', autocomplete: 'new-password', placeholder: 'Новый пароль' });
     const n2 = field('pw-new2', { type: 'password', autocomplete: 'new-password', placeholder: 'Повтори новый пароль' });
     const chBtn = el('button', { id: 'pw-change', type: 'submit', textContent: 'Сменить пароль' });
-    const chForm = el('form', { class: 'form-stack' }, o, n1, n2, chBtn);
+    const chForm = el('form', { class: 'form-stack' }, revealable(o), revealable(n1), revealable(n2), chBtn);
     chForm.onsubmit = async e => {
       e.preventDefault();
       if (n1.value !== n2.value) return toast('Новые пароли не совпадают');
@@ -83,7 +89,7 @@ export function createSettingsView({ lockNow, applyTheme, onVaultChange }) {
     const off = field('pw-off', { type: 'password', autocomplete: 'current-password', placeholder: 'Пароль для подтверждения' });
     const offBtn = el('button', { id: 'pw-disable', type: 'submit', class: 'danger', textContent: 'Отключить защиту' });
     const offForm = el('form', { class: 'form-stack' },
-      el('p', { class: 'muted', textContent: 'Данные снова будут храниться без шифрования, вход по паролю пропадёт.' }), off, offBtn);
+      el('p', { class: 'muted', textContent: 'Данные снова будут храниться без шифрования, вход по паролю пропадёт.' }), revealable(off), offBtn);
     offForm.onsubmit = async e => {
       e.preventDefault();
       setBusy(offBtn, true, 'Расшифровываю…');
@@ -129,17 +135,17 @@ export function createSettingsView({ lockNow, applyTheme, onVaultChange }) {
     try { await saveTextFile(`lifeos-${stamp()}.json`, serialize(store.state.events)); setPref('lastBackupAt', Date.now()); renderStats(); toast(`Сохранено записей: ${store.state.events.length}`); }
     catch (err) { toast('Не удалось сохранить: ' + (err?.message || err)); }
   };
-  const csvBtn = el('button', { id: 'export-csv', type: 'button', textContent: 'Расходы для Excel (CSV)', onclick: () => exportCsv() });
+  const csvBtn = el('button', { id: 'export-csv', type: 'button', textContent: 'Расходы и доходы для Excel (CSV)', onclick: () => exportCsv() });
   const mdBtn = el('button', { id: 'export-md', type: 'button', textContent: 'Всё читаемо (Markdown)', onclick: () => saveTextFile(`lifeos-${stamp()}.md`, toMarkdown(store.state.events), 'text/markdown').catch(err => toast(err.message)) });
   async function exportCsv() {
-    try { await saveTextFile(`expenses-${stamp()}.csv`, expensesToCsv(store.state.events), 'text/csv'); }
+    try { await saveTextFile(`money-${stamp()}.csv`, expensesToCsv(store.state.events), 'text/csv'); }
     catch (err) { toast('Не удалось сохранить: ' + (err?.message || err)); }
   }
 
   const impInput = el('input', { id: 'import-input', type: 'file', accept: '.json,application/json', hidden: true });
   const impPass = field('imp-pass', { type: 'password', autocomplete: 'current-password', placeholder: 'Пароль от этой копии' });
   const impGo = el('button', { id: 'imp-go', type: 'button', class: 'primary', textContent: 'Расшифровать и восстановить' });
-  const impRow = el('div', { id: 'imp-row', class: 'row', hidden: true }, impPass, impGo);
+  const impRow = el('div', { id: 'imp-row', class: 'row', hidden: true }, revealable(impPass), impGo);
   async function runImport(text, password) {
     try {
       const r = await readBackup(text, password);
@@ -263,7 +269,7 @@ export function createSettingsView({ lockNow, applyTheme, onVaultChange }) {
     card('Профиль', nameForm),
     card('Защита паролем', secBox),
     card('Резервные копии и экспорт',
-      el('div', { class: 'form-stack' }, bkPass, bkBtn),
+      el('div', { class: 'form-stack' }, revealable(bkPass), bkBtn),
       el('div', { class: 'row wrap' }, plainBtn, csvBtn, mdBtn),
       el('div', { class: 'row wrap' }, impLabel), impRow),
     card('Внешний вид и поведение',

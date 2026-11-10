@@ -4,6 +4,7 @@ import { parseQuick } from './quick.js';
 import { getPref, setPref } from './prefs.js';
 import { activeHabits } from './habits.js';
 import { weekReview } from './review.js';
+import { dayLog } from './journal.js';
 import { spentBetween } from './money.js';
 import * as store from './store.js';
 
@@ -89,6 +90,21 @@ export function createTodayView({ go }) {
   const reviewBody = el('div', { class: 'review-body' });
   const review = el('details', { id: 'review', class: 'card' }, el('summary', { textContent: 'Итоги недели' }), reviewBody);
 
+  // ----- журнал дня -----
+  const jDate = el('input', { id: 'journal-date', type: 'date', value: todayStr() });
+  const jList = el('ul', { id: 'journal-list', class: 'journal' });
+  const journal = el('details', { id: 'journal', class: 'card' }, el('summary', { textContent: 'Журнал дня' }),
+    el('div', { class: 'row' }, jDate, el('button', { type: 'button', textContent: 'Сегодня', onclick: () => { jDate.value = todayStr(); renderJournal(); } })), jList);
+  jDate.oninput = () => renderJournal();
+  function renderJournal() {
+    const date = jDate.value || todayStr();
+    const log = dayLog(events, date);
+    jList.replaceChildren(...(log.length ? log.map(x => el('li', {},
+      el('span', { class: 'muted j-time', textContent: new Date(x.ts).toLocaleTimeString('ru', { hour: '2-digit', minute: '2-digit' }) }),
+      el('span', { class: 'j-kind', textContent: x.kind }), el('span', { class: 'j-text', textContent: x.text })))
+      : [el('li', { class: 'muted', textContent: 'В этот день записей нет.' })]));
+  }
+
   // ----- списки -----
   const sections = {};
   for (const [key, title, cls] of [['overdue', 'Просрочено', 'overdue'], ['today', 'Сегодня', ''], ['upcoming', 'Скоро', ''], ['nodate', 'Без срока', '']]) {
@@ -107,7 +123,7 @@ export function createTodayView({ go }) {
     toast(`Удалено сделанных: ${ids.length}`, { actionLabel: 'Отменить', onAction: () => store.saveMany(old) });
   };
 
-  root.append(hello, dateLine, summary, onboarding, form, review, ...Object.values(sections).map(s => s.sec), empty, doneBlock);
+  root.append(hello, dateLine, summary, onboarding, form, review, journal, ...Object.values(sections).map(s => s.sec), empty, doneBlock);
 
   // ----- элементы списка -----
   async function removeTask(ev) {
@@ -234,6 +250,7 @@ export function createTodayView({ go }) {
     empty.hidden = g.openCount > 0;
     renderSummary(g, today);
     renderReview(today);
+    renderJournal();
   }
 
   return {

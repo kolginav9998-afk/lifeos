@@ -25,9 +25,29 @@ export function hasVault() { try { return !!storage.getItem(META); } catch { ret
 export const isUnlocked = () => dek !== null;
 export function status() { return !hasVault() ? 'none' : dek ? 'unlocked' : 'locked'; }
 
+const COMMON = ['password', 'password1', 'qwertyui', 'qwerty123', 'qwertyuiop', '12345678', '123456789', '1234567890', '11111111', '00000000', 'iloveyou', 'admin123',
+  'letmein1', 'welcome1', 'йцукенгш', 'йцукенгшщзх', '12341234', 'abcd1234', 'qazwsxedc', '1q2w3e4r', 'password123', 'qwerty12', 'lifeos123'];
+
+// Оценка надёжности для подсказки в форме (не заменяет проверку checkPassword).
+export function passwordStrength(pw) {
+  const p = String(pw ?? '');
+  if (!p) return { score: 0, label: '' };
+  if (COMMON.includes(p.toLowerCase())) return { score: 0, label: 'очень слабый: так обычно не делают' };
+  let score = 0;
+  if (p.length >= 8) score++;
+  if (p.length >= 12) score++;
+  if (p.length >= 16) score++;
+  const classes = [/[a-zа-яё]/.test(p), /[A-ZА-ЯЁ]/.test(p), /\d/.test(p), /[^\p{L}\d]/u.test(p)].filter(Boolean).length;
+  if (classes >= 3) score++;
+  if (new Set(p).size < Math.max(4, p.length / 3)) score = Math.max(0, score - 1);   // много повторов
+  score = Math.min(4, score);
+  return { score, label: ['очень слабый', 'слабый', 'средний', 'хороший', 'отличный'][score] };
+}
+
 export function checkPassword(pw) {
   if (typeof pw !== 'string' || pw.length < MIN_PASSWORD) return `Пароль должен быть не короче ${MIN_PASSWORD} символов`;
   if (/^(.)\1+$/.test(pw)) return 'Пароль не должен состоять из одного повторяющегося символа';
+  if (COMMON.includes(pw.toLowerCase())) return 'Слишком известный пароль: его подберут первым';
   return null;
 }
 

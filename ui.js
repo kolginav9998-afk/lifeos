@@ -68,3 +68,10 @@ export function agoText(ts, now = Date.now()) {
   const d = Math.floor((now - ts) / 86400000);
   return d <= 0 ? 'сегодня' : d === 1 ? 'вчера' : `${d} дн. назад`;
 }
+
+// Поле пароля с кнопкой «показать/скрыть» (меньше опечаток на телефоне).
+export function revealable(input) {
+  const btn = el('button', { type: 'button', class: 'reveal', textContent: 'показать', 'aria-label': 'Показать или скрыть пароль' });
+  btn.onclick = () => { const show = input.type === 'password'; input.type = show ? 'text' : 'password'; btn.textContent = show ? 'скрыть' : 'показать'; };
+  return el('div', { class: 'pw-wrap' }, input, btn);
+}

@@ -144,3 +144,18 @@ html.amounts-hidden .amount{letter-spacing:.1em}
 .pre{white-space:pre-line}
 .bar-col.current .bar-fill{background:var(--ok)}
 .chart-title{margin:10px 0 0}
+
+/* ---- переключатель, быстрые траты, журнал ---- */
+.seg-group{display:grid;grid-template-columns:1fr 1fr;gap:4px;background:var(--soft);padding:4px;border-radius:12px}
+.seg{border:0;background:none;border-radius:9px;min-height:40px;color:var(--muted)}
+.seg[aria-pressed=true]{background:var(--card);color:var(--text);font-weight:600;box-shadow:0 1px 2px rgba(0,0,0,.08)}
+.amount.plus{color:var(--ok)}
+.chip.quick,.chip.tpl{min-height:40px}
+.journal{list-style:none;margin:8px 0 0;padding:0;display:flex;flex-direction:column;gap:6px}
+.journal li{display:flex;gap:8px;align-items:baseline;font-size:.9rem}
+.j-time{min-width:42px}.j-kind{color:var(--accent);font-size:.75rem;min-width:70px}.j-text{overflow-wrap:anywhere}
+.pw-wrap{position:relative}
+.pw-wrap input{padding-right:84px}
+.pw-wrap .reveal{position:absolute;right:4px;top:4px;min-height:36px;padding:0 10px;border:0;background:none;color:var(--accent);font-size:.8rem}
+.strength{font-size:.85rem;margin:-2px 0 2px}
+.strength.s0,.strength.s1{color:var(--danger)}.strength.s2{color:var(--warn)}.strength.s3,.strength.s4{color:var(--ok)}

@@ -2,11 +2,15 @@ import test from 'node:test';
 import assert from 'node:assert/strict';
 import { makeTask, completeTask, todayStr, parseImport, serialize, cleanEvent, makeProfile, profileOf, groupTasks, updateTask } from '../events.js';
 import { makeHabit, makeHabitLog, habitStats, habitCalendar, activeHabits, habitLogId, archiveHabit, updateHabit, logsOf } from '../habits.js';
+import { makeIncome, makeEntry, balanceOfMonth, frequentEntries, INCOME_CATEGORIES, KINDS, monthTotals as monthTotals0 } from '../money.js';
 import { parseAmount, formatMoney, makeExpense, updateExpense, summarizeMonth, shiftMonth, monthLabel, spentBetween, categoriesUsed,
   makeBudget, budgetOf, expensesToCsv, csvCell, DEFAULT_CATEGORIES } from '../money.js';
 import { makeNote, updateNote, noteTitle, sortedNotes } from '../notes.js';
 import { searchEvents, normalize } from '../search.js';
 import { weekReview } from '../review.js';
+import { dayLog } from '../journal.js';
+import { HABIT_TEMPLATES } from '../habits.js';
+import { passwordStrength, checkPassword } from '../vault.js';
 import { parseQuick } from '../quick.js';
 import { toMarkdown } from '../export.js';
 import { encryptBackup, decryptBackup, readBackup, backupKind, BadBackupPasswordError, NeedPasswordError } from '../backup.js';
@@ -134,7 +138,8 @@ test('CSV: разделитель, BOM, кавычки и защита от фо
   const ev = [makeExpense({ amount: '1500,5', category: 'Еда', note: '=HYPERLINK("http://x")', date: '2026-11-02' }, NOW),
     makeExpense({ amount: '10', category: 'A;B', note: 'строка\nвторая', date: '2026-11-01' }, NOW)];
   const csv = expensesToCsv(ev);
-  assert.ok(csv.startsWith('﻿Дата;Сумма;Категория;Комментарий\r\n'));
+  assert.ok(csv.startsWith('\ufeffТип;Дата;Сумма;Категория;Комментарий\r\n'));
+  assert.ok(csv.includes('Расход;2026-11-02;1500,50;Еда;'), 'строка расхода');
   assert.ok(csv.includes("'=HYPERLINK"), 'ячейка с «=» экранирована');
   assert.ok(csv.includes('"A;B"'));
   assert.ok(csv.includes('"строка\nвторая"'));
@@ -301,7 +306,7 @@ test('Markdown-экспорт содержит все разделы и не л�
     makeNote('текст заметки', NOW), makeExpense({ amount: '100', category: 'Еда', note: 'x\ny', date: TODAY }, NOW), makeHabit({ name: 'Бег' }, NOW)], NOW);
   for (const part of ['## Задачи', '- [ ] задача ★ (до 2026-11-10)', '- [x] готово', '## Привычки', '**Бег**', '## Заметки', 'текст заметки', '## Расходы', '100 ₽', 'x y']) assert.ok(md.includes(part), part);
   const empty = toMarkdown([], NOW);
-  assert.equal((empty.match(/_нет_/g) || []).length, 4);
+  assert.equal((empty.match(/_нет_/g) || []).length, 5);
 });
 
 // ---------- напоминания ----------
@@ -355,4 +360,79 @@ test('расходы по месяцам: шесть месяцев, нули т
   assert.deepEqual(r.map(x => x.ym), ['2026-06', '2026-07', '2026-08', '2026-09', '2026-10', '2026-11']);
   assert.deepEqual(r.map(x => x.total), [0, 0, 0, 5000, 0, 10000]);
   assert.equal(monthTotals(ev, '2026-01', 3)[0].ym, '2025-11', 'через границу года');
+});
+
+// ---------- доходы и баланс ----------
+test('доходы: создание, правка сохраняет тип, баланс месяца, категории по типу', () => {
+  const inc = makeIncome({ amount: '100 000', category: 'Зарплата', date: '2026-11-05' }, NOW);
+  const ex = makeExpense({ amount: '34 540,50', category: 'Еда', date: '2026-11-06' }, NOW);
+  const other = makeIncome({ amount: '5000', date: '2026-10-05' }, NOW);
+  assert.equal(inc.type, 'income'); assert.equal(other.payload.category, 'Другое');
+  assert.deepEqual(balanceOfMonth([inc, ex, other], '2026-11'), { income: 10000000, expense: 3454050, balance: 6545950 });
+  assert.equal(balanceOfMonth([ex], '2026-11').balance, -3454050, 'отрицательный баланс');
+  assert.equal(summarizeMonth([inc, ex], '2026-11', 'income').total, 10000000);
+  assert.equal(summarizeMonth([inc, ex], '2026-11').total, 3454050, 'по умолчанию — расходы');
+  const u = updateExpense(inc, { amount: '120000', category: 'Зарплата', note: 'премия', date: '2026-11-05' }, NOW + 1);
+  assert.equal(u.type, 'income'); assert.equal(u.payload.amountMinor, 12000000);
+  assert.deepEqual(categoriesUsed([inc], 'income').slice(0, 2), ['Зарплата', 'Подработка']);
+  assert.ok(!categoriesUsed([], 'income').includes('Еда'));
+  assert.equal(monthTotals0([inc, ex], '2026-11', 2, 'income')[1].total, 10000000);
+  assert.throws(() => makeEntry('gift', { amount: '1' }));
+  assert.equal(KINDS.income.categories, INCOME_CATEGORIES);
+});
+test('CSV и Markdown содержат и доходы, и расходы; поиск находит доходы', () => {
+  const ev = [makeIncome({ amount: '1000', category: 'Зарплата', note: 'аванс', date: TODAY }, NOW), makeExpense({ amount: '50', category: 'Еда', date: TODAY }, NOW)];
+  const csv = expensesToCsv(ev);
+  assert.ok(csv.includes('Доход;' + TODAY + ';1000,00;Зарплата;аванс') && csv.includes('Расход;' + TODAY + ';50,00;Еда;'));
+  const md = toMarkdown(ev, NOW);
+  assert.ok(md.includes('## Доходы') && md.includes('аванс'));
+  assert.equal(searchEvents(ev, 'аванс')[0].kind, 'Доход');
+  assert.equal(searchEvents(ev, 'аванс')[0].tab, 'money');
+  assert.equal(weekReview(ev, TODAY).income, 100000);
+});
+test('частые траты: пары «категория + сумма» от двух раз, по убыванию', () => {
+  const mk = (c, a, d) => makeExpense({ amount: a, category: c, date: d }, at(2026, 11, Number(d.slice(-2))));
+  const ev = [mk('Еда', '350', '2026-11-01'), mk('Еда', '350', '2026-11-02'), mk('Еда', '350', '2026-11-03'), mk('Транспорт', '60', '2026-11-04'), mk('Транспорт', '60', '2026-11-05'),
+    mk('Еда', '700', '2026-11-06'), mk('Кино', '500', '2026-11-07')];
+  const f = frequentEntries(ev, 'expense');
+  assert.deepEqual(f.map(x => [x.category, x.amountMinor, x.count]), [['Еда', 35000, 3], ['Транспорт', 6000, 2]]);
+  assert.deepEqual(frequentEntries(ev, 'income'), []);
+  assert.equal(frequentEntries(ev, 'expense', 1).length, 1);
+  assert.equal(frequentEntries(ev, 'expense', 4, 1).length, 4, 'порог можно снизить');
+});
+
+// ---------- журнал дня ----------
+test('журнал дня: задачи, привычки, деньги, заметки — по времени, только за выбранный день', () => {
+  const h = makeHabit({ name: 'Бег' }, at(2026, 11, 1));
+  const t = completeTask(makeTask('отчёт', at(2026, 11, 9)), at(2026, 11, 10, 15)).updated;
+  const old = completeTask(makeTask('вчера', at(2026, 11, 8)), at(2026, 11, 9, 15)).updated;
+  const l = makeHabitLog(h, TODAY, 'min', at(2026, 11, 10, 8));
+  const e = makeExpense({ amount: '120', category: 'Еда', note: 'кофе', date: TODAY }, at(2026, 11, 10, 12));
+  const i = makeIncome({ amount: '500', category: 'Подарок', date: TODAY }, at(2026, 11, 10, 13));
+  const n = makeNote('идея\nвторая строка', at(2026, 11, 10, 20));
+  const other = makeNote('вчерашняя', at(2026, 11, 9, 20));
+  const log = dayLog([h, t, old, l, e, i, n, other], TODAY);
+  assert.deepEqual(log.map(x => x.kind), ['Привычка', 'Расход', 'Доход', 'Задача', 'Заметка']);
+  assert.equal(log[0].text, 'Бег — минимум');
+  assert.equal(log[1].text, '−120\u00a0₽ · Еда — кофе');
+  assert.equal(log[2].text, '+500\u00a0₽ · Подарок');
+  assert.equal(log[4].text, 'идея');
+  assert.deepEqual(dayLog([h, t], '2026-11-12'), []);
+});
+
+// ---------- шаблоны привычек и пароли ----------
+test('шаблоны привычек валидны (из них можно создать привычку)', () => {
+  assert.ok(HABIT_TEMPLATES.length >= 4);
+  for (const tpl of HABIT_TEMPLATES) { const h = makeHabit(tpl, NOW); assert.equal(h.payload.name, tpl.name); assert.ok(tpl.minimum && tpl.anchor); }
+});
+test('надёжность пароля: подсказка и отказ от самых известных', () => {
+  assert.equal(passwordStrength('').score, 0);
+  assert.equal(passwordStrength('password').score, 0);
+  assert.ok(passwordStrength('abcdefgh').score <= 1);
+  assert.ok(passwordStrength('длинная-надёжная-фраза-для-входа').score >= 3);
+  assert.ok(passwordStrength('Ab1!Ab1!Ab1!Ab1!xY').score >= 3);
+  assert.ok(passwordStrength('aaaaaaaaaaaaaaaaaaaa').score <= 2, 'длинный, но однообразный');
+  for (const bad of ['password', 'PASSWORD', '12345678', 'qwertyui', 'йцукенгш', 'Password1']) assert.match(checkPassword(bad) || '', /известный/, bad);
+  assert.equal(checkPassword('длинная-надёжная-фраза'), null);
+  assert.match(checkPassword('коротк'), /не короче/);
 });

@@ -1,7 +1,7 @@
 // Недельный обзор: что сделано, как с привычками, куда ушли деньги. Только факты из твоих данных.
 import { addDays, todayStr } from './events.js';
 import { activeHabits } from './habits.js';
-import { spentBetween } from './money.js';
+import { spentBetween, sumBetween } from './money.js';
 import { logsOf } from './habits.js';
 
 const localDate = ts => todayStr(ts);
@@ -30,6 +30,7 @@ export function weekReview(events, today) {
   return {
     from, to: today, tasksDone, prevDone, perDay, habits,
     spent: spentBetween(events, from, today),
+    income: sumBetween(events, 'income', from, today),
     spentPrev: spentBetween(events, prevFrom, prevTo),
     notes: events.filter(e => e.type === 'note' && localDate(e.ts) >= from).length,
   };

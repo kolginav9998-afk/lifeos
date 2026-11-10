@@ -119,7 +119,7 @@ await waitCount('#exp-list .item', 2);
 
 const [csv] = await Promise.all([page.waitForEvent('download'), page.click('#csv-btn')]);
 const csvText = fs.readFileSync(await csv.path(), 'utf8');
-assert.ok(csvText.startsWith('﻿Дата;Сумма;Категория;Комментарий'));
+assert.ok(csvText.startsWith('\ufeffТип;Дата;Сумма;Категория;Комментарий'));
 assert.ok(csvText.includes(';2000,00;Еда;хлеб'));
 
 await page.locator('#exp-list .item', { hasText: 'Жильё' }).locator('.del').click();   // удаление с отменой
@@ -194,7 +194,7 @@ await page.selectOption('#theme-select', 'auto');
 assert.equal(await page.evaluate(() => document.documentElement.getAttribute('data-theme')), null);
 assert.match(await text('#stats'), /задачи|привычки/);
 assert.match(await text('#stats'), /расходы: 2/);
-assert.match(await text('#diag'), /Версия R2\.1/);
+assert.match(await text('#diag'), /Версия R2\.2/);
 assert.match(await text('#diag'), /Запуск №\d+/);
 assert.match(await text('#diag'), /Пароль: не задан/);
 

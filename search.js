@@ -12,10 +12,11 @@ function searchable(e) {
     case 'note': return { kind: 'Заметка', title: p.text.split('\n').find(l => l.trim()) || '', text: p.text };
     case 'habit': return { kind: 'Привычка', title: p.name, text: [p.name, p.anchor, p.minimum, p.full].join(' ') };
     case 'expense': return { kind: 'Расход', title: `${p.category}${p.note ? ' — ' + p.note : ''}`, text: [p.category, p.note, (p.amountMinor / 100).toFixed(2), p.date].join(' ') };
+    case 'income': return { kind: 'Доход', title: `${p.category}${p.note ? ' — ' + p.note : ''}`, text: [p.category, p.note, (p.amountMinor / 100).toFixed(2), p.date].join(' ') };
     default: return null;
   }
 }
-export const TAB_OF = { task: 'today', note: 'notes', habit: 'habits', expense: 'money' };
+export const TAB_OF = { task: 'today', note: 'notes', habit: 'habits', expense: 'money', income: 'money' };
 
 export function searchEvents(events, query, limit = 50) {
   const tokens = normalize(query).split(/\s+/).filter(Boolean);

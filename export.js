@@ -27,5 +27,9 @@ export function toMarkdown(events, now = Date.now()) {
   const ex = events.filter(e => e.type === 'expense').sort((a, b) => a.payload.date.localeCompare(b.payload.date));
   for (const e of ex) L.push(`- ${e.payload.date} — ${formatMoney(e.payload.amountMinor)} — ${esc(e.payload.category)}${e.payload.note ? ` (${esc(e.payload.note)})` : ''}`);
   if (!ex.length) L.push('_нет_');
+  L.push('', '## Доходы', '');
+  const inc = events.filter(e => e.type === 'income').sort((a, b) => a.payload.date.localeCompare(b.payload.date));
+  for (const e of inc) L.push(`- ${e.payload.date} — ${formatMoney(e.payload.amountMinor)} — ${esc(e.payload.category)}${e.payload.note ? ` (${esc(e.payload.note)})` : ''}`);
+  if (!inc.length) L.push('_нет_');
   return L.join('\n') + '\n';
 }

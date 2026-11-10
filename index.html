@@ -21,7 +21,7 @@
     <h1>Life OS</h1>
     <p class="muted">Введи пароль, чтобы открыть данные</p>
     <form id="lock-form" autocomplete="off">
-      <input id="lock-input" type="password" autocomplete="current-password" placeholder="Пароль" aria-label="Пароль" required>
+      <div class="pw-wrap"><input id="lock-input" type="password" autocomplete="current-password" placeholder="Пароль" aria-label="Пароль" required><button id="lock-reveal" type="button" class="reveal" aria-label="Показать или скрыть пароль">показать</button></div>
       <button id="lock-btn" type="submit" class="primary">Открыть</button>
     </form>
     <p id="lock-msg" class="error" role="alert"></p>

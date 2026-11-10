@@ -85,3 +85,12 @@ export function activeHabits(events, today) {
   return hs.map(h => ({ h, st: habitStats(h, events, today) }))
     .sort((a, b) => Number(a.st.doneToday) - Number(b.st.doneToday) || a.h.ts - b.h.ts);
 }
+
+// Готовые заготовки для быстрого старта (подставляются в форму, ничего не сохраняют сами).
+export const HABIT_TEMPLATES = [
+  { name: 'Вода', anchor: 'после пробуждения', minimum: 'один глоток', full: 'стакан воды' },
+  { name: 'Зарядка', anchor: 'после пробуждения', minimum: '5 приседаний', full: '10 минут зарядки' },
+  { name: 'Чтение', anchor: 'перед сном', minimum: 'одна страница', full: '20 минут чтения' },
+  { name: 'Прогулка', anchor: 'после обеда', minimum: 'выйти на улицу', full: '20 минут пешком' },
+  { name: 'Английский', anchor: 'после завтрака', minimum: '5 слов', full: '15 минут практики' },
+];

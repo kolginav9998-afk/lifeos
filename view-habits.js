@@ -1,6 +1,6 @@
 import { el, toast } from './ui.js';
 import { todayStr } from './events.js';
-import { makeHabit, updateHabit, archiveHabit, makeHabitLog, habitStats, habitCalendar, activeHabits, logsOf } from './habits.js';
+import { HABIT_TEMPLATES, makeHabit, updateHabit, archiveHabit, makeHabitLog, habitStats, habitCalendar, activeHabits, logsOf } from './habits.js';
 import { getPref, setPref } from './prefs.js';
 import * as store from './store.js';
 
@@ -23,7 +23,9 @@ export function createHabitsView() {
   const anchor = el('input', { id: 'habit-anchor', type: 'text', placeholder: 'После чего? Например «после завтрака»', maxLength: 200, autocomplete: 'off' });
   const minimum = el('input', { id: 'habit-min', type: 'text', placeholder: 'Версия на 2 минуты: «открыть редактор»', maxLength: 200, autocomplete: 'off' });
   const full = el('input', { id: 'habit-full', type: 'text', placeholder: 'Полная версия: «20 минут практики»', maxLength: 200, autocomplete: 'off' });
-  const form = el('form', { id: 'habit-form', class: 'form-stack' }, name, anchor, minimum, full,
+  const templates = el('div', { id: 'habit-templates', class: 'chips' }, ...HABIT_TEMPLATES.map(t =>
+    el('button', { type: 'button', class: 'chip tpl', textContent: t.name, onclick: () => { name.value = t.name; anchor.value = t.anchor; minimum.value = t.minimum; full.value = t.full; name.focus(); } })));
+  const form = el('form', { id: 'habit-form', class: 'form-stack' }, el('span', { class: 'muted', textContent: 'Быстрый старт — выбери заготовку и поправь под себя:' }), templates, name, anchor, minimum, full,
     el('button', { type: 'submit', class: 'primary', textContent: 'Добавить привычку' }));
   const addBox = el('details', { id: 'habit-add', class: 'card habit-add' }, el('summary', { textContent: '＋ Новая привычка' }), form);
   form.onsubmit = async e => {
