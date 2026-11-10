@@ -15,6 +15,8 @@ node --test tests/events.test.mjs          # юнит-тесты
 node tests/e2e.mjs                         # браузер, офлайн, экспорт/импорт (нужен playwright)
 ```
 
+Идеи и план этапов: [docs/IDEAS.md](docs/IDEAS.md)
+
 ## Модель данных
 Всё — события: `{id, type, ts, payload, source, confidence, evidence}`.
 Задача = событие `type: "task"`. Новые модули (расходы, заметки, навыки) добавляются
