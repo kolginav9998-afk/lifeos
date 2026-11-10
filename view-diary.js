@@ -63,7 +63,8 @@ export function createDiaryView() {
     if (!dText.value.startsWith(head)) dText.value = head + dText.value;
     dirty.d = true; paintTags(); dText.focus(); dText.setSelectionRange(dText.value.length, dText.value.length);
   } });
-  const qRow = el('div', { class: 'row wrap hint' }, el('span', { textContent: 'Вопрос дня: ' }), qText, qBtn);
+  qText.className = 'q-text';
+  const qRow = el('div', { class: 'q-row' }, el('span', { class: 'q-label', textContent: 'Вопрос дня' }), qText, qBtn);
   const past = el('div', { id: 'diary-past' });
   const dBox = el('details', { id: 'diary-box', class: 'card', open: true }, dSum, el('div', { class: 'form-stack' }, qRow, dText, tags, dHigh, ...dG, el('div', { class: 'row' }, dSave, dDel), past));
 

@@ -151,5 +151,6 @@ export function createInsightsView() {
     }
   }
 
-  return { root, update(evs) { events = evs; render(); }, show() { render(); } };
+  // Тяжёлые расчёты (связи, подсказки) делаем только когда экран открыт: обновления данных на других вкладках их не запускают.
+  return { root, update(evs) { events = evs; if (!root.hidden) render(); }, show() { render(); } };
 }

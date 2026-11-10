@@ -119,7 +119,7 @@ export function createTestsView() {
     update(evs) {
       events = evs;
       if (running && !evs.length && runner) { runner.abort(); return; }       // приложение заблокировано
-      if (!running) render();
+      if (!running && !root.hidden) render();
     },
     show() { if (!running) render(); },
   };

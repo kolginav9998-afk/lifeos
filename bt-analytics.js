@@ -146,8 +146,8 @@ export function insights(events, now = Date.now()) {
     const doms = Object.entries(last.domains).map(([d, z]) => ({ d, z })).sort((a, b) => a.z - b.z);
     const low = doms.filter(x => x.z <= -1), high = doms.filter(x => x.z >= 1);
     const parts = [];
-    if (low.length) parts.push('ниже обычного: ' + low.map(x => DOMAINS[x.d].toLowerCase()).join(', '));
-    if (high.length) parts.push('выше обычного: ' + high.map(x => DOMAINS[x.d].toLowerCase()).join(', '));
+    if (low.length) parts.push('Ниже обычного: ' + low.map(x => DOMAINS[x.d].toLowerCase()).join(', '));
+    if (high.length) parts.push((parts.length ? 'выше' : 'Выше') + ' обычного: ' + high.map(x => DOMAINS[x.d].toLowerCase()).join(', '));
     out.push({ id: 'latest', kind: last.composite <= -1 ? 'warn' : last.composite >= 1 ? 'good' : 'info', conf: 'mid',
       title: `Последняя проверка: ${zWord(last.composite)}`, text: `Общий результат ${zText(last.composite)} относительно твоей нормы.${parts.length ? ' ' + parts.join('; ') + '.' : ''} Один день — не вывод: смотри на несколько дней подряд.` });
   }
@@ -183,7 +183,10 @@ export function insights(events, now = Date.now()) {
 
   // 5. Связи с образом жизни (с поправкой на множественные сравнения)
   const cors = correlations(rows).filter(c => c.q <= FDR_LIMIT && Math.abs(c.rho) >= 0.3);
-  for (const c of cors.slice(0, 4)) {
+  const byFactor = new Map();                       // по одному выводу на фактор: общий результат важнее частных областей
+  for (const c of cors) { const cur = byFactor.get(c.x); if (!cur || (c.y === 'composite' && cur.y !== 'composite')) byFactor.set(c.x, c); }
+  const picked = [...byFactor.values()].sort((a, b) => a.p - b.p || Math.abs(b.rho) - Math.abs(a.rho));
+  for (const c of picked.slice(0, 4)) {
     let extra = '';
     if (c.x === 'sleepHours' && c.y === 'composite') {
       const g = groupDiff(rows, 'sleepHours', 7);
@@ -191,7 +194,7 @@ export function insights(events, now = Date.now()) {
     }
     out.push({ id: `rel-${c.x}-${c.y}`, kind: 'relation', conf: c.n >= 30 && c.q <= 0.1 ? 'high' : 'low',
       title: `${c.xLabel} ↔ ${c.yLabel}`,
-      text: `${c.rho > 0 ? 'Чем больше' : 'Чем меньше'}: «${c.xLabel.toLowerCase()}», тем ${c.rho > 0 ? 'выше' : 'ниже'} ${c.yLabel} (ρ = ${fmtNum(c.rho, 2)}, дней: ${c.n}, q = ${fmtNum(c.q, 2)}).${extra} Это связь, а не доказанная причина: проверь её личным экспериментом на 1–2 недели.` });
+      text: `${c.rho > 0 ? 'Когда выше' : 'Когда ниже'} «${c.xLabel}», обычно ${c.rho > 0 ? 'выше' : 'ниже'} ${c.yLabel} (ρ = ${fmtNum(c.rho, 2)}, дней: ${c.n}, ${c.q < 0.01 ? 'q < 0,01' : `q = ${fmtNum(c.q, 2)}`}).${extra} Это связь, а не доказанная причина: проверь её личным экспериментом на 1–2 недели (Аналитика → Эксперименты).` });
   }
   if (!cors.length && rows.filter(r => Number.isFinite(r.composite)).length >= 14) out.push({ id: 'no-relations', kind: 'info', conf: 'mid', title: 'Устойчивых связей пока нет', text: 'С отметками дня (сон, кофе, нагрузка) убедительных связей не найдено. Это нормально: чем дольше ведёшь отметки, тем точнее картина.' });
   if (rows.filter(r => Number.isFinite(r.composite) && Number.isFinite(r.sleepHours)).length < MIN_PAIRS && days >= 3) out.push({ id: 'need-checkins', kind: 'info', conf: 'high', title: 'Добавь утренние отметки сна', text: `Для поиска связей нужно хотя бы ${MIN_PAIRS} дней, где есть и проверка, и отметка сна (раздел «Дневник»). Сейчас таких дней: ${rows.filter(r => Number.isFinite(r.composite) && Number.isFinite(r.sleepHours)).length}.` });
