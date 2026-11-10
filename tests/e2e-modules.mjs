@@ -104,6 +104,8 @@ await until(page, () => /^32\s000\s₽$/.test(document.getElementById('month-tot
 assert.equal(await text('#exp-form strong'), 'Новый расход');
 assert.equal(await page.inputValue('#exp-amount'), '');
 
+assert.equal(await count('#month-chart .bar-col'), 6, 'график за 6 месяцев');
+assert.equal(await count('#month-chart .bar-col.current'), 1);
 await page.click('#hide-amounts');                           // скрыть суммы
 assert.equal(await text('#month-total'), '•••• ₽');
 assert.ok(!(await text('#exp-list')).match(/\d\s?000/), 'суммы в списке скрыты');
@@ -163,6 +165,20 @@ await page.click('#search-results .result');
 assert.equal(await text('#title'), 'Деньги', 'клик по результату открывает нужную вкладку');
 assert.equal(await page.locator('#search-panel').isVisible(), false);
 
+// ---------- горячие клавиши ----------
+await page.locator('body').press('/');
+assert.equal(await page.locator('#search-panel').isVisible(), true);
+assert.equal(await page.evaluate(() => document.activeElement.id), 'search-input');
+await page.keyboard.press('Escape');
+assert.equal(await page.locator('#search-panel').isVisible(), false);
+await tab(page, 'notes');
+await page.locator('body').press('n');
+assert.equal(await text('#title'), 'Сегодня');
+assert.equal(await page.evaluate(() => document.activeElement.id), 'add-input');
+await page.fill('#add-input', '/ и n внутри поля не срабатывают');
+assert.equal(await text('#title'), 'Сегодня');
+await page.fill('#add-input', '');
+
 // ---------- профиль, тема, диагностика ----------
 await tab(page, 'more');
 await page.fill('#profile-name', 'Алекс');
@@ -178,13 +194,24 @@ await page.selectOption('#theme-select', 'auto');
 assert.equal(await page.evaluate(() => document.documentElement.getAttribute('data-theme')), null);
 assert.match(await text('#stats'), /задачи|привычки/);
 assert.match(await text('#stats'), /расходы: 2/);
-assert.match(await text('#diag'), /Версия R2\.0/);
+assert.match(await text('#diag'), /Версия R2\.1/);
 assert.match(await text('#diag'), /Запуск №\d+/);
 assert.match(await text('#diag'), /Пароль: не задан/);
 
+assert.match(await text('#remind-box'), /только в приложении для Android/, 'на сайте напоминания недоступны и это объяснено');
+assert.match(await text('#stats'), /Последняя копия: ещё не делал/);
+await tab(page, 'today');
+assert.equal(await page.locator('#backup-chip').isVisible(), true, 'много данных и нет копии — предложение сделать копию');
+await tab(page, 'more');
 const [md] = await Promise.all([page.waitForEvent('download'), page.click('#export-md')]);
 const mdText = fs.readFileSync(await md.path(), 'utf8');
 for (const part of ['## Задачи', '## Привычки', 'Python 2', '## Заметки', 'Первая заметка (правка)', '## Расходы']) assert.ok(mdText.includes(part), part);
+
+const [jsonDl] = await Promise.all([page.waitForEvent('download'), page.click('#export-btn')]);
+assert.equal(JSON.parse(fs.readFileSync(await jsonDl.path(), 'utf8')).app, 'lifeos');
+await until(page, () => /Последняя копия: сегодня/.test(document.getElementById('stats').textContent));
+await tab(page, 'today');
+assert.equal(await page.locator('#backup-chip').count(), 0, 'после копии предложение пропало');
 
 // ---------- «Поделиться» и ярлыки ----------
 await page.goto(t.url + '?title=Привет&text=мир&url=https%3A%2F%2Fexample.com');

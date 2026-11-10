@@ -6,6 +6,7 @@ import { getPref, setPref } from './prefs.js';
 import { isNative } from './platform.js';
 import { searchEvents } from './search.js';
 import { VERSION } from './version.js';
+import * as notify from './notify.js';
 import { createTodayView } from './view-today.js';
 import { createHabitsView } from './view-habits.js';
 import { createMoneyView } from './view-money.js';
@@ -48,6 +49,7 @@ function go(tab) {
   if (!views[tab]) tab = 'today';
   current = tab;
   for (const [id, v] of Object.entries(views)) v.root.hidden = id !== tab;
+  views[tab].update(store.state.events);                   // настройки могли измениться (например, время последней копии)
   for (const b of $('tabs').children) b.setAttribute('aria-selected', String(b.dataset.tab === tab));
   $('title').textContent = TABS.find(t => t.id === tab).title;
   setPref('tab', tab);
@@ -160,6 +162,17 @@ setInterval(() => {
   if (vault.isUnlocked() && ms > 0 && ms !== Infinity && Date.now() - lastActive >= ms) lockNow();
 }, 15000);
 
+// ---------- горячие клавиши (для сайта на компьютере) ----------
+document.addEventListener('keydown', e => {
+  if (e.ctrlKey || e.metaKey || e.altKey || $('app').hidden) return;
+  const t = e.target;
+  const typing = t && (/^(INPUT|TEXTAREA|SELECT)$/.test(t.tagName) || t.isContentEditable);
+  if (e.key === 'Escape') { if (!$('search-panel').hidden) closeSearch(); return; }
+  if (typing) return;
+  if (e.key === '/') { e.preventDefault(); $('search-panel').hidden = false; $('search-input').focus(); }
+  else if (e.key === 'n' || e.key === 'т') { e.preventDefault(); go('today'); views.today.focusAdd(); }
+});
+
 // ---------- ссылки: «поделиться» из других приложений и ярлыки ----------
 function handleUrlParams() {
   const q = new URLSearchParams(location.search);
@@ -197,7 +210,7 @@ function build() {
   $('tabs').replaceChildren(...TABS.map(t => el('button', { type: 'button', dataset: { tab: t.id }, role: 'tab', 'aria-selected': 'false', onclick: () => go(t.id) },
     icon(t.icon), el('span', { textContent: t.label }))));
 
-  store.onChange(evs => { for (const v of Object.values(views)) v.update(evs); renderSearch(); });
+  store.onChange(evs => { for (const v of Object.values(views)) v.update(evs); renderSearch(); notify.resyncSoon(); });
   store.setLockedHandler(showLock);
   for (const v of Object.values(views)) v.update([]);
 }

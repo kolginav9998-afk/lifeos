@@ -59,6 +59,15 @@ export function summarizeMonth(events, ym) {
   return { ym, items, total, count: items.length, byCategory };
 }
 
+export function monthTotals(events, endYm, n = 6) {          // последние n месяцев, старые -> новые
+  const out = [];
+  for (let i = n - 1; i >= 0; i--) {
+    const ym = shiftMonth(endYm, -i);
+    out.push({ ym, total: events.filter(e => e.type === 'expense' && monthOf(e.payload.date) === ym).reduce((s, e) => s + e.payload.amountMinor, 0) });
+  }
+  return out;
+}
+
 export function spentBetween(events, fromDate, toDate) {      // включительно
   return events.filter(e => e.type === 'expense' && e.payload.date >= fromDate && e.payload.date <= toDate)
     .reduce((s, e) => s + e.payload.amountMinor, 0);

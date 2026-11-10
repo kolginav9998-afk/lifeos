@@ -1,14 +1,15 @@
-import { el, toast, setBusy } from './ui.js';
+import { el, toast, setBusy, agoText } from './ui.js';
 import * as vault from './vault.js';
 import * as db from './db.js';
 import * as store from './store.js';
 import { serialize, makeProfile, profileOf, todayStr } from './events.js';
-import { encryptBackup, readBackup, backupKind, NeedPasswordError, BadBackupPasswordError, MAX_BACKUP_BYTES } from './backup.js';
+import { encryptBackup, decryptBackup, readBackup, backupKind, NeedPasswordError, BadBackupPasswordError, MAX_BACKUP_BYTES } from './backup.js';
 import { expensesToCsv } from './money.js';
 import { toMarkdown } from './export.js';
 import { saveTextFile, isNative, platformName } from './platform.js';
 import { getPref, setPref } from './prefs.js';
 import { VERSION } from './version.js';
+import * as notify from './notify.js';
 
 const TYPE_NAMES = { task: 'задачи', habit: 'привычки', habit_log: 'отметки привычек', expense: 'расходы', note: 'заметки' };
 const AUTOLOCK = [[0, 'сразу при сворачивании'], [1, 'через 1 минуту'], [5, 'через 5 минут'], [15, 'через 15 минут'], [60, 'через час'], [-1, 'никогда']];
@@ -112,16 +113,20 @@ export function createSettingsView({ lockNow, applyTheme, onVaultChange }) {
     setBusy(bkBtn, true, 'Шифрую…');
     try {
       const text = await encryptBackup(store.state.events, bkPass.value);
+      const check = await decryptBackup(text, bkPass.value);               // сразу проверяем, что копию можно прочитать
+      if (check.events.length !== store.state.events.length || check.skipped) throw new Error('Проверка копии не пройдена, файл не сохранён');
       await saveTextFile(`lifeos-${stamp()}.enc.json`, text);
-      toast('Зашифрованная копия готова');
+      setPref('lastBackupAt', Date.now());
+      toast(`Копия проверена и сохранена (записей: ${check.events.length})`);
       bkPass.value = '';
+      renderStats();
     } catch (err) { toast(err.message); }
     finally { setBusy(bkBtn, false); }
   };
   const plainBtn = el('button', { id: 'export-btn', type: 'button', textContent: 'Копия открытым текстом (JSON)' });
   plainBtn.onclick = async () => {
     if (vault.hasVault() && !confirm('Файл будет БЕЗ шифрования: любой, кто его получит, прочтёт все данные. Продолжить?')) return;
-    try { await saveTextFile(`lifeos-${stamp()}.json`, serialize(store.state.events)); toast(`Сохранено записей: ${store.state.events.length}`); }
+    try { await saveTextFile(`lifeos-${stamp()}.json`, serialize(store.state.events)); setPref('lastBackupAt', Date.now()); renderStats(); toast(`Сохранено записей: ${store.state.events.length}`); }
     catch (err) { toast('Не удалось сохранить: ' + (err?.message || err)); }
   };
   const csvBtn = el('button', { id: 'export-csv', type: 'button', textContent: 'Расходы для Excel (CSV)', onclick: () => exportCsv() });
@@ -167,8 +172,43 @@ export function createSettingsView({ lockNow, applyTheme, onVaultChange }) {
   const hideAmounts = el('input', { id: 'pref-hide', type: 'checkbox', checked: !!getPref('hideAmounts') });
   hideAmounts.onchange = () => { setPref('hideAmounts', hideAmounts.checked); store.refresh(); };
 
+  // ---------- напоминания (только в приложении) ----------
+  const remindBox = el('div', { id: 'remind-box', class: 'form-stack' });
+  const hours = (values, off) => values.map(h => [h, h < 0 ? off : `в ${String(h).padStart(2, '0')}:00`]);
+  function renderReminders() {
+    if (!isNative) {
+      remindBox.replaceChildren(el('p', { class: 'muted', textContent: 'Напоминания работают только в приложении для Android: сайт не может будить телефон. Они не требуют интернета и Google-сервисов, а в тексте уведомлений нет названий задач.' }));
+      return;
+    }
+    const on = el('input', { id: 'pref-remind', type: 'checkbox', checked: !!getPref('remindersOn') });
+    const th = el('select', { id: 'remind-task-hour' }, ...hours([-1, 7, 8, 9, 10, 11, 12], 'не напоминать').map(([v, t]) => el('option', { value: String(v), textContent: t })));
+    const hh = el('select', { id: 'remind-habit-hour' }, ...hours([-1, 18, 19, 20, 21, 22], 'не напоминать').map(([v, t]) => el('option', { value: String(v), textContent: t })));
+    th.value = String(getPref('taskHour')); hh.value = String(getPref('habitHour'));
+    const status = el('p', { id: 'remind-status', class: 'muted', textContent: getPref('remindersOn') ? 'Включено' : 'Выключено' });
+    const run = async ask => {
+      const r = await notify.resync({ ask });
+      status.textContent = r.ok ? `Запланировано уведомлений: ${r.count ?? 0}` : r.reason === 'denied' ? 'Нет разрешения на уведомления' : `Не удалось: ${r.reason}`;
+      return r;
+    };
+    on.onchange = async () => {
+      setPref('remindersOn', on.checked);
+      const r = await run(on.checked);
+      if (on.checked && !r.ok) { setPref('remindersOn', false); on.checked = false; toast(r.reason === 'denied' ? 'Разрешение не выдано. Включи уведомления для Life OS в настройках телефона.' : 'Не удалось включить напоминания'); }
+    };
+    th.onchange = () => { setPref('taskHour', Number(th.value)); if (getPref('remindersOn')) run(false); };
+    hh.onchange = () => { setPref('habitHour', Number(hh.value)); if (getPref('remindersOn')) run(false); };
+    const test = el('button', { id: 'remind-test', type: 'button', textContent: 'Тестовое уведомление через 5 секунд', onclick: async () => {
+      const r = await notify.testNow();
+      toast(r.ok ? 'Закрой экран или сверни приложение: уведомление придёт через 5 секунд' : r.reason === 'denied' ? 'Нет разрешения на уведомления' : `Не удалось: ${r.reason}`);
+    } });
+    remindBox.replaceChildren(
+      el('label', { class: 'check-label' }, on, ' Напоминать о задачах и привычках'),
+      el('label', {}, 'О задачах на день: ', th), el('label', {}, 'О привычках: ', hh), status, test,
+      el('p', { class: 'muted', textContent: 'Если уведомления не приходят, на Huawei разреши приложению автозапуск и работу в фоне (Настройки → Батарея → Запуск приложений).' }));
+  }
+
   // ---------- данные и диагностика ----------
-  const stats = el('div', { id: 'stats', class: 'muted' });
+  const stats = el('div', { id: 'stats', class: 'muted pre' });
   const corrupt = el('p', { id: 'corrupt', class: 'warn', hidden: true });
   const diag = el('pre', { id: 'diag', class: 'diag', 'aria-label': 'Диагностика хранилища' });
 
@@ -196,7 +236,7 @@ export function createSettingsView({ lockNow, applyTheme, onVaultChange }) {
     const parts = Object.entries(TYPE_NAMES).filter(([t]) => cnt[t]).map(([t, name]) => `${name}: ${cnt[t]}`);
     let usage = '';
     try { const est = await navigator.storage?.estimate?.(); if (est?.usage) usage = ` · занято ≈ ${Math.max(1, Math.round(est.usage / 1024))} КБ`; } catch { /* нет API */ }
-    stats.textContent = (parts.length ? parts.join(' · ') : 'Данных пока нет') + usage;
+    stats.textContent = (parts.length ? parts.join(' · ') : 'Данных пока нет') + usage + `\nПоследняя копия: ${agoText(getPref('lastBackupAt'))}`;
     const bad = db.state.corrupt.length;
     corrupt.hidden = bad === 0;
     corrupt.textContent = bad ? `Не удалось прочитать записей: ${bad}. Они не удалены и остались на диске. Если помнишь, что менял пароль или файлы вручную, восстанови данные из копии.` : '';
@@ -230,12 +270,14 @@ export function createSettingsView({ lockNow, applyTheme, onVaultChange }) {
       el('label', {}, 'Тема: ', theme),
       el('label', { class: 'check-label' }, parseDates, ' Понимать даты в тексте задачи («завтра», «10 числа»)'),
       el('label', { class: 'check-label' }, hideAmounts, ' Скрывать суммы на экране')),
+    card('Напоминания', remindBox),
     card('Данные', stats, corrupt),
     card('Приватность', privacy),
     card('О приложении', diag),
     card('Опасная зона', el('p', { class: 'muted', textContent: 'Удаляет все записи, пароль и настройки на этом устройстве. Отменить нельзя.' }), wipeConfirm, wipeBtn));
 
   renderSecurity();
+  renderReminders();
 
   return {
     root,

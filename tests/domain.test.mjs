@@ -303,3 +303,56 @@ test('Markdown-экспорт содержит все разделы и не л�
   const empty = toMarkdown([], NOW);
   assert.equal((empty.match(/_нет_/g) || []).length, 4);
 });
+
+// ---------- напоминания ----------
+import { planReminders, atLocal, HORIZON_DAYS, TASK_ID_BASE, HABIT_ID_BASE } from '../reminders.js';
+import { monthTotals } from '../money.js';
+
+test('напоминания: по одному на день со сроками, общий текст без названий задач', () => {
+  const now = at(2026, 11, 10, 7);                           // 7:00 — до 9:00
+  const ev = [makeTask('секретное название', 1, { due: TODAY }), makeTask('ещё', 1, { due: TODAY }), makeTask('вчерашняя', 1, { due: '2026-11-09' }),
+    makeTask('послезавтра', 1, { due: '2026-11-12' }), makeTask('без срока', 1)];
+  const r = planReminders(ev, now, { taskHour: 9, habitHour: -1 });
+  assert.equal(r.length, 2);
+  assert.deepEqual(r.map(x => x.id), [TASK_ID_BASE, TASK_ID_BASE + 2]);
+  assert.equal(r[0].at, atLocal(TODAY, 9));
+  assert.equal(r[0].body, '2 задачи на сегодня, просрочено: 1');
+  assert.equal(r[1].body, '1 задача на сегодня');
+  assert.ok(r.every(x => !x.body.includes('секретное') && !x.body.includes('вчерашняя') && x.title === 'Life OS'), 'названий задач в уведомлениях нет');
+});
+test('напоминания: время уже прошло — на сегодня не планируем; выполненные и отключение часов', () => {
+  const now = at(2026, 11, 10, 10);
+  const ev = [makeTask('a', 1, { due: TODAY }), makeTask('b', 1, { due: '2026-11-11' }), completeTask(makeTask('c', 1, { due: '2026-11-12' }), 5).updated];
+  const r = planReminders(ev, now, { taskHour: 9, habitHour: -1 });
+  assert.deepEqual(r.map(x => x.id), [TASK_ID_BASE + 1], 'только завтра; готовая задача не напоминает');
+  assert.equal(planReminders(ev, now, { taskHour: -1, habitHour: -1 }).length, 0);
+});
+test('напоминания: привычки — сегодня только если не отмечено; идентификаторы уникальны; горизонт ограничен', () => {
+  const now = at(2026, 11, 10, 8);
+  const h = makeHabit({ name: 'Бег' }, at(2026, 11, 1));
+  const none = planReminders([h], now, { taskHour: -1, habitHour: 20 });
+  assert.equal(none.length, HORIZON_DAYS);
+  assert.equal(none[0].id, HABIT_ID_BASE);
+  const done = planReminders([h, makeHabitLog(h, TODAY, 'min')], now, { taskHour: -1, habitHour: 20 });
+  assert.equal(done.length, HORIZON_DAYS - 1, 'сегодня уже отмечено — без напоминания');
+  assert.equal(done[0].id, HABIT_ID_BASE + 1);
+  const many = Array.from({ length: 40 }, (_, i) => makeTask('t' + i, 1, { due: `2026-11-${String(10 + (i % 5)).padStart(2, '0')}` }));
+  const all = planReminders([...many, h], now);
+  assert.equal(new Set(all.map(x => x.id)).size, all.length, 'id не повторяются');
+  assert.ok(all.every(x => x.at > now && x.id < 3000));
+  assert.deepEqual(planReminders([], now), []);
+  assert.deepEqual(planReminders([makeHabit({ name: 'x' }, at(2026, 11, 1)), ], now, { habitHour: 20, taskHour: -1 }).length, HORIZON_DAYS);
+});
+test('напоминания: склонение «задача/задачи/задач»', () => {
+  const now = at(2026, 11, 10, 7);
+  const mk = n => planReminders(Array.from({ length: n }, (_, i) => makeTask('t' + i, 1, { due: TODAY })), now, { taskHour: 9, habitHour: -1 })[0].body;
+  assert.equal(mk(1), '1 задача на сегодня'); assert.equal(mk(3), '3 задачи на сегодня'); assert.equal(mk(5), '5 задач на сегодня');
+  assert.equal(mk(11), '11 задач на сегодня'); assert.equal(mk(21), '21 задача на сегодня'); assert.equal(mk(22), '22 задачи на сегодня');
+});
+test('расходы по месяцам: шесть месяцев, нули там, где пусто', () => {
+  const ev = [makeExpense({ amount: '100', date: '2026-11-03' }, NOW), makeExpense({ amount: '50', date: '2026-09-30' }, NOW), makeExpense({ amount: '7', date: '2025-12-31' }, NOW)];
+  const r = monthTotals(ev, '2026-11', 6);
+  assert.deepEqual(r.map(x => x.ym), ['2026-06', '2026-07', '2026-08', '2026-09', '2026-10', '2026-11']);
+  assert.deepEqual(r.map(x => x.total), [0, 0, 0, 5000, 0, 10000]);
+  assert.equal(monthTotals(ev, '2026-01', 3)[0].ym, '2025-11', 'через границу года');
+});

@@ -62,3 +62,9 @@ export function setBusy(button, busy, label) {
 export const moneyText = minor => (getPref('hideAmounts') ? '•••• ₽' : formatMoney(minor));
 export const WEEKDAYS = ['вс', 'пн', 'вт', 'ср', 'чт', 'пт', 'сб'];
 export function weekdayOf(ymd) { const [y, m, d] = ymd.split('-').map(Number); return WEEKDAYS[new Date(y, m - 1, d, 12).getDay()]; }
+
+export function agoText(ts, now = Date.now()) {
+  if (!ts) return 'ещё не делал';
+  const d = Math.floor((now - ts) / 86400000);
+  return d <= 0 ? 'сегодня' : d === 1 ? 'вчера' : `${d} дн. назад`;
+}

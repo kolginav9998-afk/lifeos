@@ -1,6 +1,6 @@
 import { el, toast, dateRu, icon, moneyText } from './ui.js';
 import { todayStr } from './events.js';
-import { makeExpense, updateExpense, summarizeMonth, shiftMonth, monthLabel, monthOf, categoriesUsed, makeBudget, budgetOf, parseAmount, formatMoney } from './money.js';
+import { makeExpense, updateExpense, summarizeMonth, shiftMonth, monthLabel, monthOf, categoriesUsed, makeBudget, budgetOf, parseAmount, formatMoney, monthTotals } from './money.js';
 import { getPref, setPref } from './prefs.js';
 import * as store from './store.js';
 
@@ -32,7 +32,8 @@ export function createMoneyView({ exportCsv }) {
   };
   const budgetBtn = el('button', { type: 'button', id: 'budget-btn', class: 'link', textContent: 'Бюджет', onclick: () => { budgetForm.hidden = !budgetForm.hidden; if (!budgetForm.hidden) budgetInput.focus(); } });
   const cats = el('div', { id: 'cats', class: 'cats' });
-  const summary = el('div', { class: 'card' }, total, budgetLine, budgetBar, el('div', { class: 'row' }, budgetBtn), budgetForm, cats);
+  const chart = el('div', { id: 'month-chart', class: 'bars' });
+  const summary = el('div', { class: 'card' }, total, budgetLine, budgetBar, el('div', { class: 'row' }, budgetBtn), budgetForm, cats, el('p', { class: 'muted chart-title', textContent: 'Последние 6 месяцев' }), chart);
 
   // ----- форма -----
   const amount = el('input', { id: 'exp-amount', type: 'text', inputMode: 'decimal', placeholder: 'Сумма, например 1250,50', autocomplete: 'off', required: true });
@@ -97,6 +98,16 @@ export function createMoneyView({ exportCsv }) {
         el('div', { class: 'progress thin' }, el('span')));
       bar.querySelector('.progress span').style.setProperty('--w', Math.round(c.share * 100) + '%');
       return bar;
+    }));
+    const mt = monthTotals(events, ym, 6);
+    const maxT = Math.max(1, ...mt.map(x => x.total));
+    const compact = minor => { const r = minor / 100; return r >= 1000 ? `${Math.round(r / 100) / 10}к`.replace('.', ',') : String(Math.round(r)); };
+    chart.replaceChildren(...mt.map(x => {
+      const col = el('div', { class: 'bar-col' + (x.ym === ym ? ' current' : ''), title: `${monthLabel(x.ym)}: ${moneyText(x.total)}` },
+        el('span', { class: 'bar-fill' }), el('span', { class: 'bar-n', textContent: getPref('hideAmounts') ? '•' : compact(x.total) }),
+        el('span', { class: 'bar-d', textContent: monthLabel(x.ym).slice(0, 3).toLowerCase() }));
+      col.firstChild.style.setProperty('--h', Math.round((x.total / maxT) * 100) + '%');
+      return col;
     }));
     catList.replaceChildren(...categoriesUsed(events).map(c => el('option', { value: c })));
     list.replaceChildren(...s.items.map(ev => {

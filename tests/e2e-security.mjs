@@ -152,6 +152,7 @@ await page.click('#bk-enc');
 await expectToast(page, /не короче 8/);
 await page.fill('#bk-pass', 'пароль-для-копии');
 const [encDl] = await Promise.all([page.waitForEvent('download'), page.click('#bk-enc')]);
+await expectToast(page, /Копия проверена и сохранена \(записей: \d+\)/);
 const encFile = await encDl.path();
 const encText = fs.readFileSync(encFile, 'utf8');
 assert.equal(JSON.parse(encText).app, 'lifeos-enc');

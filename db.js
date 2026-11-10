@@ -62,7 +62,7 @@ function lsWrite(list) {
 async function rawAll() {
   const a = await idb('readonly', s => s.getAll());
   const ls = lsRead();
-  if (a.ok && Array.isArray(a.value) && a.value.length >= ls.length) { lsWrite(a.value); return a.value; }
+  if (a.ok && Array.isArray(a.value) && a.value.length >= ls.length) { if (a.value.length !== ls.length) lsWrite(a.value); return a.value; }
   if (ls.length) { if (a.ok) await idb('readwrite', s => { ls.forEach(r => s.put(r)); }); return ls; }
   return a.ok && Array.isArray(a.value) ? a.value : [];
 }

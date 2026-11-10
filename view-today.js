@@ -186,6 +186,9 @@ export function createTodayView({ go }) {
     chips.push(el('span', { class: 'chip static', textContent: `Задач: ${g.openCount}` }));
     if (g.overdue.length) chips.push(el('span', { class: 'chip static danger', textContent: `Просрочено: ${g.overdue.length}` }));
     const hs = activeHabits(events, today);
+    const real = events.filter(e => e.type !== 'profile' && e.type !== 'budget').length;
+    const last = getPref('lastBackupAt');
+    if (real >= 5 && (!last || Date.now() - last > 14 * 86400000)) chips.push(el('button', { type: 'button', id: 'backup-chip', class: 'chip', textContent: 'Сделай резервную копию', onclick: () => go('more') }));
     if (hs.length) chips.push(el('button', { type: 'button', class: 'chip', textContent: `Привычки: ${hs.filter(x => x.st.doneToday).length}/${hs.length}`, onclick: () => go('habits') }));
     const spent = spentBetween(events, today, today);
     if (spent) chips.push(el('button', { type: 'button', class: 'chip', textContent: `Потрачено сегодня: ${moneyText(spent)}`, onclick: () => go('money') }));

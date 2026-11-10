@@ -141,3 +141,6 @@ html.amounts-hidden .amount{letter-spacing:.1em}
 @media (prefers-reduced-motion: no-preference){.toast{animation:pop .15s ease-out}@keyframes pop{from{transform:translateY(8px);opacity:0}}}
 .habit-add>summary{color:var(--accent);font-weight:600}
 .habit-add[open]>summary{margin-bottom:8px}
+.pre{white-space:pre-line}
+.bar-col.current .bar-fill{background:var(--ok)}
+.chart-title{margin:10px 0 0}

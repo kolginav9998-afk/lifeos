@@ -26,3 +26,43 @@ export async function saveTextFile(filename, text, mime = 'application/json') {
   setTimeout(() => URL.revokeObjectURL(a.href), 1000);
   return 'download';
 }
+
+// ---- локальные уведомления (только в приложении для Android) ----
+// Возвращает { ok, reason?, count? }. Никогда не бросает исключений: сбой уведомлений не должен ломать приложение.
+export async function syncNotifications(items, { ask = false } = {}) {
+  if (!isNative) return { ok: false, reason: 'web' };
+  try {
+    const LN = plugin('LocalNotifications');
+    const perm = await (ask ? LN.requestPermissions() : LN.checkPermissions());
+    if (perm.display !== 'granted') return { ok: false, reason: 'denied' };
+    const pending = await LN.getPending();
+    if (pending.notifications.length) await LN.cancel({ notifications: pending.notifications.map(n => ({ id: n.id })) });
+    if (items.length) {
+      await LN.schedule({ notifications: items.map(i => ({
+        id: i.id, title: i.title, body: i.body, schedule: { at: new Date(i.at), allowWhileIdle: true },
+      })) });
+    }
+    return { ok: true, count: items.length };
+  } catch (e) { return { ok: false, reason: String(e?.message || e) }; }
+}
+
+export async function clearNotifications() {
+  if (!isNative) return { ok: false, reason: 'web' };
+  try {
+    const LN = plugin('LocalNotifications');
+    const pending = await LN.getPending();
+    if (pending.notifications.length) await LN.cancel({ notifications: pending.notifications.map(n => ({ id: n.id })) });
+    return { ok: true };
+  } catch (e) { return { ok: false, reason: String(e?.message || e) }; }
+}
+
+export async function scheduleTest(id, seconds) {
+  if (!isNative) return { ok: false, reason: 'web' };
+  try {
+    const LN = plugin('LocalNotifications');
+    const perm = await LN.requestPermissions();
+    if (perm.display !== 'granted') return { ok: false, reason: 'denied' };
+    await LN.schedule({ notifications: [{ id, title: 'Life OS', body: 'Тестовое напоминание. Всё работает.', schedule: { at: new Date(Date.now() + seconds * 1000), allowWhileIdle: true } }] });
+    return { ok: true };
+  } catch (e) { return { ok: false, reason: String(e?.message || e) }; }
+}
