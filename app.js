@@ -10,18 +10,29 @@ import { isNative } from './platform.js';
 import { searchEvents } from './search.js';
 import { VERSION } from './version.js';
 import * as notify from './notify.js';
+
 import { createTodayView } from './view-today.js';
 import { createHabitsView } from './view-habits.js';
 import { createMoneyView } from './view-money.js';
 import { createNotesView } from './view-notes.js';
 import { createSettingsView } from './view-settings.js';
+import { createAccountView } from './view-account.js';
+import * as appSync from './app-sync.js';
 
-const TABS = [
-  { id: 'today', label: 'Сегодня', title: 'Сегодня', icon: 'tasks' },
-  { id: 'habits', label: 'Привычки', title: 'Привычки', icon: 'habits' },
-  { id: 'money', label: 'Деньги', title: 'Деньги', icon: 'money' },
-  { id: 'notes', label: 'Заметки', title: 'Заметки', icon: 'notes' },
-  { id: 'more', label: 'Ещё', title: 'Настройки', icon: 'more' },
+// Экраны и группы вкладок. Нижняя панель — группы; внутри группы с несколькими экранами есть вторая строка переключателей.
+const DEFS = [
+  { id: 'today', group: 'today', title: 'Сегодня', sub: 'Задачи', make: ctx => createTodayView(ctx) },
+  { id: 'habits', group: 'today', title: 'Привычки', sub: 'Привычки', make: () => createHabitsView() },
+  { id: 'notes', group: 'diary', title: 'Заметки', sub: 'Заметки', make: () => createNotesView() },
+  { id: 'money', group: 'money', title: 'Деньги', sub: 'Деньги', make: ctx => createMoneyView(ctx) },
+  { id: 'more', group: 'more', title: 'Настройки', sub: 'Настройки', make: ctx => createSettingsView(ctx) },
+  { id: 'account', group: 'more', title: 'Аккаунт', sub: 'Аккаунт', make: ctx => createAccountView(ctx) },
+];
+const GROUPS = [
+  { id: 'today', label: 'Сегодня', icon: 'tasks' },
+  { id: 'diary', label: 'Заметки', icon: 'notes' },
+  { id: 'money', label: 'Деньги', icon: 'money' },
+  { id: 'more', label: 'Ещё', icon: 'more' },
 ];
 const FOCUS_TAB = { task: 'today', habit: 'habits', expense: 'money', note: 'notes' };
 
@@ -48,16 +59,30 @@ const views = {};
 let current = 'today';
 let entered = false;
 
-function go(tab) {
-  if (!views[tab]) tab = 'today';
-  current = tab;
-  for (const [id, v] of Object.entries(views)) v.root.hidden = id !== tab;
-  views[tab].update(store.state.events);                   // настройки могли измениться (например, время последней копии)
-  for (const b of $('tabs').children) b.setAttribute('aria-selected', String(b.dataset.tab === tab));
-  $('title').textContent = TABS.find(t => t.id === tab).title;
-  setPref('tab', tab);
+function go(id) {
+  const def = DEFS.find(d => d.id === id) ?? DEFS[0];
+  current = def.id;
+  for (const [vid, v] of Object.entries(views)) v.root.hidden = vid !== def.id;
+  const v = views[def.id];
+  if (v.show) v.show(); else v.update(store.state.events);        // настройки могли измениться (например, время последней копии)
+  for (const b of $('tabs').children) b.setAttribute('aria-selected', String(b.dataset.tab === def.group));
+  const siblings = DEFS.filter(d => d.group === def.group);
+  const sub = $('subnav');
+  sub.hidden = siblings.length < 2;
+  sub.replaceChildren(...siblings.map(d => el('button', { type: 'button', dataset: { view: d.id }, 'aria-pressed': String(d.id === def.id), textContent: d.sub, onclick: () => go(d.id) })));
+  $('title').textContent = def.title;
+  setPref('tab', def.id);
   window.scrollTo(0, 0);
 }
+
+// ---------- состояние синхронизации в шапке ----------
+const BADGE = { idle: ['☁ ✓', 'Всё синхронизировано'], syncing: ['☁ …', 'Синхронизация'], offline: ['☁ ✕', 'Нет связи, изменения сохранены'], error: ['☁ !', 'Ошибка синхронизации'], 'needs-login': ['☁ войти', 'Нужно войти заново'] };
+appSync.onStatus(s => {
+  const b = $('sync-badge');
+  const info = BADGE[s.state];
+  b.hidden = !info;
+  if (info) { b.textContent = info[0]; b.title = info[1]; b.dataset.state = s.state; }
+});
 
 // ---------- поиск ----------
 function closeSearch() { $('search-panel').hidden = true; $('search-input').value = ''; renderSearch(); }
@@ -91,6 +116,7 @@ function updateLockout() {
 }
 
 function showLock() {
+  appSync.stop();
   $('app').hidden = true;
   $('lock').hidden = false;
   document.body.classList.remove('privacy');
@@ -118,6 +144,7 @@ async function enterApp() {
   try { const n = await db.sealPending(); if (n) toast(`Дошифровано записей: ${n}`); } catch (e) { console.error(e); }
   await store.refresh();
   updateLockButton();
+  appSync.start().catch(e => console.error(e));
   if (!entered) { entered = true; handleUrlParams(); }
 }
 
@@ -204,15 +231,12 @@ function build() {
   $('search-input').oninput = renderSearch;
   $('lock-top').onclick = () => lockNow();
 
-  views.today = createTodayView({ go });
-  views.more = createSettingsView({ lockNow, applyTheme, onVaultChange: updateLockButton });
-  views.habits = createHabitsView();
-  views.money = createMoneyView({ exportCsv: () => views.more.exportCsv() });
-  views.notes = createNotesView();
+  const ctx = { go, lockNow, applyTheme, onVaultChange: updateLockButton, openAccount: () => go('account'), exportCsv: () => views.more.exportCsv() };
   const main = $('view');
-  for (const t of TABS) main.append(views[t.id].root);
-  $('tabs').replaceChildren(...TABS.map(t => el('button', { type: 'button', dataset: { tab: t.id }, role: 'tab', 'aria-selected': 'false', onclick: () => go(t.id) },
-    icon(t.icon), el('span', { textContent: t.label }))));
+  for (const d of DEFS) { views[d.id] = d.make(ctx); main.append(views[d.id].root); }
+  $('tabs').replaceChildren(...GROUPS.map(g => el('button', { type: 'button', dataset: { tab: g.id }, role: 'tab', 'aria-selected': 'false',
+    onclick: () => go(DEFS.find(d => d.group === g.id).id) }, icon(g.icon), el('span', { textContent: g.label }))));
+  $('sync-badge').onclick = () => go('account');
 
   store.onChange(evs => { for (const v of Object.values(views)) v.update(evs); renderSearch(); notify.resyncSoon(); });
   store.setLockedHandler(showLock);

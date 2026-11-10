@@ -11,6 +11,8 @@ import { getPref, setPref } from './prefs.js';
 import { VERSION } from './version.js';
 import * as notify from './notify.js';
 import { log as errorLog } from './errlog.js';
+import { account } from './app-sync.js';
+import { describeError } from './account.js';
 
 const TYPE_NAMES = { task: 'задачи', habit: 'привычки', habit_log: 'отметки привычек', expense: 'расходы', income: 'доходы', note: 'заметки' };
 const AUTOLOCK = [[0, 'сразу при сворачивании'], [1, 'через 1 минуту'], [5, 'через 5 минут'], [15, 'через 15 минут'], [60, 'через час'], [-1, 'никогда']];
@@ -18,7 +20,7 @@ const AUTOLOCK = [[0, 'сразу при сворачивании'], [1, 'чер
 function card(title, ...kids) { return el('section', { class: 'card settings-card' }, el('h3', { textContent: title }), ...kids); }
 function field(id, props) { return el('input', { id, autocomplete: 'off', ...props }); }
 
-export function createSettingsView({ lockNow, applyTheme, onVaultChange }) {
+export function createSettingsView({ lockNow, applyTheme, onVaultChange, openAccount = () => {} }) {
   let events = [];
   let pendingImport = null;                       // текст выбранного файла, ждущий пароля
   const root = el('section', { id: 'view-more', class: 'view' });
@@ -84,8 +86,8 @@ export function createSettingsView({ lockNow, applyTheme, onVaultChange }) {
       e.preventDefault();
       if (n1.value !== n2.value) return toast('Новые пароли не совпадают');
       setBusy(chBtn, true, 'Меняю…');
-      try { await vault.changePassword(o.value, n1.value); toast('Пароль изменён'); o.value = n1.value = n2.value = ''; }
-      catch (err) { toast(err instanceof vault.WrongPasswordError ? 'Текущий пароль неверный' : err.message); }
+      try { await account.changePassword({ oldPassword: o.value, newPassword: n1.value }); toast('Пароль изменён'); o.value = n1.value = n2.value = ''; }
+      catch (err) { toast(err instanceof vault.WrongPasswordError ? 'Текущий пароль неверный' : describeError(err)); }
       finally { setBusy(chBtn, false); }
     };
 
@@ -107,7 +109,9 @@ export function createSettingsView({ lockNow, applyTheme, onVaultChange }) {
       el('label', {}, 'Блокировать приложение: ', auto),
       el('div', { class: 'row' }, el('button', { id: 'lock-now', type: 'button', class: 'primary', textContent: 'Заблокировать сейчас', onclick: () => lockNow() })),
       el('details', {}, el('summary', { textContent: 'Сменить пароль' }), chForm),
-      el('details', {}, el('summary', { textContent: 'Отключить защиту' }), offForm));
+      account.isLinked()
+        ? el('p', { id: 'pw-off-blocked', class: 'muted', textContent: 'Защиту нельзя отключить, пока устройство подключено к аккаунту: данные на сервере зашифрованы. Сначала выйди из аккаунта.' })
+        : el('details', {}, el('summary', { textContent: 'Отключить защиту' }), offForm));
   }
 
   function renderSecurity() {
@@ -269,7 +273,15 @@ export function createSettingsView({ lockNow, applyTheme, onVaultChange }) {
     el('li', { textContent: 'После удаления следы старых записей могут оставаться в памяти устройства, пока система её не перезапишет. Для полной очистки используй «Стереть все данные» и перезагрузи телефон.' }),
     el('li', { textContent: 'Резервные копии сохраняй зашифрованными: открытый JSON читается любым.' }));
 
+  const accountText = el('p', { id: 'settings-account', class: 'muted' });
+  const accountCard = card('Аккаунт и синхронизация', accountText, el('div', { class: 'row' }, el('button', { id: 'open-account', type: 'button', class: 'primary', textContent: 'Открыть', onclick: () => openAccount() })));
+  function renderAccountText() {
+    const a = account.info();
+    accountText.textContent = a ? `Подключён: ${a.username} · ${a.server}` : 'Не подключён. Один логин для телефона, приложения и браузера.';
+  }
+
   root.append(
+    accountCard,
     card('Профиль', nameForm),
     card('Защита паролем', secBox),
     card('Резервные копии и экспорт',
@@ -288,9 +300,11 @@ export function createSettingsView({ lockNow, applyTheme, onVaultChange }) {
 
   renderSecurity();
   renderReminders();
+  renderAccountText();
 
   return {
     root,
+    show() { renderSecurity(); renderAccountText(); this.update(store.state.events); },
     update(evs) {
       events = evs;
       if (document.activeElement !== nameInput) nameInput.value = profileOf(evs)?.payload.name || '';

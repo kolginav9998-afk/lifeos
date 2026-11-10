@@ -194,7 +194,7 @@ await page.selectOption('#theme-select', 'auto');
 assert.equal(await page.evaluate(() => document.documentElement.getAttribute('data-theme')), null);
 assert.match(await text('#stats'), /задачи|привычки/);
 assert.match(await text('#stats'), /расходы: 2/);
-assert.match(await text('#diag'), /Версия R2\.3/);
+assert.match(await text('#diag'), /Версия R3\.0/);
 assert.match(await text('#diag'), /Запуск №\d+/);
 assert.match(await text('#diag'), /Пароль: не задан/);
 assert.doesNotMatch(await text('#diag'), /Последние ошибки/, 'ошибок нет');

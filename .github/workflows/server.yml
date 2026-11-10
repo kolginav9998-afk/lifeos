@@ -1,0 +1,76 @@
+name: server
+
+on:
+  push:
+    paths: ['server/**', 'tests/server.test.mjs', 'tests/cf-local.mjs', '.github/workflows/server.yml']
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: server-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  # Проверка сервера в настоящем окружении Cloudflare (локально, workerd): тот же код, что будет работать в облаке.
+  cloudflare-local:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with: { node-version: 22 }
+      - name: Установить wrangler
+        run: npm install --no-save --no-package-lock wrangler@4
+      - name: Запустить сервер локально и прогнать сценарий
+        working-directory: server/cloudflare
+        run: |
+          npx wrangler dev --local --port 8799 --ip 127.0.0.1 --persist-to "$RUNNER_TEMP/cf-state" > "$RUNNER_TEMP/wrangler.log" 2>&1 &
+          for i in $(seq 1 60); do curl -fs http://127.0.0.1:8799/v1/status >/dev/null && break; sleep 1; done
+          cd ../.. && node tests/cf-local.mjs
+      - name: Журнал wrangler (если упало)
+        if: failure()
+        run: cat "$RUNNER_TEMP/wrangler.log" || true
+
+  # Публикация сервера на Cloudflare. Выполняется, только если добавлены два секрета (см. docs/SERVER.md, способ Б).
+  deploy:
+    needs: cloudflare-local
+    if: github.ref == 'refs/heads/main'
+    runs-on: ubuntu-latest
+    env:
+      CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
+      CLOUDFLARE_ACCOUNT_ID: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
+    steps:
+      - name: Проверить, что секреты заданы
+        id: gate
+        run: |
+          if [ -n "$CLOUDFLARE_API_TOKEN" ] && [ -n "$CLOUDFLARE_ACCOUNT_ID" ]; then echo "go=true" >> "$GITHUB_OUTPUT"
+          else echo "Секреты Cloudflare не заданы — публикацию пропускаю (это нормально, если сервер ещё не разворачивали)."; fi
+      - uses: actions/checkout@v4
+        if: steps.gate.outputs.go == 'true'
+      - uses: actions/setup-node@v4
+        if: steps.gate.outputs.go == 'true'
+        with: { node-version: 22 }
+      - name: Подготовить адрес workers.dev (один раз для аккаунта)
+        if: steps.gate.outputs.go == 'true'
+        id: sub
+        run: |
+          API="https://api.cloudflare.com/client/v4/accounts/$CLOUDFLARE_ACCOUNT_ID/workers/subdomain"
+          SUB=$(curl -fsS -H "Authorization: Bearer $CLOUDFLARE_API_TOKEN" "$API" | jq -r '.result.subdomain // empty')
+          if [ -z "$SUB" ]; then
+            SUB="lifeos-$(head -c 4 /dev/urandom | od -An -tx1 | tr -d ' \n')"
+            curl -fsS -X PUT -H "Authorization: Bearer $CLOUDFLARE_API_TOKEN" -H "Content-Type: application/json" --data "{\"subdomain\":\"$SUB\"}" "$API" >/dev/null
+          fi
+          echo "sub=$SUB" >> "$GITHUB_OUTPUT"
+      - name: Опубликовать сервер
+        if: steps.gate.outputs.go == 'true'
+        working-directory: server/cloudflare
+        run: npx --yes wrangler@4 deploy
+      - name: Показать адрес сервера
+        if: steps.gate.outputs.go == 'true'
+        run: |
+          URL="https://lifeos-sync.${{ steps.sub.outputs.sub }}.workers.dev"
+          echo "### Адрес сервера Life OS" >> "$GITHUB_STEP_SUMMARY"
+          echo "\`$URL\`" >> "$GITHUB_STEP_SUMMARY"
+          echo "Адрес сервера: $URL"
+          curl -fsS "$URL/v1/status" | tee -a "$GITHUB_STEP_SUMMARY"

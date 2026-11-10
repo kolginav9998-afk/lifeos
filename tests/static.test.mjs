@@ -17,10 +17,10 @@ test('в коде приложения нет опасных конструкц�
   }
 });
 
-test('сетевых запросов нет нигде, кроме офлайн-кэша (sw.js, только свой адрес)', () => {
+test('сетевых запросов нет нигде, кроме офлайн-кэша (sw.js) и клиента сервера синхронизации (api.js)', () => {
   for (const f of appJs) {
     const code = read(f).replace(/\/\/.*$/gm, '');
-    if (f === 'sw.js') continue;
+    if (f === 'sw.js' || f === 'api.js') continue;
     assert.ok(!/\bfetch\s*\(|XMLHttpRequest|WebSocket|sendBeacon|EventSource/.test(code), `${f}: сетевой вызов`);
   }
   const sw = read('sw.js');
@@ -49,10 +49,15 @@ test('сборка: CSP только в веб-версии; dist совпада
   assert.match(web, /script-src 'self'/);
   assert.ok(!/unsafe-inline|unsafe-eval/.test(web));
   const sw = fs.readFileSync(path.join(root, 'dist/sw.js'), 'utf8');
-  const shell = [...sw.slice(sw.indexOf('const SHELL'), sw.indexOf('];')).matchAll(/'([^']+)'/g)].map(m => m[1]).filter(x => x !== './');
-  const dist = fs.readdirSync(path.join(root, 'dist')).filter(f => f.endsWith('.js') && f !== 'sw.js');
-  for (const f of dist) assert.ok(shell.includes(f), `${f} не в офлайн-кэше`);
-  for (const f of shell) assert.ok(fs.existsSync(path.join(root, 'dist', f)), `${f} есть в кэше, но нет в сборке`);
+  assert.ok(!sw.includes('/*SHELL_LIST*/') && !sw.includes('/*BUILD_HASH*/'), 'метки сборки заменены');
+  const shell = JSON.parse(sw.match(/const SHELL = (\[.*?\]);/s)[1]).filter(x => x !== './');
+  const all = fs.readdirSync(path.join(root, 'dist'), { recursive: true, withFileTypes: true }).filter(e => e.isFile())
+    .map(e => path.relative(path.join(root, 'dist'), path.join(e.parentPath, e.name))).filter(f => f !== 'sw.js');
+  assert.deepEqual([...shell].sort(), [...all].sort(), 'офлайн-кэш = все файлы сборки');
+  const hash1 = sw.match(/const CACHE = 'lifeos-' \+ '([0-9a-f]{12})'/)?.[1];
+  assert.ok(hash1, 'версия кэша из содержимого');
+  execFileSync('bash', ['scripts/build-web.sh', 'web'], { cwd: root, stdio: 'pipe' });
+  assert.equal(fs.readFileSync(path.join(root, 'dist/sw.js'), 'utf8').match(/'lifeos-' \+ '([0-9a-f]{12})'/)[1], hash1, 'без изменений версия та же');
   execFileSync('bash', ['scripts/build-web.sh', 'apk'], { cwd: root, stdio: 'pipe' });
   assert.ok(!/Content-Security-Policy/.test(fs.readFileSync(path.join(root, 'dist/index.html'), 'utf8')));
   fs.rmSync(path.join(root, 'dist'), { recursive: true, force: true });

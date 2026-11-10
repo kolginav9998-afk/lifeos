@@ -19,6 +19,28 @@ async function add(text, { due, repeat, high } = {}) {
   await until(page, tx => [...document.querySelectorAll('.item .text')].some(n => n.textContent.endsWith(tx)), text);
 }
 
+// ---------- данные прошлой версии: записаны «по-старому» прямо в IndexedDB, новая версия обязана их показать ----------
+await page.evaluate(() => new Promise((resolve, reject) => {
+  const rq = indexedDB.open('lifeos', 1);
+  rq.onsuccess = () => {
+    const db = rq.result, tx = db.transaction('events', 'readwrite'), st = tx.objectStore('events');
+    st.put({ id: 'legacy-r0', type: 'task', ts: 1793900000000, payload: { text: 'задача из старой версии R0', done: false, doneAt: null }, source: 'manual', confidence: 1, evidence: [] });
+    st.put({ id: 'legacy-r1', type: 'task', ts: 1793900001000, payload: { text: 'жильё из версии R1', done: false, doneAt: null, due: '2099-01-10', repeat: { type: 'monthly', day: 10 } }, source: 'manual', confidence: 1, evidence: [] });
+    tx.oncomplete = () => { db.close(); resolve(); };
+    tx.onerror = () => reject(tx.error);
+  };
+  rq.onerror = () => reject(rq.error);
+}));
+await page.reload();
+await until(page, () => [...document.querySelectorAll('.item .text')].some(n => n.textContent === 'задача из старой версии R0'));
+await until(page, () => [...document.querySelectorAll('.item .text')].some(n => n.textContent === 'жильё из версии R1'));
+await page.locator('.item', { hasText: 'задача из старой версии R0' }).locator('.body').click();      // старую запись можно править
+await page.fill('.edit-text', 'старая задача, исправлена'); await page.click('form.editing .save');
+await until(page, () => [...document.querySelectorAll('.item .text')].some(n => n.textContent === 'старая задача, исправлена'));
+await page.locator('.item', { hasText: 'старая задача, исправлена' }).locator('.del').click();
+await page.locator('.item', { hasText: 'жильё из версии R1' }).locator('.del').click();
+await waitCount('.item', 0);
+
 // ---------- офлайн ----------
 await ctx.setOffline(true);
 await page.reload();

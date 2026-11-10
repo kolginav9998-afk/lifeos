@@ -1,0 +1,16 @@
+# Сервер синхронизации Life OS для Cloudflare Workers (бесплатный тариф).
+name = "lifeos-sync"
+main = "worker.js"
+compatibility_date = "2025-06-01"
+
+[vars]
+# Адреса, которым разрешено обращаться к серверу из браузера. Свой адрес сайта можно добавить через запятую.
+ALLOWED_ORIGINS = "https://kolginav9998-afk.github.io,https://localhost,http://localhost,capacitor://localhost"
+
+[[durable_objects.bindings]]
+name = "VAULT"
+class_name = "Vault"
+
+[[migrations]]
+tag = "v1"
+new_sqlite_classes = ["Vault"]

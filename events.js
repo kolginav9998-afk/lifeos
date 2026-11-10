@@ -179,6 +179,7 @@ export function cleanEvent(e) {
     source: typeof e.source === 'string' ? e.source.slice(0, 20) : 'import',
     confidence: typeof e.confidence === 'number' && e.confidence >= 0 && e.confidence <= 1 ? e.confidence : 1,
     evidence: Array.isArray(e.evidence) ? e.evidence.slice(0, 50) : [],
+    ...(Number.isSafeInteger(e.u) && e.u >= 0 ? { u: e.u } : {}),
   };
 }
 

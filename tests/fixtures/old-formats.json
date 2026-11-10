@@ -1,0 +1,21 @@
+{
+  "R0_export": {
+    "app": "lifeos", "schema": 1, "exportedAt": 1794000000000,
+    "events": [
+      { "id": "r0-task-1", "type": "task", "ts": 1793900000000, "payload": { "text": "задача из R0", "done": false, "doneAt": null }, "source": "manual", "confidence": 1, "evidence": [] },
+      { "id": "r0-task-2", "type": "task", "ts": 1793900001000, "payload": { "text": "сделано в R0", "done": true, "doneAt": 1793950000000 }, "source": "manual", "confidence": 1, "evidence": [] }
+    ]
+  },
+  "R1_events": [
+    { "id": "r1-rent", "type": "task", "ts": 1793900002000, "payload": { "text": "оплата жилья", "done": false, "doneAt": null, "due": "2026-11-10", "repeat": { "type": "monthly", "day": 10 } }, "source": "manual", "confidence": 1, "evidence": [] },
+    { "id": "r1-done-rent", "type": "task", "ts": 1793900003000, "payload": { "text": "оплата жилья", "done": true, "doneAt": 1793950001000, "due": "2026-10-10", "repeat": { "type": "monthly", "day": 10 }, "spawnedId": "r1-rent" }, "source": "manual", "confidence": 1, "evidence": [] }
+  ],
+  "R2_events": [
+    { "id": "r2-habit", "type": "habit", "ts": 1793800000000, "payload": { "name": "Python", "anchor": "после завтрака", "minimum": "открыть редактор", "full": "", "startDate": "2026-11-01", "archived": false }, "source": "manual", "confidence": 1, "evidence": [] },
+    { "id": "r2-habit:2026-11-09", "type": "habit_log", "ts": 1793850000000, "payload": { "habitId": "r2-habit", "date": "2026-11-09", "level": "min" }, "source": "manual", "confidence": 1, "evidence": [] },
+    { "id": "r2-exp", "type": "expense", "ts": 1793860000000, "payload": { "amountMinor": 125050, "currency": "RUB", "category": "Еда", "note": "хлеб", "date": "2026-11-09" }, "source": "manual", "confidence": 1, "evidence": [] },
+    { "id": "r2-note", "type": "note", "ts": 1793870000000, "payload": { "text": "заметка из R2\nвторая строка" }, "source": "manual", "confidence": 1, "evidence": [] },
+    { "id": "budget", "type": "budget", "ts": 1793880000000, "payload": { "amountMinor": 5000000 }, "source": "manual", "confidence": 1, "evidence": [] },
+    { "id": "profile", "type": "profile", "ts": 1793890000000, "payload": { "name": "Имя", "accountId": "11111111-2222-3333-4444-555555555555", "updatedAt": 1793890000000 }, "source": "manual", "confidence": 1, "evidence": [] }
+  ]
+}

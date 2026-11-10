@@ -44,3 +44,11 @@ export async function decryptBytes(key, { iv, ct }, aad) {
   const out = await crypto.subtle.decrypt({ name: 'AES-GCM', iv: unb64(iv), additionalData: aad }, key, unb64(ct));
   return new Uint8Array(out);
 }
+
+// Сырые байты из пароля (для ключа входа на сервер). Это НЕ ключ шифрования: у них разные соли и метки.
+export async function deriveBits(password, salt, iterations, label) {
+  if (!Number.isInteger(iterations) || iterations < MIN_ITER || iterations > MAX_ITER) throw new Error('bad iterations');
+  const base = await crypto.subtle.importKey('raw', te.encode(`${label}\u0000${String(password).normalize('NFKC')}`), 'PBKDF2', false, ['deriveBits']);
+  return new Uint8Array(await crypto.subtle.deriveBits({ name: 'PBKDF2', salt, iterations, hash: 'SHA-256' }, base, 256));
+}
+export const deriveAuthKey = async (password, salt, iterations) => b64(await deriveBits(password, salt, iterations, 'lifeos-auth-v1'));

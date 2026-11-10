@@ -9,10 +9,10 @@ const { chromium } = createRequire(import.meta.url)('playwright');
 export const root = path.resolve(import.meta.dirname, '..');
 const types = { '.html': 'text/html; charset=utf-8', '.js': 'text/javascript', '.css': 'text/css', '.webmanifest': 'application/manifest+json', '.png': 'image/png', '.json': 'application/json' };
 
-export function build(target = 'web') { execFileSync('bash', ['scripts/build-web.sh', target], { cwd: root, stdio: 'pipe' }); }
+export function build(target = 'web', env = {}) { execFileSync('bash', ['scripts/build-web.sh', target], { cwd: root, stdio: 'pipe', env: { ...process.env, ...env } }); }
 
-export async function launch({ viewport = { width: 390, height: 844 }, ctxOptions = {} } = {}) {
-  build('web');
+export async function launch({ viewport = { width: 390, height: 844 }, ctxOptions = {}, buildEnv = {} } = {}) {
+  build('web', buildEnv);
   const dir = path.join(root, 'dist');
   const server = http.createServer((req, res) => {
     const u = decodeURIComponent(req.url.split('?')[0]);
@@ -35,7 +35,14 @@ export async function launch({ viewport = { width: 390, height: 844 }, ctxOption
 }
 
 export const ymd = (off = 0) => { const d = new Date(); d.setDate(d.getDate() + off); return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`; };
-export const tab = (page, id) => page.click(`#tabs button[data-tab="${id}"]`);
+// Нижняя панель — группы вкладок; экраны внутри группы переключаются второй строкой.
+const GROUP_OF = { today: 'today', habits: 'today', notes: 'diary', diary: 'diary', money: 'money', more: 'more', account: 'more' };
+const FIRST_OF = { today: 'today', diary: 'notes', money: 'money', more: 'more' };
+export async function tab(page, id) {
+  const g = GROUP_OF[id] ?? id;
+  await page.click(`#tabs button[data-tab="${g}"]`);
+  if (id !== FIRST_OF[g] && id !== g) await page.click(`#subnav button[data-view="${id}"]`);
+}
 
 // Ждать, пока выполнится условие в странице (с понятной ошибкой).
 export const until = (page, fn, arg, timeout = 5000) => page.waitForFunction(fn, arg, { timeout });
@@ -50,4 +57,17 @@ export async function rawDisk(page) {
     });
     return { idb, ls: localStorage.getItem('lifeos.events.v1'), all: Object.fromEntries(Object.keys(localStorage).map(k => [k, localStorage.getItem(k)])) };
   });
+}
+
+// Второе (третье…) «устройство»: отдельный контекст браузера = отдельное хранилище, тот же сайт.
+export async function newDevice(t, { viewport = { width: 390, height: 844 } } = {}) {
+  const ctx = await t.browser.newContext({ viewport, acceptDownloads: true, locale: 'ru-RU' });
+  const page = await ctx.newPage();
+  const errors = [];
+  page.on('pageerror', e => errors.push('pageerror: ' + e.message));
+  page.on('console', m => { if (m.type() === 'error') errors.push(m.text()); });
+  page.on('dialog', d => d.accept());
+  await page.goto(t.url);
+  await page.waitForFunction(() => !document.getElementById('app').hidden || !document.getElementById('lock').hidden);
+  return { ctx, page, errors };
 }

@@ -6,7 +6,7 @@ const { page, errors } = t;
 await page.goto(t.url);
 await until(page, () => !document.getElementById('app').hidden);
 assert.equal(await page.textContent('#title'), 'Сегодня');
-assert.match(await page.textContent('#status'), /R2\.3 · онлайн/);
+assert.match(await page.textContent('#status'), /R3\.0 · онлайн/);
 for (const [id, title] of [['habits', 'Привычки'], ['money', 'Деньги'], ['notes', 'Заметки'], ['more', 'Настройки'], ['today', 'Сегодня']]) {
   await tab(page, id);
   assert.equal(await page.textContent('#title'), title);

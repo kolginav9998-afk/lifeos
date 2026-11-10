@@ -99,3 +99,107 @@ test('vault.verify и remove', async () => {
   await assert.rejects(V.verify('нет-нет-нет-нет'), V.WrongPasswordError);
   V.remove(); assert.equal(V.status(), 'none');
 });
+
+// ---------- v2: код восстановления, подключение на втором устройстве ----------
+import { deriveAuthKey } from '../cryptoutil.js';
+
+test('код восстановления: формат, нормализация, ошибки', () => {
+  const code = V.newRecoveryCode();
+  assert.match(code, /^[0-9A-HJKMNP-TV-Z]{4}(-[0-9A-HJKMNP-TV-Z]{4}){5}$/);
+  assert.notEqual(V.newRecoveryCode(), code);
+  const plain = code.replace(/-/g, '');
+  assert.equal(V.normalizeRecoveryCode(code.toLowerCase()), plain, 'регистр и дефисы не важны');
+  assert.equal(V.normalizeRecoveryCode(` ${plain.slice(0, 8)} ${plain.slice(8)} `), plain);
+  assert.equal(V.normalizeRecoveryCode('OIL0'.repeat(6)), '0110'.repeat(6), 'O→0, I/L→1');
+  for (const bad of ['', 'abc', 'U'.repeat(24), '1'.repeat(23), '1'.repeat(25), null]) assert.throws(() => V.normalizeRecoveryCode(bad), V.WrongRecoveryCodeError, String(bad));
+});
+
+test('код восстановления: создать, сбросить пароль, неверный код, старый пароль больше не работает', async () => {
+  V.useStorage(mem());
+  await V.create('старый-пароль-1', FAST);
+  const rec = await V.addRecovery('старый-пароль-1');
+  assert.ok(rec.code && rec.meta.rec && rec.server.authKey.length === 44);
+  assert.equal(V.getMeta().rec, undefined, 'пока не подтверждено, локально не записано');
+  V.commitMeta(rec.meta);
+  assert.ok(V.getMeta().rec);
+  const sealed = await V.seal(ev('a', 'данные'));
+  V.lock();
+  await assert.rejects(V.resetWithCode('AAAA-AAAA-AAAA-AAAA-AAAA-AAAA', 'новый-пароль-22', FAST), V.WrongRecoveryCodeError);
+  await assert.rejects(V.resetWithCode(rec.code, 'коротк', FAST), /не короче/);
+  await V.resetWithCode(rec.code, 'новый-пароль-22', FAST);
+  assert.equal(V.status(), 'unlocked');
+  assert.deepEqual(await V.open(sealed), ev('a', 'данные'), 'данные читаются тем же ключом');
+  V.lock();
+  await assert.rejects(V.unlock('старый-пароль-1'), V.WrongPasswordError);
+  await V.unlock('новый-пароль-22');
+  assert.ok(V.getMeta().rec, 'код восстановления сохранился и работает снова');
+  V.lock();
+  await V.resetWithCode(rec.code.toLowerCase(), 'третий-пароль-333', FAST);
+});
+
+test('без кода восстановления сбросить пароль нельзя', async () => {
+  V.useStorage(mem()); await V.create('надёжный-пароль', FAST); V.lock();
+  await assert.rejects(V.resetWithCode('A'.repeat(24).replace(/A/g, '1'), 'новый-пароль-22', FAST), V.WrongRecoveryCodeError);
+});
+
+test('второе устройство: та же мета + тот же пароль = тот же ключ данных', async () => {
+  const devA = mem(), devB = mem();
+  V.useStorage(devA); await V.create('общий-пароль-1', FAST);
+  const sealed = await V.seal(ev('x', 'с первого устройства'));
+  const meta = JSON.parse(devA.getItem('lifeos.vault.v1'));
+  V.useStorage(devB);
+  assert.equal(V.status(), 'none');
+  await assert.rejects(V.adoptMeta(meta, 'не-тот-пароль-1'), V.WrongPasswordError);
+  assert.equal(V.status(), 'none', 'неудача ничего не записала');
+  await V.adoptMeta(meta, 'общий-пароль-1');
+  assert.equal(V.status(), 'unlocked');
+  assert.deepEqual(await V.open(sealed), ev('x', 'с первого устройства'));
+  assert.deepEqual(JSON.parse(devB.getItem('lifeos.vault.v1')), meta);
+  await assert.rejects(V.adoptMeta({ v: 1 }, 'x'.repeat(10)), /Повреждены/);
+});
+
+test('смена пароля вместе с сервером: новая мета готовится без записи, фиксируется отдельно; код восстановления сохраняется', async () => {
+  V.useStorage(mem()); await V.create('старый-пароль-1', FAST);
+  const rec = await V.addRecovery('старый-пароль-1'); V.commitMeta(rec.meta);
+  await assert.rejects(V.prepareNewMeta('не-тот-пароль-1', 'новый-пароль-22', FAST), V.WrongPasswordError);
+  const before = JSON.stringify(V.getMeta());
+  const next = await V.prepareNewMeta('старый-пароль-1', 'новый-пароль-22', FAST);
+  assert.equal(JSON.stringify(V.getMeta()), before, 'prepare ничего не пишет');
+  assert.deepEqual(next.rec, rec.meta.rec);
+  V.commitMeta(next); V.lock();
+  await V.unlock('новый-пароль-22');
+});
+
+test('вход на новом устройстве по коду восстановления: ключ данных получаем кодом, пароль задаём новый', async () => {
+  const devA = mem();
+  V.useStorage(devA); await V.create('пароль-устройства-1', FAST);
+  const rec = await V.addRecovery('пароль-устройства-1'); V.commitMeta(rec.meta);
+  const sealed = await V.seal(ev('q', 'секрет'));
+  const serverMeta = V.getMeta();
+  V.useStorage(mem());
+  await assert.rejects(V.adoptMetaWithCode(serverMeta, 'AAAA-AAAA-AAAA-AAAA-AAAA-AAAA', 'новый-пароль-22', FAST), V.WrongRecoveryCodeError);
+  const { meta, raw } = await V.adoptMetaWithCode(serverMeta, rec.code, 'новый-пароль-22', FAST);
+  await V.installUnlocked(meta, raw);
+  assert.deepEqual(await V.open(sealed), ev('q', 'секрет'));
+  V.lock(); await V.unlock('новый-пароль-22');
+});
+
+test('ключ входа на сервер зависит от пароля и соли и не равен ключу шифрования', async () => {
+  const salt = crypto.getRandomValues(new Uint8Array(16));
+  const a = await deriveAuthKey('пароль-1234', salt, 2000);
+  assert.equal(a.length, 44);
+  assert.equal(a, await deriveAuthKey('пароль-1234', salt, 2000), 'детерминирован');
+  assert.notEqual(a, await deriveAuthKey('пароль-1235', salt, 2000));
+  assert.notEqual(a, await deriveAuthKey('пароль-1234', crypto.getRandomValues(new Uint8Array(16)), 2000));
+  assert.notEqual(a, await deriveAuthKey('пароль-1234', salt, 2001));
+});
+
+test('seal/open переносят метку времени u снаружи шифртекста и она не подменяется внутри', async () => {
+  V.useStorage(mem()); await V.create('надёжный-пароль', FAST);
+  const rec = await V.seal({ ...ev('t', 'x'), u: 12345 });
+  assert.equal(rec.u, 12345);
+  assert.ok(!JSON.stringify(rec).includes('"type"'), 'тип записи скрыт');
+  assert.equal((await V.open(rec)).u, 12345);
+  assert.equal((await V.open({ ...rec, u: 99999 })).u, 99999, 'u берётся снаружи (нужна для слияния)');
+  const noU = await V.seal(ev('n', 'y')); assert.equal('u' in noU, false);
+});

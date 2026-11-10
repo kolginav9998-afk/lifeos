@@ -38,9 +38,11 @@
   <header class="top">
     <h1 id="title">Сегодня</h1>
     <span id="status" class="status" title="Версия и режим"></span>
+    <button id="sync-badge" type="button" class="sync-badge" hidden aria-label="Состояние синхронизации"></button>
     <button id="search-btn" type="button" class="icon-btn" aria-label="Поиск"></button>
     <button id="lock-top" type="button" class="icon-btn" aria-label="Заблокировать" hidden></button>
   </header>
+  <nav id="subnav" class="subnav" aria-label="Разделы группы" hidden></nav>
   <div id="search-panel" class="search-panel" hidden>
     <input id="search-input" type="search" placeholder="Искать по задачам, привычкам, расходам, заметкам" autocomplete="off" aria-label="Поиск">
     <div id="search-results" class="results"></div>
