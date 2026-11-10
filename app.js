@@ -1,7 +1,8 @@
 import { makeTask, completeTask, reopenTask, groupTasks, todayStr, dueLabel, repeatLabel, serialize, parseImport } from './events.js';
 import * as db from './db.js';
+import { isNative, platformName, saveTextFile } from './platform.js';
 
-const VERSION = 'R1.0';
+const VERSION = 'R1.1';
 const $ = id => document.getElementById(id);
 let events = [];
 
@@ -79,12 +80,11 @@ $('add-form').addEventListener('submit', async e => {
   await refresh().then(renderDiag);
 });
 
-$('export-btn').onclick = () => {
-  const blob = new Blob([serialize(events)], { type: 'application/json' });
-  const a = el('a', { href: URL.createObjectURL(blob), download: `lifeos-${new Date().toISOString().slice(0, 10)}.json` });
-  document.body.append(a); a.click(); a.remove();
-  setTimeout(() => URL.revokeObjectURL(a.href), 1000);
-  say(`Экспортировано событий: ${events.length}`);
+$('export-btn').onclick = async () => {
+  try {
+    await saveTextFile(`lifeos-${new Date().toISOString().slice(0, 10)}.json`, serialize(events));
+    say(`Экспортировано событий: ${events.length}`);
+  } catch (err) { say('Не удалось сохранить: ' + (err?.message || err)); }
 };
 
 $('import-input').onchange = async e => {
@@ -120,7 +120,7 @@ async function renderDiag() {
   const standalone = matchMedia('(display-mode: standalone)').matches || navigator.standalone;
   const lines = [
     meta ? `Запуск №${meta.launches} (первый: ${new Date(meta.first).toLocaleString('ru')})` : 'Запуски: счётчик недоступен',
-    `Режим: ${standalone ? 'установленное приложение' : 'вкладка браузера'}`,
+    `Платформа: ${platformName}; ${isNative ? 'встроенное приложение' : standalone ? 'установленное приложение' : 'вкладка браузера'}`,
     `Записей: IndexedDB ${c.idb ?? 'ошибка'}, копия ${c.ls}`,
     `Защита от очистки: ${persisted}`,
     db.state.idbOk === false ? `Ошибка IndexedDB: ${db.state.idbError}` : '',
@@ -135,7 +135,8 @@ addEventListener('online', setStatus);
 addEventListener('offline', setStatus);
 setStatus();
 
-if ('serviceWorker' in navigator) {
+// В приложении файлы уже внутри APK: офлайн-кэш сайта не нужен (и мешал бы обновлениям)
+if (!isNative && 'serviceWorker' in navigator) {
   navigator.serviceWorker.register('sw.js').catch(() => {});
 }
 

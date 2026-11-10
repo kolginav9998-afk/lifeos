@@ -1,0 +1,8 @@
+{
+  "appId": "app.lifeos.mobile",
+  "appName": "Life OS",
+  "webDir": "dist",
+  "android": {
+    "allowMixedContent": false
+  }
+}

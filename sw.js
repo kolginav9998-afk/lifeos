@@ -1,6 +1,6 @@
 // Офлайн-оболочка. При изменении файлов — поднять CACHE.
-const CACHE = 'lifeos-r1.0';
-const SHELL = ['./', 'index.html', 'style.css', 'app.js', 'events.js', 'db.js',
+const CACHE = 'lifeos-r1.1';
+const SHELL = ['./', 'index.html', 'style.css', 'app.js', 'events.js', 'db.js', 'platform.js',
   'manifest.webmanifest', 'icons/icon-192.png', 'icons/icon-512.png'];
 
 self.addEventListener('install', e => {

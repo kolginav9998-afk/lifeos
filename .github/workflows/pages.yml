@@ -31,13 +31,10 @@ jobs:
       url: ${{ steps.deployment.outputs.page_url }}
     steps:
       - uses: actions/checkout@v4
-      - name: Собрать только то, что нужно приложению
-        run: |
-          mkdir _site
-          cp index.html style.css app.js events.js db.js sw.js manifest.webmanifest _site/
-          cp -r icons _site/
+      - name: Собрать веб-часть (та же, что внутри APK)
+        run: bash scripts/build-web.sh
       - uses: actions/configure-pages@v5
       - uses: actions/upload-pages-artifact@v3
-        with: { path: _site }
+        with: { path: dist }
       - id: deployment
         uses: actions/deploy-pages@v4
