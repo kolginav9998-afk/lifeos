@@ -28,6 +28,7 @@ const ICONS = {
   eye: ['M1 12s4-8 11-8 11 8 11 8-4 8-11 8-11-8-11-8z', 'M12 9a3 3 0 1 0 0 6 3 3 0 0 0 0-6z'],
   diary: ['M2 3h6a4 4 0 0 1 4 4v14a3 3 0 0 0-3-3H2z', 'M22 3h-6a4 4 0 0 0-4 4v14a3 3 0 0 1 3-3h7z'],
   tests: ['M22 12h-4l-3 9L9 3l-3 9H2'],
+  growth: ['M23 6l-9.5 9.5-5-5L1 18', 'M17 6h6v6'],
 };
 export function icon(name, size = 22) {
   const s = document.createElementNS(SVG_NS, 'svg');

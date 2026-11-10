@@ -198,3 +198,71 @@ html.amounts-hidden .amount{letter-spacing:.1em}
 .delta.up{color:var(--warn)}.delta.down{color:var(--ok)}
 .tags{display:flex;gap:6px;flex-wrap:wrap}
 .tag{font-size:.8rem;color:var(--accent)}
+
+/* ---- учёба ---- */
+.track-card{display:flex;gap:12px;align-items:center;text-align:left;width:100%;min-height:68px;padding:12px;border-radius:14px;background:var(--card);border:1px solid var(--line)}
+.track-card:active{background:var(--soft)}
+.track-ic{flex:none;width:44px;height:44px;border-radius:12px;display:grid;place-items:center;color:#fff;font-weight:700;font-size:.95rem}
+.track-body{display:flex;flex-direction:column;gap:3px;min-width:0;flex:1}
+.bar{height:6px;border-radius:99px;background:var(--line);overflow:hidden;margin-top:4px}
+.bar>span{display:block;height:100%;background:var(--accent);border-radius:99px;transition:width .2s}
+.lesson summary{color:var(--text);font-weight:600;padding:2px 0}
+.lesson-n{display:inline-grid;place-items:center;min-width:26px;height:26px;border-radius:50%;background:var(--soft);color:var(--accent);font-size:.8rem;margin-right:8px}
+.lesson p{margin:8px 0}
+.prompt{border-top:1px solid var(--line);padding:8px 0}
+.prompt p{margin:0 0 6px;font-size:.92rem}
+.grow{flex:1;min-width:0}
+.overlay{position:fixed;inset:0;z-index:15;background:var(--bg);display:flex;flex-direction:column;gap:14px;padding:max(14px,env(safe-area-inset-top)) 16px calc(16px + env(safe-area-inset-bottom));overflow:auto;max-width:680px;margin:0 auto}
+.overlay:focus{outline:none}
+.sess-top{display:flex;justify-content:space-between;align-items:center}
+.flash{background:var(--card);border:1px solid var(--line);border-radius:18px;padding:22px 18px;display:flex;flex-direction:column;gap:12px;min-height:200px;justify-content:center;text-align:center}
+.flash-q{font-size:1.45rem;font-weight:700;margin:0;word-break:break-word}
+.flash-a{font-size:1.2rem;color:var(--accent);margin:0;border-top:1px dashed var(--line);padding-top:12px;word-break:break-word}
+.big-btn{min-height:54px;font-size:1.05rem}
+.grade-row{display:grid;grid-template-columns:repeat(3,1fr);gap:8px}
+.grade{flex-direction:column;gap:2px;min-height:64px;padding:8px 4px}
+.grade.again{border-color:var(--danger)}.grade.good{border-color:var(--ok)}
+
+/* ---- тесты ---- */
+.bt-stage{flex:1;display:flex;flex-direction:column;justify-content:center;gap:12px;touch-action:manipulation;user-select:none;-webkit-user-select:none;-webkit-touch-callout:none}
+.bt-intro{display:flex;flex-direction:column;gap:10px}
+.bt-intro p{margin:0}
+.bt-box{min-height:52vh;border-radius:20px;display:grid;place-items:center;font-size:2rem;font-weight:800;text-align:center;color:#fff;touch-action:manipulation}
+.bt-box.wait{background:#c2410c}.bt-box.go{background:#15803d}.bt-box.early{background:#7f1d1d}.bt-box.done{background:#1d4ed8}
+.bt-box.blank{background:var(--card);border:1px solid var(--line);color:var(--text)}
+.bt-stim{width:120px;height:120px}.bt-stim.go{background:#15803d;border-radius:50%}.bt-stim.nogo{background:#dc2626;border-radius:10px}
+.bt-count{font-size:5rem;font-weight:800;text-align:center;color:var(--accent)}
+.bt-word,.bt-digit{font-size:2.6rem;font-weight:800;text-align:center;min-height:90px;display:grid;place-items:center;word-break:break-word}
+.bt-digit{font-size:5rem}
+.bt-problem{font-size:2rem;font-weight:700;text-align:center;word-break:break-word}
+.bt-timer{text-align:center;color:var(--muted);font-variant-numeric:tabular-nums}
+.kp-out{min-height:56px;font-size:2rem;font-weight:700;text-align:center;letter-spacing:.15em;border:1px solid var(--line);border-radius:12px;display:grid;place-items:center;background:var(--card)}
+.kp-grid{display:grid;grid-template-columns:repeat(3,1fr);gap:8px}
+.kp{min-height:58px;font-size:1.5rem;font-weight:700;touch-action:manipulation}
+.kp.ok{background:var(--accent);color:#fff;border-color:transparent}
+.stroop-word{font-size:3rem;font-weight:900;text-align:center;min-height:120px;display:grid;place-items:center}
+.stroop-btns,.series-opts{display:grid;grid-template-columns:1fr 1fr;gap:10px}
+.series-opts.one-col{grid-template-columns:1fr}
+.stroop-btn,.series-opt{min-height:64px;font-size:1.15rem;font-weight:700;touch-action:manipulation}
+.series-opt.wide{font-weight:500;font-size:1rem;text-align:left;justify-content:flex-start;padding:10px 14px;height:auto}
+.grade-row.two-col{grid-template-columns:1fr 1fr}
+.schulte{display:grid;gap:6px}
+.sh-cell{min-height:64px;font-size:1.4rem;font-weight:700;padding:0;touch-action:manipulation}
+.sh-cell.found{background:var(--soft);color:var(--muted);border-style:dashed}
+.sh-cell.wrong{background:#fecaca}
+.bt-hold{min-height:38vh;font-size:1.6rem;font-weight:800;border-radius:20px;touch-action:none}
+.bt-hold.held{background:var(--accent);color:#fff}
+.badge{display:inline-block;font-size:.8rem;padding:2px 8px;border-radius:99px;background:var(--soft);color:var(--muted);margin-left:6px}
+.badge.good{background:#dcfce7;color:#166534}.badge.bad{background:#fee2e2;color:#991b1b}
+.res-row{display:flex;flex-wrap:wrap;gap:6px 10px;align-items:baseline;justify-content:space-between;padding:8px 0;border-top:1px solid var(--line)}
+.test-row{align-items:center}
+.run summary{color:var(--text);justify-content:space-between;gap:8px}
+.zrow{display:grid;grid-template-columns:110px 1fr 56px;gap:8px;align-items:center;margin:6px 0;font-size:.9rem}
+.zbar{position:relative;height:10px;background:var(--soft);border-radius:99px;overflow:hidden}
+.zbar::after{content:"";position:absolute;left:50%;top:0;bottom:0;width:1px;background:var(--muted)}
+.zfill{position:absolute;top:0;bottom:0}.zfill.pos{background:var(--ok)}.zfill.neg{background:var(--danger)}
+.zv{text-align:right;font-variant-numeric:tabular-nums;color:var(--muted)}
+.insight{border-left:4px solid var(--line)}.insight p{margin:6px 0}
+.insight.warn{border-left-color:var(--warn)}.insight.good{border-left-color:var(--ok)}.insight.relation{border-left-color:var(--accent)}
+@media (prefers-color-scheme: dark){:root:not([data-theme=light]) .badge.good{background:#14532d;color:#bbf7d0}:root:not([data-theme=light]) .badge.bad{background:#7f1d1d;color:#fecaca}:root:not([data-theme=light]) .sh-cell.wrong{background:#7f1d1d}}
+.entry{display:flex;align-items:center;gap:12px;background:var(--card);border:1px solid var(--line);border-radius:12px;padding:10px 12px}

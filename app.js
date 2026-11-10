@@ -17,6 +17,9 @@ import { createMoneyView } from './view-money.js';
 import { createNotesView } from './view-notes.js';
 import { createDiaryView } from './view-diary.js';
 import { createHealthView } from './view-health.js';
+import { createLearnView } from './view-learn.js';
+import { createTestsView } from './view-tests.js';
+import { createInsightsView } from './view-insights.js';
 import { createSettingsView } from './view-settings.js';
 import { createAccountView } from './view-account.js';
 import * as appSync from './app-sync.js';
@@ -28,6 +31,9 @@ const DEFS = [
   { id: 'diary', group: 'diary', title: 'Дневник', sub: 'Дневник', make: () => createDiaryView() },
   { id: 'health', group: 'diary', title: 'Здоровье', sub: 'Здоровье', make: () => createHealthView() },
   { id: 'notes', group: 'diary', title: 'Заметки', sub: 'Заметки', make: () => createNotesView() },
+  { id: 'learn', group: 'grow', title: 'Учёба', sub: 'Учёба', make: () => createLearnView() },
+  { id: 'tests', group: 'grow', title: 'Проверка', sub: 'Тесты', make: () => createTestsView() },
+  { id: 'insights', group: 'grow', title: 'Аналитика', sub: 'Аналитика', make: () => createInsightsView() },
   { id: 'money', group: 'money', title: 'Деньги', sub: 'Деньги', make: ctx => createMoneyView(ctx) },
   { id: 'more', group: 'more', title: 'Настройки', sub: 'Настройки', make: ctx => createSettingsView(ctx) },
   { id: 'account', group: 'more', title: 'Аккаунт', sub: 'Аккаунт', make: ctx => createAccountView(ctx) },
@@ -35,6 +41,7 @@ const DEFS = [
 const GROUPS = [
   { id: 'today', label: 'Сегодня', icon: 'tasks' },
   { id: 'diary', label: 'Дневник', icon: 'diary' },
+  { id: 'grow', label: 'Развитие', icon: 'growth' },
   { id: 'money', label: 'Деньги', icon: 'money' },
   { id: 'more', label: 'Ещё', icon: 'more' },
 ];

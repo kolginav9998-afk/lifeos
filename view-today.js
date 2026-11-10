@@ -6,6 +6,7 @@ import { activeHabits } from './habits.js';
 import { weekReview } from './review.js';
 import { dayLog } from './journal.js';
 import { spentBetween } from './money.js';
+import { todayLoad } from './academy.js';
 import * as store from './store.js';
 
 const REPEAT_OPTS = [['', 'не повторять'], ['daily', 'каждый день'], ['weekly', 'каждую неделю'], ['monthly', 'каждый месяц']];
@@ -208,6 +209,10 @@ export function createTodayView({ go }) {
     if (hs.length) chips.push(el('button', { type: 'button', class: 'chip', textContent: `Привычки: ${hs.filter(x => x.st.doneToday).length}/${hs.length}`, onclick: () => go('habits') }));
     const spent = spentBetween(events, today, today);
     if (spent) chips.push(el('button', { type: 'button', class: 'chip', textContent: `Потрачено сегодня: ${moneyText(spent)}`, onclick: () => go('money') }));
+    const load = todayLoad(events, today);
+    if (load.due + load.fresh) chips.push(el('button', { type: 'button', id: 'learn-chip', class: 'chip', textContent: `Повторение: ${load.due + load.fresh}`, onclick: () => go('learn') }));
+    if (!events.some(e => e.type === 'checkin' && e.payload.date === today && e.payload.slot === 'm')) chips.push(el('button', { type: 'button', id: 'checkin-chip', class: 'chip', textContent: 'Отметка утра', onclick: () => go('diary') }));
+    if (!events.some(e => e.type === 'testrun' && e.payload.date === today)) chips.push(el('button', { type: 'button', id: 'test-chip', class: 'chip', textContent: 'Проверка дня', onclick: () => go('tests') }));
     summary.replaceChildren(...chips);
   }
 

@@ -1,4 +1,5 @@
 import assert from 'node:assert/strict';
+import { VERSION } from '../version.js';
 import { launch, tab, until } from './helpers.mjs';
 
 const t = await launch();
@@ -6,7 +7,7 @@ const { page, errors } = t;
 await page.goto(t.url);
 await until(page, () => !document.getElementById('app').hidden);
 assert.equal(await page.textContent('#title'), 'Сегодня');
-assert.match(await page.textContent('#status'), /R3\.0 · онлайн/);
+assert.equal((await page.textContent('#status')).trim(), `${VERSION} · онлайн`);
 for (const [id, title] of [['habits', 'Привычки'], ['money', 'Деньги'], ['notes', 'Заметки'], ['more', 'Настройки'], ['today', 'Сегодня']]) {
   await tab(page, id);
   assert.equal(await page.textContent('#title'), title);
