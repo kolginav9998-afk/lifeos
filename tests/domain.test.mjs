@@ -1,0 +1,305 @@
+import test from 'node:test';
+import assert from 'node:assert/strict';
+import { makeTask, completeTask, todayStr, parseImport, serialize, cleanEvent, makeProfile, profileOf, groupTasks, updateTask } from '../events.js';
+import { makeHabit, makeHabitLog, habitStats, habitCalendar, activeHabits, habitLogId, archiveHabit, updateHabit, logsOf } from '../habits.js';
+import { parseAmount, formatMoney, makeExpense, updateExpense, summarizeMonth, shiftMonth, monthLabel, spentBetween, categoriesUsed,
+  makeBudget, budgetOf, expensesToCsv, csvCell, DEFAULT_CATEGORIES } from '../money.js';
+import { makeNote, updateNote, noteTitle, sortedNotes } from '../notes.js';
+import { searchEvents, normalize } from '../search.js';
+import { weekReview } from '../review.js';
+import { parseQuick } from '../quick.js';
+import { toMarkdown } from '../export.js';
+import { encryptBackup, decryptBackup, readBackup, backupKind, BadBackupPasswordError, NeedPasswordError } from '../backup.js';
+
+const at = (y, m, d, h = 12) => new Date(y, m - 1, d, h).getTime();
+const NOW = at(2026, 11, 10);          // вторник
+const TODAY = '2026-11-10';
+const FAST = { iterations: 2000 };
+
+// ---------- привычки ----------
+const mkHabit = (start = at(2026, 11, 1)) => makeHabit({ name: 'Python', anchor: 'после завтрака', minimum: 'открыть редактор' }, start);
+const logs = (h, dates, level = 'full') => dates.map(d => makeHabitLog(h, d, level));
+
+test('привычка: создание, валидация, одна отметка в день (детерминированный id)', () => {
+  const h = mkHabit();
+  assert.equal(h.payload.startDate, '2026-11-01');
+  assert.throws(() => makeHabit({ name: '  ' }));
+  const l1 = makeHabitLog(h, TODAY, 'full'), l2 = makeHabitLog(h, TODAY, 'min');
+  assert.equal(l1.id, l2.id, 'повторная отметка перезаписывает, а не дублирует');
+  assert.equal(l1.id, habitLogId(h.id, TODAY));
+  assert.throws(() => makeHabitLog(h, '2026-02-30', 'full'));
+  assert.throws(() => makeHabitLog(h, TODAY, 'super'));
+});
+test('привычка: серия не сгорает, пока день не кончился', () => {
+  const h = mkHabit();
+  const ev = [h, ...logs(h, ['2026-11-07', '2026-11-08', '2026-11-09'])];
+  let st = habitStats(h, ev, TODAY);
+  assert.equal(st.doneToday, false);
+  assert.equal(st.streak, 3, 'сегодня ещё не отмечено, но серия жива');
+  assert.equal(st.neverMissTwice, false, 'вчера выполнено');
+  ev.push(...logs(h, [TODAY]));
+  st = habitStats(h, ev, TODAY);
+  assert.equal(st.streak, 4); assert.equal(st.doneToday, true); assert.equal(st.level, 'full');
+});
+test('привычка: «не пропусти второй раз», регулярность и самая длинная серия', () => {
+  const h = mkHabit();
+  const ev = [h, ...logs(h, ['2026-11-02', '2026-11-03', '2026-11-04', '2026-11-05', '2026-11-08'])];
+  const st = habitStats(h, ev, TODAY);
+  assert.equal(st.streak, 0, 'вчера (9-го) пропуск — серия 0');
+  assert.equal(st.missedYesterday, true);
+  assert.equal(st.neverMissTwice, true);
+  assert.equal(st.longest, 4);
+  assert.equal(st.span, 10, '1–10 ноября, привычка создана 1-го');
+  assert.equal(st.hits, 5);
+  assert.equal(st.consistency, 0.5);
+  assert.equal(st.gapDays, 2);
+  assert.equal(st.needsRecovery, false);
+  ev.push(...logs(h, [TODAY]));
+  assert.equal(habitStats(h, ev, TODAY).neverMissTwice, false, 'сегодня отметил — предупреждение снято');
+});
+test('привычка: в день создания нет «пропуска вчера»; окно — не больше 30 дней; перерыв ≥3 дней = возвращение', () => {
+  const h = makeHabit({ name: 'x' }, NOW);
+  assert.equal(habitStats(h, [h], TODAY).missedYesterday, false);
+  assert.equal(habitStats(h, [h], TODAY).span, 1);
+  const old = makeHabit({ name: 'y' }, at(2026, 6, 1));
+  const st = habitStats(old, [old, ...logs(old, ['2026-11-05'])], TODAY);
+  assert.equal(st.span, 30);
+  assert.equal(st.gapDays, 5); assert.equal(st.needsRecovery, true);
+});
+test('привычка: чужие отметки не считаются; календарь; сортировка; архив; правка', () => {
+  const a = mkHabit(), b = makeHabit({ name: 'Бег' }, at(2026, 11, 1));
+  const ev = [a, b, ...logs(a, [TODAY]), ...logs(b, ['2026-11-09'])];
+  assert.equal(habitStats(a, ev, TODAY).doneToday, true);
+  assert.equal(habitStats(b, ev, TODAY).doneToday, false);
+  const cal = habitCalendar(a, ev, TODAY, 28);
+  assert.equal(cal.length, 28); assert.equal(cal.at(-1).date, TODAY); assert.equal(cal.at(-1).level, 'full'); assert.equal(cal.at(-1).today, true);
+  assert.equal(cal[0].before, true, 'дни до создания помечены');
+  assert.deepEqual(activeHabits(ev, TODAY).map(x => x.h.payload.name), ['Бег', 'Python'], 'невыполненные выше');
+  assert.equal(activeHabits([archiveHabit(a), b], TODAY).length, 1);
+  assert.equal(archiveHabit(archiveHabit(a), false).payload.archived, false);
+  assert.equal(updateHabit(a, { name: 'Python 2', anchor: '', minimum: '', full: '' }).payload.name, 'Python 2');
+  assert.throws(() => updateHabit(a, { name: ' ' }));
+  assert.equal(logsOf(ev, a.id).length, 1);
+});
+
+// ---------- деньги ----------
+test('сумма: форматы ввода, копейки, ошибки', () => {
+  assert.equal(parseAmount('1250'), 125000);
+  assert.equal(parseAmount('1 250,50'), 125050);
+  assert.equal(parseAmount('1 250.5'), 125050);
+  assert.equal(parseAmount('0,07'), 7);
+  for (const bad of ['', 'abc', '-5', '0', '0,00', '1,234', '1e5', '12..5', '999999999999']) assert.throws(() => parseAmount(bad), bad);
+});
+test('формат денег без дробных артефактов', () => {
+  assert.equal(formatMoney(125050), '1 250,50 ₽');
+  assert.equal(formatMoney(100), '1 ₽');
+  assert.equal(formatMoney(7), '0,07 ₽');
+  assert.equal(formatMoney(123456789), '1 234 567,89 ₽');
+  assert.equal(parseAmount('0,1') + parseAmount('0,2'), 30, 'вместо 0.1+0.2=0.30000000000000004');
+});
+test('расходы: создание, правка, месяц, категории, доли', () => {
+  const e1 = makeExpense({ amount: '30000', category: 'Жильё', date: '2026-11-10' }, NOW);
+  const e2 = makeExpense({ amount: '1 500,50', category: 'Еда', note: 'хлеб', date: '2026-11-02' }, NOW);
+  const e3 = makeExpense({ amount: '700', category: 'Еда', date: '2026-11-05' }, NOW);
+  const e4 = makeExpense({ amount: '999', category: 'Еда', date: '2026-10-31' }, NOW);
+  assert.equal(e1.payload.amountMinor, 3000000);
+  const s = summarizeMonth([e1, e2, e3, e4, { id: 'z', type: 'task', ts: 1, payload: {} }], '2026-11');
+  assert.equal(s.count, 3);
+  assert.equal(s.total, 3000000 + 150050 + 70000);
+  assert.deepEqual(s.byCategory.map(c => c.category), ['Жильё', 'Еда']);
+  assert.ok(Math.abs(s.byCategory.reduce((a, c) => a + c.share, 0) - 1) < 1e-9);
+  assert.deepEqual(s.items.map(i => i.payload.date), ['2026-11-10', '2026-11-05', '2026-11-02'], 'новые сверху');
+  assert.equal(spentBetween([e1, e2, e3, e4], '2026-11-01', '2026-11-05'), 150050 + 70000);
+  const u = updateExpense(e2, { amount: '2000', category: 'Продукты', note: '', date: '2026-11-03' }, NOW + 1);
+  assert.equal(u.id, e2.id); assert.equal(u.payload.amountMinor, 200000); assert.equal(u.payload.date, '2026-11-03');
+  assert.equal(makeExpense({ amount: '5' }, NOW).payload.category, 'Другое');
+  assert.throws(() => makeExpense({ amount: '5', date: '2026-13-01' }, NOW));
+  assert.throws(() => makeExpense({ amount: 0 }, NOW));
+  assert.deepEqual(categoriesUsed([e2, e3, e1]).slice(0, 2), ['Еда', 'Жильё']);
+  assert.ok(categoriesUsed([]).length === DEFAULT_CATEGORIES.length);
+});
+test('месяцы: сдвиг через границу года, подписи', () => {
+  assert.equal(shiftMonth('2026-01', -1), '2025-12');
+  assert.equal(shiftMonth('2026-12', 1), '2027-01');
+  assert.equal(shiftMonth('2026-11', 14), '2028-01');
+  assert.equal(monthLabel('2026-11'), 'Ноябрь 2026');
+});
+test('бюджет: запись и сброс', () => {
+  assert.equal(budgetOf([makeBudget(5000000)]), 5000000);
+  assert.equal(budgetOf([makeBudget(null)]), null);
+  assert.equal(budgetOf([]), null);
+  assert.throws(() => makeBudget(-1)); assert.throws(() => makeBudget(1.5));
+});
+test('CSV: разделитель, BOM, кавычки и защита от формул', () => {
+  const ev = [makeExpense({ amount: '1500,5', category: 'Еда', note: '=HYPERLINK("http://x")', date: '2026-11-02' }, NOW),
+    makeExpense({ amount: '10', category: 'A;B', note: 'строка\nвторая', date: '2026-11-01' }, NOW)];
+  const csv = expensesToCsv(ev);
+  assert.ok(csv.startsWith('﻿Дата;Сумма;Категория;Комментарий\r\n'));
+  assert.ok(csv.includes("'=HYPERLINK"), 'ячейка с «=» экранирована');
+  assert.ok(csv.includes('"A;B"'));
+  assert.ok(csv.includes('"строка\nвторая"'));
+  assert.ok(csv.includes('1500,50'));
+  assert.equal(csvCell('+1'), "'+1"); assert.equal(csvCell('@a'), "'@a"); assert.equal(csvCell('-2'), "'-2"); assert.equal(csvCell('ok'), 'ok');
+});
+
+// ---------- заметки и поиск ----------
+test('заметки: создание, правка, заголовок, порядок', () => {
+  const a = makeNote('  первая\nвторая строка ', 100), b = makeNote('вторая', 200);
+  assert.equal(a.payload.text, 'первая\nвторая строка');
+  assert.throws(() => makeNote('   ')); assert.throws(() => makeNote('x'.repeat(20001)));
+  assert.equal(noteTitle('\n\nзаголовок\nтекст'), 'заголовок');
+  assert.equal(noteTitle('x'.repeat(100)).length, 60);
+  assert.deepEqual(sortedNotes([a, b]).map(n => n.payload.text), ['вторая', 'первая\nвторая строка'], 'новые сверху');
+  const u = updateNote(a, 'правка', 300);
+  assert.equal(u.id, a.id); assert.equal(u.payload.editedAt, 300);
+  assert.deepEqual(sortedNotes([u, b]).map(n => n.payload.text), ['правка', 'вторая'], 'отредактированная поднимается наверх');
+  assert.throws(() => updateNote(a, '  '));
+});
+test('поиск: регистр, ё/е, несколько слов, типы, пустой запрос', () => {
+  const t = makeTask('Купить ЁЛКУ и хлеб', 1), n = makeNote('идея про ёлку\nвторая строка', 2),
+    h = makeHabit({ name: 'Зарядка', anchor: 'после сна' }, 3), e = makeExpense({ amount: '120', category: 'Еда', note: 'хлеб', date: TODAY }, 4);
+  const ev = [t, n, h, e];
+  assert.equal(normalize('Ёж'), 'еж');
+  assert.deepEqual(searchEvents(ev, 'елку').map(r => r.kind).sort(), ['Задача', 'Заметка']);
+  assert.deepEqual(searchEvents(ev, 'ХЛЕБ').map(r => r.kind).sort(), ['Задача', 'Расход']);
+  assert.deepEqual(searchEvents(ev, 'купить хлеб').map(r => r.kind), ['Задача'], 'все слова должны встретиться');
+  assert.equal(searchEvents(ev, 'после сна')[0].tab, 'habits');
+  assert.equal(searchEvents(ev, '120')[0].kind, 'Расход', 'ищет и по сумме');
+  assert.deepEqual(searchEvents(ev, '   '), []);
+  assert.deepEqual(searchEvents(ev, 'нет такого'), []);
+  assert.equal(searchEvents([{ id: 'p', type: 'profile', ts: 1, payload: { name: 'ёлка' } }], 'елка').length, 0, 'профиль не ищется');
+});
+
+// ---------- разбор дат ----------
+test('quick: относительные даты и дни недели', () => {
+  const p = s => parseQuick(s, NOW);
+  assert.deepEqual([p('купить хлеб завтра').text, p('купить хлеб завтра').due], ['купить хлеб', '2026-11-11']);
+  assert.equal(p('на завтра сделать').due, '2026-11-11'); assert.equal(p('на завтра сделать').text, 'сделать');
+  assert.equal(p('позвонить послезавтра').due, '2026-11-12');
+  assert.equal(p('сегодня оплатить').due, TODAY);
+  assert.equal(p('позвонить в пятницу маме').text, 'позвонить маме');
+  assert.equal(p('позвонить в пятницу маме').due, '2026-11-13');
+  assert.equal(p('в понедельник отчёт').due, '2026-11-16');
+  assert.equal(p('во вторник встреча').due, '2026-11-17', 'сегодня вторник — берётся следующий');
+  assert.equal(p('через 3 дня врач').due, '2026-11-13');
+  assert.equal(p('через неделю звонок').due, '2026-11-17');
+  assert.equal(p('через 2 недели отчёт').due, '2026-11-24');
+});
+test('quick: числа, месяцы и повторы', () => {
+  const p = s => parseQuick(s, NOW);
+  assert.equal(p('15 ноября встреча').due, '2026-11-15');
+  assert.equal(p('5 ноября ДР').due, '2027-11-05', 'прошедшая дата — на следующий год');
+  assert.equal(p('10 числа оплатить').due, TODAY);
+  assert.equal(p('9 числа оплатить').due, '2026-12-09');
+  assert.equal(p('до 31 числа сдать').due, '2026-11-30', 'в ноябре нет 31-го');
+  const r = p('оплатить жильё 10 числа каждого месяца');
+  assert.deepEqual([r.text, r.due, r.repeat], ['оплатить жильё', TODAY, 'monthly']);
+  const w = p('каждую пятницу отчёт'); assert.deepEqual([w.text, w.due, w.repeat], ['отчёт', '2026-11-13', 'weekly']);
+  const d = p('каждый день зарядка'); assert.deepEqual([d.text, d.repeat], ['зарядка', 'daily']);
+  const m = p('каждого 5 числа аренда'); assert.deepEqual([m.text, m.due, m.repeat], ['аренда', '2026-12-05', 'monthly']);
+  assert.equal(p('ежемесячно проверять счета').repeat, 'monthly');
+});
+test('quick: без уверенности ничего не меняет', () => {
+  for (const s of ['завтра', 'версия 1.2 релиз', 'купить 3 яблока', 'позвонить', '  ', 'в 5 вечера', '32 числа', 'сегодняшний отчёт']) {
+    const r = parseQuick(s, NOW);
+    assert.equal(r.due, null, s); assert.equal(r.repeat, null, s); assert.equal(r.text, s.trim(), s);
+  }
+  assert.equal(parseQuick('сегодняшний отчёт', NOW).due, null, 'слово «сегодняшний» — не «сегодня»');
+});
+test('quick + makeTask: результат пригоден для создания задачи', () => {
+  const q = parseQuick('оплатить жильё 10 числа каждого месяца', NOW);
+  const t = makeTask(q.text, NOW, { due: q.due, repeat: q.repeat });
+  assert.deepEqual(t.payload.repeat, { type: 'monthly', day: 10 });
+  assert.equal(completeTask(t, NOW).next.payload.due, '2026-12-10');
+});
+
+// ---------- обзор недели ----------
+test('обзор недели: сделанные задачи, привычки, расходы за 7 дней и за предыдущие 7', () => {
+  const t1 = completeTask(makeTask('a', at(2026, 11, 1)), at(2026, 11, 9)).updated;
+  const t2 = completeTask(makeTask('b', at(2026, 11, 1)), at(2026, 11, 10)).updated;
+  const t3 = completeTask(makeTask('c', at(2026, 11, 1)), at(2026, 11, 2)).updated;     // предыдущая неделя (3–9 ноября? нет: 27 окт–2 ноя... 2 ноября = prev)
+  const t4 = makeTask('открытая', NOW);
+  const h = makeHabit({ name: 'Бег' }, at(2026, 11, 1));
+  const ev = [t1, t2, t3, t4, h, ...['2026-11-08', '2026-11-09', TODAY].map(d => makeHabitLog(h, d, 'full')),
+    makeExpense({ amount: '100', date: '2026-11-08' }, NOW), makeExpense({ amount: '50', date: '2026-11-02' }, NOW),
+    makeNote('n', at(2026, 11, 9))];
+  const r = weekReview(ev, TODAY);
+  assert.equal(r.from, '2026-11-04');
+  assert.equal(r.tasksDone, 2);
+  assert.equal(r.prevDone, 1);
+  assert.equal(r.perDay.length, 7); assert.equal(r.perDay.at(-1).count, 1); assert.equal(r.perDay.at(-2).count, 1);
+  assert.equal(r.habits[0].hits, 3); assert.equal(r.habits[0].of, 7);
+  assert.equal(r.spent, 10000); assert.equal(r.spentPrev, 5000);
+  assert.equal(r.notes, 1);
+});
+
+// ---------- профиль ----------
+test('профиль: имя, accountId сохраняется при правке', () => {
+  const p = makeProfile('  Имя  ', 1);
+  assert.equal(p.payload.name, 'Имя');
+  const p2 = makeProfile('Другое', 2, p);
+  assert.equal(p2.payload.accountId, p.payload.accountId);
+  assert.equal(profileOf([p2]).payload.name, 'Другое');
+  assert.equal(profileOf([]), null);
+  assert.equal(makeProfile('x'.repeat(200), 1).payload.name.length, 60);
+});
+
+// ---------- задачи: приоритет ----------
+test('задачи: приоритет «важное» поднимает задачу внутри группы, правка меняет приоритет', () => {
+  const a = makeTask('обычная', 1, { due: TODAY }), b = makeTask('важная', 2, { due: TODAY, priority: 'high' });
+  assert.deepEqual(groupTasks([a, b], TODAY).today.map(t => t.payload.text), ['важная', 'обычная']);
+  assert.equal(updateTask(a, { text: 'обычная', due: TODAY, repeat: null, priority: 'high' }).payload.priority, 'high');
+  assert.equal(updateTask(b, { text: 'важная', due: TODAY, repeat: null }).payload.priority, 'high', 'без указания приоритет сохраняется');
+  const old = { id: 'o', type: 'task', ts: 1, payload: { text: 'старая', done: false, doneAt: null } };
+  assert.equal(updateTask(old, { text: 'старая', due: null, repeat: null }).payload.priority, 'normal');
+});
+
+// ---------- импорт: строгая проверка ----------
+test('импорт: отбрасывает мусор, нормализует поля, не принимает чужие ключи верхнего уровня', () => {
+  const good = makeTask('ok', 1);
+  const evil = JSON.parse('{"id":"e","type":"task","ts":1,"payload":{"__proto__":{"polluted":1},"text":"x"},"source":"' + 'a'.repeat(100) + '","confidence":7,"evidence":"no","extra":"drop"}');
+  const text = JSON.stringify({ app: 'lifeos', events: [good, evil, { id: 'x'.repeat(101), type: 'task', ts: 1, payload: {} },
+    { id: 'a', type: 'Bad Type', ts: 1, payload: {} }, { id: 'b', type: 'task', ts: NaN, payload: {} },
+    { id: 'c', type: 'task', ts: 1, payload: [] }, 5, null, 'str'] });
+  const { events, skipped } = parseImport(text);
+  assert.equal(skipped, 7);
+  assert.equal(events.length, 2);
+  const e = events[1];
+  assert.equal(e.source.length, 20); assert.equal(e.confidence, 1); assert.deepEqual(e.evidence, []); assert.equal('extra' in e, false);
+  assert.equal({}.polluted, undefined, 'прототип Object не загрязнён');
+  assert.equal(cleanEvent({ id: 'a', type: 'note', ts: 1, payload: {} }).source, 'import');
+  assert.throws(() => parseImport(JSON.stringify({ app: 'lifeos', events: new Array(200001).fill(0) })), /Слишком много/);
+});
+
+// ---------- зашифрованные копии ----------
+test('копия: шифрование, чтение с паролем, неверный пароль, подмена, понимает оба формата', async () => {
+  const ev = [makeTask('секретная задача', 1), makeExpense({ amount: '500', date: TODAY }, NOW)];
+  const file = await encryptBackup(ev, 'надёжный-пароль', FAST);
+  assert.equal(backupKind(file), 'encrypted');
+  assert.ok(!file.includes('секретная'), 'в файле нет открытого текста');
+  const back = await decryptBackup(file, 'надёжный-пароль');
+  assert.deepEqual(back.events, ev); assert.equal(back.skipped, 0);
+  await assert.rejects(decryptBackup(file, 'другой-пароль-1'), BadBackupPasswordError);
+  await assert.rejects(decryptBackup(file, ''), NeedPasswordError);
+  const d = JSON.parse(file); d.ct = d.ct.slice(0, -4) + 'AAAA';
+  await assert.rejects(decryptBackup(JSON.stringify(d), 'надёжный-пароль'), BadBackupPasswordError, 'подмена шифртекста обнаружена');
+  await assert.rejects(decryptBackup(JSON.stringify({ ...JSON.parse(file), iter: 5 }), 'надёжный-пароль'), /параметры/);
+  await assert.rejects(decryptBackup(JSON.stringify({ ...JSON.parse(file), iter: 999_999_999 }), 'надёжный-пароль'), /параметры/);
+  await assert.rejects(encryptBackup(ev, 'short', FAST), /не короче/);
+  assert.equal(backupKind(serialize(ev)), 'plain'); assert.equal(backupKind('{"a":1}'), 'unknown'); assert.equal(backupKind('мусор'), 'unknown');
+  const plain = await readBackup(serialize(ev));
+  assert.equal(plain.encrypted, false); assert.equal(plain.events.length, 2);
+  const enc = await readBackup(file, 'надёжный-пароль');
+  assert.equal(enc.encrypted, true);
+  await assert.rejects(readBackup('{"x":1}'), /не резервная/);
+  await assert.rejects(readBackup('x'.repeat(31 * 1024 * 1024)), /слишком большой/);
+});
+
+// ---------- Markdown ----------
+test('Markdown-экспорт содержит все разделы и не ломается на пустых данных', () => {
+  const md = toMarkdown([makeTask('задача', 1, { due: TODAY, priority: 'high' }), completeTask(makeTask('готово', 1), 5).updated,
+    makeNote('текст заметки', NOW), makeExpense({ amount: '100', category: 'Еда', note: 'x\ny', date: TODAY }, NOW), makeHabit({ name: 'Бег' }, NOW)], NOW);
+  for (const part of ['## Задачи', '- [ ] задача ★ (до 2026-11-10)', '- [x] готово', '## Привычки', '**Бег**', '## Заметки', 'текст заметки', '## Расходы', '100 ₽', 'x y']) assert.ok(md.includes(part), part);
+  const empty = toMarkdown([], NOW);
+  assert.equal((empty.match(/_нет_/g) || []).length, 4);
+});

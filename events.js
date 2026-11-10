@@ -4,6 +4,7 @@
 
 export const SCHEMA_VERSION = 1;
 export const REPEAT_TYPES = ['daily', 'weekly', 'monthly'];
+export const MAX_TEXT = 500;
 
 export function newId() {
   if (globalThis.crypto?.randomUUID) return crypto.randomUUID();
@@ -75,11 +76,12 @@ export function makeTask(text, now = Date.now(), opts = {}) {
     repeat = { type: opts.repeat };
     if (opts.repeat === 'monthly') repeat.day = Number(due.split('-')[2]);
   }
+  if (clean.length > MAX_TEXT) throw new Error('text too long');
   return {
     id: newId(),
     type: 'task',
     ts: now,
-    payload: { text: clean, done: false, doneAt: null, due, repeat },
+    payload: { text: clean, done: false, doneAt: null, due, repeat, priority: opts.priority === 'high' ? 'high' : 'normal' },
     source: 'manual',   // manual | voice | ai | notification | import
     confidence: 1,      // 0..1
     evidence: [],
@@ -87,7 +89,7 @@ export function makeTask(text, now = Date.now(), opts = {}) {
 }
 
 // Изменить текст/срок/повтор открытой задачи. id, время создания и происхождение не меняются.
-export function updateTask(ev, { text, due, repeat }, now = Date.now()) {
+export function updateTask(ev, { text, due, repeat, priority }, now = Date.now()) {
   const clean = String(text ?? '').trim();
   if (!clean) throw new Error('empty task');
   let nd = due || null;
@@ -99,7 +101,9 @@ export function updateTask(ev, { text, due, repeat }, now = Date.now()) {
     rep = { type: repeat };
     if (repeat === 'monthly') rep.day = Number(nd.split('-')[2]);
   }
-  return { ...ev, payload: { ...ev.payload, text: clean, due: nd, repeat: rep, editedAt: now } };
+  if (clean.length > MAX_TEXT) throw new Error('text too long');
+  const pr = priority === undefined ? (ev.payload.priority || 'normal') : (priority === 'high' ? 'high' : 'normal');
+  return { ...ev, payload: { ...ev.payload, text: clean, due: nd, repeat: rep, priority: pr, editedAt: now } };
 }
 
 // Отметить сделанной. Для повторяющейся создаётся следующая задача.
@@ -124,7 +128,8 @@ export function reopenTask(ev) {
   return { updated: { ...ev, payload: { ...rest, done: false, doneAt: null } }, removeId: spawnedId || null };
 }
 
-const byDue = (a, b) => (a.payload.due || '').localeCompare(b.payload.due || '') || a.ts - b.ts;
+const prio = e => (e.payload.priority === 'high' ? 0 : 1);
+const byDue = (a, b) => (a.payload.due || '').localeCompare(b.payload.due || '') || prio(a) - prio(b) || a.ts - b.ts;
 
 export function groupTasks(events, today) {
   const tasks = events.filter(e => e.type === 'task');
@@ -133,7 +138,7 @@ export function groupTasks(events, today) {
     overdue: open.filter(e => e.payload.due && e.payload.due < today).sort(byDue),
     today: open.filter(e => e.payload.due === today).sort(byDue),
     upcoming: open.filter(e => e.payload.due && e.payload.due > today).sort(byDue),
-    nodate: open.filter(e => !e.payload.due).sort((a, b) => b.ts - a.ts),
+    nodate: open.filter(e => !e.payload.due).sort((a, b) => prio(a) - prio(b) || b.ts - a.ts),
     done: tasks.filter(e => e.payload.done).sort((a, b) => b.payload.doneAt - a.payload.doneAt),
   };
   g.openCount = open.length;
@@ -145,6 +150,38 @@ export function serialize(events, now = Date.now()) {
   return JSON.stringify({ app: 'lifeos', schema: SCHEMA_VERSION, exportedAt: now, events }, null, 2);
 }
 
+// ---------- профиль ----------
+export const PROFILE_ID = 'profile';
+export function makeProfile(name, now = Date.now(), prev = null) {
+  const clean = String(name ?? '').trim().slice(0, 60);
+  return {
+    id: PROFILE_ID, type: 'profile', ts: prev?.ts ?? now,
+    // accountId — задел под будущую синхронизацию/аккаунт на сервере; сейчас нигде не отправляется
+    payload: { name: clean, accountId: prev?.payload?.accountId || newId(), updatedAt: now },
+    source: 'manual', confidence: 1, evidence: [],
+  };
+}
+export const profileOf = events => events.find(e => e.type === 'profile' && e.id === PROFILE_ID) || null;
+
+// ---------- импорт: только проверенные события ----------
+export const MAX_IMPORT_EVENTS = 200000;
+const TYPE_RE = /^[a-z][a-z0-9_]{0,39}$/;
+const isPlain = o => !!o && typeof o === 'object' && !Array.isArray(o);
+
+export function cleanEvent(e) {
+  if (!isPlain(e)) return null;
+  if (typeof e.id !== 'string' || e.id.length < 1 || e.id.length > 100) return null;
+  if (typeof e.type !== 'string' || !TYPE_RE.test(e.type)) return null;
+  if (typeof e.ts !== 'number' || !Number.isFinite(e.ts)) return null;
+  if (!isPlain(e.payload)) return null;
+  return {
+    id: e.id, type: e.type, ts: e.ts, payload: e.payload,
+    source: typeof e.source === 'string' ? e.source.slice(0, 20) : 'import',
+    confidence: typeof e.confidence === 'number' && e.confidence >= 0 && e.confidence <= 1 ? e.confidence : 1,
+    evidence: Array.isArray(e.evidence) ? e.evidence.slice(0, 50) : [],
+  };
+}
+
 // Возвращает только валидные события; мусор отбрасывает и считает.
 export function parseImport(text) {
   let data;
@@ -152,13 +189,12 @@ export function parseImport(text) {
   if (!data || data.app !== 'lifeos' || !Array.isArray(data.events)) {
     throw new Error('Это не резервная копия Life OS');
   }
+  if (data.events.length > MAX_IMPORT_EVENTS) throw new Error('Слишком много записей в файле');
   const valid = [];
   let skipped = 0;
   for (const e of data.events) {
-    const ok = e && typeof e.id === 'string' && typeof e.type === 'string'
-      && typeof e.ts === 'number' && e.payload && typeof e.payload === 'object';
-    if (ok) valid.push({ source: 'import', confidence: 1, evidence: [], ...e });
-    else skipped++;
+    const c = cleanEvent(e);
+    if (c) valid.push(c); else skipped++;
   }
   return { events: valid, skipped };
 }

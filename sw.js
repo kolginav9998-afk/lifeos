@@ -1,7 +1,9 @@
 // Офлайн-оболочка. При изменении файлов — поднять CACHE.
-const CACHE = 'lifeos-r1.2';
-const SHELL = ['./', 'index.html', 'style.css', 'app.js', 'events.js', 'db.js', 'platform.js',
-  'manifest.webmanifest', 'icons/icon-192.png', 'icons/icon-512.png'];
+const CACHE = 'lifeos-r2.0';
+const SHELL = ['./', 'index.html', 'style.css', 'manifest.webmanifest', 'icons/icon-192.png', 'icons/icon-512.png',
+  'app.js', 'ui.js', 'prefs.js', 'store.js', 'db.js', 'vault.js', 'cryptoutil.js', 'backup.js', 'events.js', 'habits.js', 'money.js',
+  'notes.js', 'search.js', 'review.js', 'quick.js', 'export.js', 'platform.js', 'version.js',
+  'view-today.js', 'view-habits.js', 'view-money.js', 'view-notes.js', 'view-settings.js'];
 
 self.addEventListener('install', e => {
   e.waitUntil(caches.open(CACHE).then(c => c.addAll(SHELL)).then(() => self.skipWaiting()));
@@ -22,7 +24,7 @@ self.addEventListener('fetch', e => {
         fetch(req, { cache: 'no-cache' }),
         new Promise((_, rej) => setTimeout(() => rej(new Error('timeout')), 4000)),
       ]);
-      if (res.ok) cache.put(req, res.clone());
+      if (res.ok && !new URL(req.url).search) cache.put(req, res.clone());   // запросы с ?параметрами («Поделиться») не кэшируем
       return res;
     } catch {
       const hit = await cache.match(req, { ignoreSearch: true });

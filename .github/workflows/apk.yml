@@ -21,9 +21,9 @@ jobs:
       - uses: actions/setup-java@v4
         with: { distribution: temurin, java-version: 21 }
       - run: npm ci
-      - run: node --test tests/events.test.mjs
+      - run: node --test "tests/*.test.mjs"
       - name: Собрать веб-часть (та же, что на сайте)
-        run: bash scripts/build-web.sh
+        run: bash scripts/build-web.sh apk
       - name: Создать Android-проект и подтянуть веб-часть
         run: |
           npx cap add android
@@ -37,14 +37,24 @@ jobs:
               <color name="ic_launcher_background">#0F1115</color>
           </resources>
           XML
+      - name: Приватность Android: запретить автоматическое облачное резервирование данных приложения
+        run: |
+          grep -q 'android:allowBackup="true"' android/app/src/main/AndroidManifest.xml
+          sed -i 's/android:allowBackup="true"/android:allowBackup="false"/' android/app/src/main/AndroidManifest.xml
+          grep -n 'allowBackup' android/app/src/main/AndroidManifest.xml
+      - name: Стабильная подпись (иначе новую версию нельзя поставить поверх старой)
+        run: |
+          mkdir -p ~/.android
+          cp signing/debug.keystore ~/.android/debug.keystore
       - name: Собрать debug-APK
         working-directory: android
         run: ./gradlew --no-daemon assembleDebug
-      - name: Подготовить файл
+      - name: Подготовить файл и показать отпечаток подписи
         run: |
           mkdir -p out
           cp android/app/build/outputs/apk/debug/app-debug.apk out/lifeos.apk
           ls -l out
+          keytool -printcert -jarfile out/lifeos.apk | grep -E 'Owner|SHA256'
       - uses: actions/upload-artifact@v4
         with:
           name: lifeos-apk
