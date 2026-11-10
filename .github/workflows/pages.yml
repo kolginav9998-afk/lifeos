@@ -36,7 +36,7 @@ jobs:
         run: npm run test:e2e
 
   deploy:
-    needs: test
+    needs: [test, e2e]          # сайт выкладывается только после юнит-тестов и браузерных сценариев
     if: github.ref == 'refs/heads/main'
     runs-on: ubuntu-latest
     environment:
