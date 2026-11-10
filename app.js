@@ -1,7 +1,7 @@
 import { makeTask, toggleTask, splitTasks, serialize, parseImport } from './events.js';
 import * as db from './db.js';
 
-const VERSION = 'R0.2';
+const VERSION = 'R0.2.1';
 const $ = id => document.getElementById(id);
 let events = [];
 
