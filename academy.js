@@ -152,3 +152,13 @@ export function lessonTitle(id) {
   if (!lessonIndex) { lessonIndex = new Map(); for (const t of TRACKS) for (const l of t.lessons) lessonIndex.set(l.id, { title: l.title, track: t.title }); }
   return lessonIndex.get(id) ?? null;
 }
+
+// Слово дня: детерминированно по дате, из колоды курса (английский и иврит).
+export function wordOfDay(date, trackId) {
+  const t = trackById(trackId);
+  if (!t || !t.deck?.length) return null;
+  const [y, m, d] = date.split('-').map(Number);
+  const n = Math.floor(Date.UTC(y, m - 1, d) / 86400000);
+  const [front, back] = t.deck[((n % t.deck.length) + t.deck.length) % t.deck.length];
+  return { track: trackId, title: t.title, front, back };
+}

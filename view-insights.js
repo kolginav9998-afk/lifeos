@@ -1,6 +1,8 @@
 // Экран «Аналитика»: отклонения от личной нормы, подсказки, динамика, выгрузка данных.
 import { el, toast, sparkline, dateRu } from './ui.js';
-import { todayStr } from './events.js';
+import { todayStr, daysBetween } from './events.js';
+import * as store from './store.js';
+import { METRICS, PRESETS, SAFETY, DAYS_OPTIONS, makeExperiment, experimentsOf, phaseOf, stateOf, endDate, evaluate } from './experiments.js';
 import { saveBinaryFile, saveTextFile } from './platform.js';
 import { TESTS, DOMAINS, runsOf, fmtPrimary, fmtNum } from './bt-core.js';
 import { analyzeRuns, insights, dailyRows, zText, zWord } from './bt-analytics.js';
@@ -27,6 +29,54 @@ export function aiSummary(events, now = Date.now()) {
 export function createInsightsView() {
   let events = [];
   const root = el('section', { id: 'view-insights', class: 'view' });
+
+  // ----- форма нового эксперимента (создаётся один раз, чтобы введённое не терялось при обновлении данных) -----
+  const preset = el('select', { id: 'exp-preset', 'aria-label': 'Готовый эксперимент' }, el('option', { value: '', textContent: 'Свой эксперимент' }), ...PRESETS.map(p => el('option', { value: p.id, textContent: p.title })));
+  const eTitle = el('input', { id: 'exp-title', type: 'text', maxLength: 100, placeholder: 'Название', autocomplete: 'off' });
+  const eChange = el('textarea', { id: 'exp-change', rows: 2, maxLength: 300, placeholder: 'Что именно меняется в фазе B?' });
+  const eMetric = el('select', { id: 'exp-metric', 'aria-label': 'Показатель' }, ...Object.entries(METRICS).map(([k, m]) => el('option', { value: k, textContent: m.label })));
+  const eDays = el('select', { id: 'exp-days', 'aria-label': 'Длительность' }, ...DAYS_OPTIONS.map(d => el('option', { value: String(d), textContent: `${d} дней (по неделе A и B)` })));
+  const eStart = el('input', { id: 'exp-date', type: 'date', value: todayStr() });
+  const eErr = el('p', { class: 'error', id: 'exp-err' });
+  preset.onchange = () => { const p = PRESETS.find(x => x.id === preset.value); if (p) { eTitle.value = p.title; eChange.value = p.change; eMetric.value = p.metric; eDays.value = String(p.days); } };
+  const startExp = async () => {
+    try {
+      const ev = makeExperiment({ title: eTitle.value, change: eChange.value, metric: eMetric.value, days: Number(eDays.value), startDate: eStart.value });
+      await store.save(ev);
+      eErr.textContent = ''; eTitle.value = ''; eChange.value = ''; preset.value = '';
+      const ph = phaseOf(ev.payload, todayStr());
+      toast(ph ? `Эксперимент начат. Сегодня фаза ${ph}.` : 'Эксперимент запланирован');
+    } catch (e) { eErr.textContent = e.message; }
+  };
+  const expForm = el('details', { class: 'card', id: 'exp-new' }, el('summary', { textContent: 'Новый эксперимент' }),
+    el('div', { class: 'form-stack' }, preset, eTitle, eChange, el('label', {}, 'Что сравниваем: ', eMetric), el('label', {}, 'Срок: ', eDays), el('label', {}, 'Начало: ', eStart),
+      el('p', { class: 'warn', textContent: SAFETY }),
+      el('p', { class: 'muted', textContent: 'Две фазы по неделе в случайном порядке: A — живёшь как обычно, B — вносишь изменение. Показатель берётся из отметок дня или проверок: чем регулярнее данные, тем точнее вывод.' }),
+      el('button', { type: 'button', id: 'exp-start', class: 'primary', textContent: 'Начать эксперимент', onclick: startExp }), eErr));
+
+  function experimentNodes(rows) {
+    const today = todayStr();
+    return experimentsOf(events).map(e => {
+      const p = e.payload, st = stateOf(p, today), m = METRICS[p.metric];
+      const head = el('strong', { textContent: p.title });
+      const lines = [];
+      if (st === 'active') {
+        const ph = phaseOf(p, today), day = daysBetween(p.startDate, today) + 1;
+        lines.push(el('p', { class: 'big', id: `exp-phase-${e.id}`, textContent: ph === 'B' ? `Сегодня фаза B: ${p.change}` : 'Сегодня фаза A: живи как обычно' }));
+        lines.push(el('p', { class: 'muted', textContent: `День ${day} из ${p.days} · показатель: ${m.label} (${m.source})` }));
+        const r = evaluate(p, rows, today);
+        if (r.verdict === 'insufficient') lines.push(el('p', { class: 'muted', textContent: r.text }));
+      } else if (st === 'planned') lines.push(el('p', { class: 'muted', textContent: `Начнётся ${dateRu(p.startDate)}` }));
+      else {
+        lines.push(el('p', { class: 'muted', textContent: `${st === 'cancelled' ? 'Остановлен' : 'Завершён'} · ${dateRu(p.startDate)} — ${dateRu(endDate(p))} · показатель: ${m.label}` }));
+        lines.push(el('p', { class: 'exp-result', textContent: evaluate(p, rows, st === 'ended' ? endDate(p) : today).text }));
+      }
+      const btns = [];
+      if (st === 'active' || st === 'planned') btns.push(el('button', { type: 'button', class: 'chip', dataset: { stop: e.id }, textContent: 'Остановить', onclick: () => store.save({ ...e, payload: { ...p, cancelled: true } }) }));
+      btns.push(el('button', { type: 'button', class: 'chip danger', textContent: 'Удалить', onclick: async () => { const old = await store.remove(e.id); toast('Эксперимент удалён', old ? { actionLabel: 'Вернуть', onAction: () => store.save(old) } : {}); } }));
+      return el('div', { class: `card exp ${st}`, dataset: { id: e.id, state: st } }, head, ...lines, el('div', { class: 'row' }, ...btns));
+    });
+  }
 
   const zRow = (label, z) => {
     const pct = Math.max(-100, Math.min(100, (z / 3) * 100));
@@ -64,6 +114,8 @@ export function createInsightsView() {
           s.series.length > 1 ? sparkline(s.series.map(p => (t.primary.better === 'lower' ? -p.value : p.value)), { width: 96, height: 32 }) : null);
       })));
     }
+
+    parts.push(el('h2', { textContent: 'Эксперименты' }), expForm, ...experimentNodes(dailyRows(events, runs, an)));
 
     parts.push(el('h2', { textContent: 'Выгрузка для анализа' }), el('div', { class: 'card' },
       el('p', { class: 'muted', textContent: 'ZIP с таблицами CSV: дни, все проходы, все метрики и пробы, отметки, замеры, привычки, обучение. Тексты дневника, заметки и деньги не входят.' }),

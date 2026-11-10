@@ -1,6 +1,6 @@
 import { el, toast, dateRu, ratingRow, stepper } from './ui.js';
 import { todayStr, addDays } from './events.js';
-import { makeCheckin, makeDiary, checkinOf, diaryOf, recentDays, sleepFromTimes, SLOTS, RATINGS, NUMBERS, hashtags } from './diary.js';
+import { makeCheckin, makeDiary, checkinOf, diaryOf, recentDays, sleepFromTimes, SLOTS, RATINGS, NUMBERS, hashtags, questionOfDay, onThisDay } from './diary.js';
 import { makeMeasure } from './health.js';
 import * as store from './store.js';
 
@@ -57,7 +57,15 @@ export function createDiaryView() {
   const dSave = el('button', { id: 'diary-save', type: 'button', class: 'primary', textContent: 'Сохранить запись' });
   const dDel = el('button', { id: 'diary-delete', type: 'button', class: 'danger', textContent: 'Удалить запись', hidden: true });
   const dSum = el('summary', { textContent: 'Дневник' });
-  const dBox = el('details', { id: 'diary-box', class: 'card', open: true }, dSum, el('div', { class: 'form-stack' }, dText, tags, dHigh, ...dG, el('div', { class: 'row' }, dSave, dDel)));
+  const qText = el('span', { id: 'diary-question' });
+  const qBtn = el('button', { id: 'diary-ask', type: 'button', class: 'chip', textContent: 'Ответить', onclick: () => {
+    const head = `${qText.textContent}\n`;
+    if (!dText.value.startsWith(head)) dText.value = head + dText.value;
+    dirty.d = true; paintTags(); dText.focus(); dText.setSelectionRange(dText.value.length, dText.value.length);
+  } });
+  const qRow = el('div', { class: 'row wrap hint' }, el('span', { textContent: 'Вопрос дня: ' }), qText, qBtn);
+  const past = el('div', { id: 'diary-past' });
+  const dBox = el('details', { id: 'diary-box', class: 'card', open: true }, dSum, el('div', { class: 'form-stack' }, qRow, dText, tags, dHigh, ...dG, el('div', { class: 'row' }, dSave, dDel), past));
 
   // ----- история -----
   const strip = el('div', { id: 'mood-strip', class: 'mood-strip', 'aria-label': 'Настроение за 14 дней' });
@@ -122,6 +130,8 @@ export function createDiaryView() {
       dG.forEach((inp, i) => { inp.value = d.gratitude?.[i] ?? ''; });
       paintTags();
     }
+    qText.textContent = questionOfDay(date);
+    past.replaceChildren(...onThisDay(events, date).map(x => el('p', { class: 'muted past' }, el('strong', { textContent: `${x.label} · ${dateRu(x.date)}: ` }), x.text)));
     mSum.textContent = `Утро${cm.date ? ' ✓' : ''}${cm.sleepHours ? ` · сон ${String(cm.sleepHours).replace('.', ',')} ч` : ''}`;
     eSum.textContent = `Вечер${ce.date ? ' ✓' : ''}`;
     dSum.textContent = `Дневник${d.date ? ' ✓' : ''}`;

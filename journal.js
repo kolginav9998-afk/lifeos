@@ -16,6 +16,7 @@ export function dayLog(events, date) {
     else if (e.type === 'diary' && p.date === date) out.push({ ts: e.ts, kind: 'Дневник', text: p.highlight || p.text.split('\n')[0] || '', id: e.id });
     else if (e.type === 'lesson' && p.date === date) { const l = lessonTitle(p.lesson); out.push({ ts: e.ts, kind: 'Урок', text: l ? `${l.title} (${l.track})` : p.lesson, id: e.id }); }
     else if (e.type === 'testrun' && p.date === date) out.push({ ts: p.startedAt, kind: 'Проверка', text: `${p.mode === 'quick' ? 'Быстрая' : p.mode === 'full' ? 'Полная' : 'Отдельный тест'} — тестов: ${Object.values(p.tests).filter(t => !t.skipped).length}${p.aborted ? ', прервана' : ''}`, id: e.id });
+    else if (e.type === 'breath' && p.date === date) out.push({ ts: e.ts, kind: 'Дыхание', text: `${Math.round(p.seconds / 60 * 10) / 10} мин${p.before && p.after ? `, стресс ${p.before} → ${p.after}` : ''}`, id: e.id });
     else if (e.type === 'note' && todayStr(e.ts) === date) out.push({ ts: e.ts, kind: 'Заметка', text: p.text.split('\n').find(l => l.trim()) || '', id: e.id });
   }
   let reviews = 0, lastTs = 0;

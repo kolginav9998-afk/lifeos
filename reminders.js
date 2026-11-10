@@ -6,12 +6,13 @@ import { activeHabits } from './habits.js';
 export const HORIZON_DAYS = 14;
 export const TASK_ID_BASE = 1000;       // 1000..1013 — задачи
 export const HABIT_ID_BASE = 2000;      // 2000..2013 — привычки
+export const EVENING_ID_BASE = 3000;    // 3000..3013 — вечерняя отметка и повторение
 export const TEST_ID = 9000;
 
 export const atLocal = (ymd, hour) => { const [y, m, d] = ymd.split('-').map(Number); return new Date(y, m - 1, d, hour, 0, 0).getTime(); };
 const plural = (n, one, few, many) => { const a = Math.abs(n) % 100, b = a % 10; return a > 10 && a < 20 ? many : b > 1 && b < 5 ? few : b === 1 ? one : many; };
 
-export function planReminders(events, now, { taskHour = 9, habitHour = 20 } = {}) {
+export function planReminders(events, now, { taskHour = 9, habitHour = 20, eveningHour = -1 } = {}) {
   const today = todayStr(now);
   const open = events.filter(e => e.type === 'task' && !e.payload.done && e.payload.due);
   const habits = activeHabits(events, today);
@@ -33,6 +34,11 @@ export function planReminders(events, now, { taskHour = 9, habitHour = 20 } = {}
       const at = atLocal(day, habitHour);
       const pending = i === 0 ? habits.filter(h => !h.st.doneToday).length : habits.length;
       if (pending && at > now) out.push({ id: HABIT_ID_BASE + i, at, title: 'Life OS', body: 'Привычки на сегодня. Минимум тоже считается.' });
+    }
+    if (eveningHour >= 0) {
+      const at = atLocal(day, eveningHour);
+      const marked = i === 0 && events.some(e => e.type === 'checkin' && e.payload.date === day && e.payload.slot === 'e');
+      if (!marked && at > now) out.push({ id: EVENING_ID_BASE + i, at, title: 'Life OS', body: 'Вечер: отметка дня и пара карточек на повторение.' });
     }
   }
   return out;

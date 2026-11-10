@@ -6,7 +6,9 @@ import { activeHabits } from './habits.js';
 import { weekReview } from './review.js';
 import { dayLog } from './journal.js';
 import { spentBetween } from './money.js';
-import { todayLoad } from './academy.js';
+import { todayLoad, wordOfDay } from './academy.js';
+import { activeExperiments, phaseOf } from './experiments.js';
+import * as vault from './vault.js';
 import * as store from './store.js';
 
 const REPEAT_OPTS = [['', 'не повторять'], ['daily', 'каждый день'], ['weekly', 'каждую неделю'], ['monthly', 'каждый месяц']];
@@ -28,15 +30,41 @@ export function createTodayView({ go }) {
   const dateLine = el('div', { id: 'date', class: 'date' });
   const summary = el('div', { id: 'summary', class: 'chips' });
 
+  const obList = el('ul', { class: 'steps', id: 'ob-steps' });
   const onboarding = el('div', { id: 'onboarding', class: 'card', hidden: true },
     el('strong', { textContent: 'Добро пожаловать в Life OS' }),
-    el('ul', { class: 'plain' },
-      el('li', { textContent: 'Задачи: пиши как говоришь — «оплатить жильё 10 числа каждого месяца».' }),
-      el('li', { textContent: 'Привычки, расходы и заметки — во вкладках внизу.' }),
-      el('li', { textContent: 'Данные хранятся только на этом устройстве. Включи защиту паролем во вкладке «Ещё».' })),
-    el('div', { class: 'row' },
-      el('button', { type: 'button', class: 'primary', textContent: 'Открыть защиту', onclick: () => { setPref('onboardingDone', true); onboarding.hidden = true; go('more'); } }),
-      el('button', { type: 'button', textContent: 'Понятно', onclick: () => { setPref('onboardingDone', true); onboarding.hidden = true; } })));
+    el('p', { class: 'muted', textContent: 'Пять шагов, чтобы приложение начало работать на тебя. Данные хранятся только у тебя, шифруются на устройстве.' }),
+    obList,
+    el('div', { class: 'row' }, el('button', { type: 'button', textContent: 'Понятно', onclick: () => { setPref('onboardingDone', true); onboarding.hidden = true; } })));
+  function renderOnboarding() {
+    const has = t => events.some(e => e.type === t);
+    const steps = [
+      ['task', 'Добавь первую задачу', has('task'), () => input.focus()],
+      ['checkin', 'Сделай отметку дня (Дневник)', has('checkin'), () => go('diary')],
+      ['lesson', 'Пройди первый урок (Развитие → Учёба)', has('lesson'), () => go('learn')],
+      ['test', 'Пройди первую проверку (Развитие → Тесты)', has('testrun'), () => go('tests')],
+      ['lock', 'Включи защиту паролем (Ещё)', vault.hasVault(), () => go('more')],
+    ];
+    const left = steps.filter(s => !s[2]).length;
+    onboarding.hidden = getPref('onboardingDone') || left === 0;
+    obList.replaceChildren(...steps.map(([id, text, done, act]) => el('li', { class: done ? 'done' : '', dataset: { step: id } },
+      el('span', { class: 'ob-mark', textContent: done ? '✓' : '○', 'aria-hidden': 'true' }),
+      done ? el('span', { textContent: text }) : el('button', { type: 'button', class: 'link', textContent: text, onclick: act }))));
+  }
+
+  // слово дня: английский и иврит, перевод по касанию
+  const wotd = el('div', { id: 'wotd', class: 'card tight', hidden: true });
+  function renderWotd(today) {
+    const rows = ['english', 'hebrew'].map(id => wordOfDay(today, id)).filter(Boolean);
+    wotd.hidden = !rows.length || getPref('wotdHidden') === today;
+    wotd.replaceChildren(el('div', { class: 'row' }, el('strong', { class: 'grow', textContent: 'Слово дня' }),
+      el('button', { type: 'button', class: 'link', 'aria-label': 'Скрыть слово дня', textContent: 'скрыть', onclick: () => { setPref('wotdHidden', today); wotd.hidden = true; } })),
+      ...rows.map(w => {
+        const back = el('span', { class: 'muted', hidden: true, textContent: ` — ${w.back}` });
+        const btn = el('button', { type: 'button', class: 'link wotd-show', dataset: { track: w.track }, textContent: w.front, onclick: () => { back.hidden = !back.hidden; } });
+        return el('p', { class: 'wotd-row', dataset: { track: w.track } }, btn, back);
+      }));
+  }
 
   // ----- форма добавления -----
   const input = el('input', { id: 'add-input', type: 'text', placeholder: 'Что нужно сделать?', enterKeyHint: 'done', maxLength: 500, required: true, autocomplete: 'off' });
@@ -124,7 +152,7 @@ export function createTodayView({ go }) {
     toast(`Удалено сделанных: ${ids.length}`, { actionLabel: 'Отменить', onAction: () => store.saveMany(old) });
   };
 
-  root.append(hello, dateLine, summary, onboarding, form, review, journal, ...Object.values(sections).map(s => s.sec), empty, doneBlock);
+  root.append(hello, dateLine, summary, onboarding, wotd, form, review, journal, ...Object.values(sections).map(s => s.sec), empty, doneBlock);
 
   // ----- элементы списка -----
   async function removeTask(ev) {
@@ -213,6 +241,7 @@ export function createTodayView({ go }) {
     if (load.due + load.fresh) chips.push(el('button', { type: 'button', id: 'learn-chip', class: 'chip', textContent: `Повторение: ${load.due + load.fresh}`, onclick: () => go('learn') }));
     if (!events.some(e => e.type === 'checkin' && e.payload.date === today && e.payload.slot === 'm')) chips.push(el('button', { type: 'button', id: 'checkin-chip', class: 'chip', textContent: 'Отметка утра', onclick: () => go('diary') }));
     if (!events.some(e => e.type === 'testrun' && e.payload.date === today)) chips.push(el('button', { type: 'button', id: 'test-chip', class: 'chip', textContent: 'Проверка дня', onclick: () => go('tests') }));
+    for (const e of activeExperiments(events, today)) chips.push(el('button', { type: 'button', class: 'chip exp-chip', dataset: { exp: e.id }, textContent: `Эксперимент: фаза ${phaseOf(e.payload, today)}`, onclick: () => go('insights') }));
     summary.replaceChildren(...chips);
   }
 
@@ -232,6 +261,13 @@ export function createTodayView({ go }) {
     if (r.habits.length) lines.push(el('p', { class: 'muted', textContent: 'Привычки: ' + r.habits.map(h => `${h.name} — ${h.hits} из ${h.of}`).join('; ') }));
     if (r.spent || r.spentPrev) lines.push(el('p', { class: 'muted', textContent: `Потрачено: ${moneyText(r.spent)} (прошлые 7 дней: ${moneyText(r.spentPrev)})` }));
     if (r.notes) lines.push(el('p', { class: 'muted', textContent: `Новых заметок: ${r.notes}` }));
+    const f1 = v => String(Math.round(v * 10) / 10).replace('.', ',');
+    const hl = [];
+    if (r.health.sleepDays) hl.push(`Сон: в среднем ${f1(r.health.sleepAvg)} ч (лучшая ночь ${f1(r.health.sleepBest)}, худшая ${f1(r.health.sleepWorst)}; отметок: ${r.health.sleepDays})`);
+    if (r.health.activityDays) hl.push(`Активность: ${r.health.activityMinutes} из ${r.health.activityGoal} минут (ориентир ВОЗ — 150 и больше в неделю)`);
+    if (r.health.moodAvg !== null) hl.push(`Настроение: в среднем ${f1(r.health.moodAvg)} из 5`);
+    if (hl.length) lines.push(el('p', { id: 'review-health', class: 'muted', textContent: hl.join(' · ') }));
+    if (r.growth.lessons || r.growth.reviews || r.growth.tests) lines.push(el('p', { id: 'review-growth', class: 'muted', textContent: `Развитие: уроков ${r.growth.lessons}, ответов на карточки ${r.growth.reviews}, проверок ${r.growth.tests}` }));
     reviewBody.replaceChildren(...lines);
   }
 
@@ -243,7 +279,8 @@ export function createTodayView({ go }) {
     const [y, m, d] = today.split('-').map(Number);
     const ds = new Date(y, m - 1, d, 12).toLocaleDateString('ru', { weekday: 'long', day: 'numeric', month: 'long' });
     dateLine.textContent = ds.charAt(0).toUpperCase() + ds.slice(1);
-    onboarding.hidden = getPref('onboardingDone') || events.some(e => e.type === 'task');
+    renderOnboarding();
+    renderWotd(today);
     const g = groupTasks(events, today);
     for (const key of Object.keys(sections)) {
       sections[key].sec.hidden = g[key].length === 0;

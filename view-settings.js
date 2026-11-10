@@ -196,7 +196,8 @@ export function createSettingsView({ lockNow, applyTheme, onVaultChange, openAcc
     const on = el('input', { id: 'pref-remind', type: 'checkbox', checked: !!getPref('remindersOn') });
     const th = el('select', { id: 'remind-task-hour' }, ...hours([-1, 7, 8, 9, 10, 11, 12], 'не напоминать').map(([v, t]) => el('option', { value: String(v), textContent: t })));
     const hh = el('select', { id: 'remind-habit-hour' }, ...hours([-1, 18, 19, 20, 21, 22], 'не напоминать').map(([v, t]) => el('option', { value: String(v), textContent: t })));
-    th.value = String(getPref('taskHour')); hh.value = String(getPref('habitHour'));
+    const eh = el('select', { id: 'remind-evening-hour' }, ...hours([-1, 19, 20, 21, 22, 23], 'не напоминать').map(([v, t]) => el('option', { value: String(v), textContent: t })));
+    th.value = String(getPref('taskHour')); hh.value = String(getPref('habitHour')); eh.value = String(getPref('eveningHour'));
     const status = el('p', { id: 'remind-status', class: 'muted', textContent: getPref('remindersOn') ? 'Включено' : 'Выключено' });
     const run = async ask => {
       const r = await notify.resync({ ask });
@@ -210,13 +211,14 @@ export function createSettingsView({ lockNow, applyTheme, onVaultChange, openAcc
     };
     th.onchange = () => { setPref('taskHour', Number(th.value)); if (getPref('remindersOn')) run(false); };
     hh.onchange = () => { setPref('habitHour', Number(hh.value)); if (getPref('remindersOn')) run(false); };
+    eh.onchange = () => { setPref('eveningHour', Number(eh.value)); if (getPref('remindersOn')) run(false); };
     const test = el('button', { id: 'remind-test', type: 'button', textContent: 'Тестовое уведомление через 5 секунд', onclick: async () => {
       const r = await notify.testNow();
       toast(r.ok ? 'Закрой экран или сверни приложение: уведомление придёт через 5 секунд' : r.reason === 'denied' ? 'Нет разрешения на уведомления' : `Не удалось: ${r.reason}`);
     } });
     remindBox.replaceChildren(
       el('label', { class: 'check-label' }, on, ' Напоминать о задачах и привычках'),
-      el('label', {}, 'О задачах на день: ', th), el('label', {}, 'О привычках: ', hh), status, test,
+      el('label', {}, 'О задачах на день: ', th), el('label', {}, 'О привычках: ', hh), el('label', {}, 'Вечерняя отметка и повторение: ', eh), status, test,
       el('p', { class: 'muted', textContent: 'Если уведомления не приходят, на Huawei разреши приложению автозапуск и работу в фоне (Настройки → Батарея → Запуск приложений).' }));
   }
 

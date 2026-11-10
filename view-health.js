@@ -5,6 +5,7 @@ import { MEASURES, makeMeasure, updateMeasure, measureKeys, measuresOf, dailySer
   sleepStats, bpAverage, healthProfile, checkHealthProfile, formatMeasure, measureLabel, ageFromBirthYear, measuresToCsv } from './health.js';
 import { saveTextFile } from './platform.js';
 import * as store from './store.js';
+import { openBreathing } from './breathing.js';
 
 const num = x => String(Math.round(x * 100) / 100).replace('.', ',');
 const signed = x => (x > 0 ? '+' : x < 0 ? '−' : '') + num(Math.abs(x));
@@ -84,7 +85,10 @@ export function createHealthView() {
   const list = el('div', { id: 'health-list' });
   const empty = el('p', { class: 'muted', hidden: true, textContent: 'Замеров пока нет. Добавь первый выше.' });
   const csv = el('button', { id: 'health-csv', type: 'button', textContent: 'Скачать замеры (CSV)', onclick: () => saveTextFile(`health-${todayStr()}.csv`, measuresToCsv(store.state.events), 'text/csv').catch(e => toast(e.message)) });
-  root.append(summary, form, list, empty, hpBox, el('div', { class: 'row' }, csv));
+  const breathHost = el('div', { id: 'breath-host', class: 'overlay', hidden: true, tabIndex: -1, role: 'dialog', 'aria-modal': 'true', 'aria-label': 'Дыхание' });
+  const breathCard = el('div', { class: 'card tight row' }, el('span', { class: 'grow', textContent: 'Дыхание 4–6: успокоиться за пару минут' }),
+    el('button', { type: 'button', id: 'breath-start', class: 'chip', textContent: 'Начать', onclick: () => { openBreathing(breathHost); breathHost.focus({ preventScroll: true }); } }));
+  root.append(summary, form, list, empty, hpBox, el('div', { class: 'row' }, csv), breathCard, breathHost);
 
   function renderSummary(today) {
     const hpf = healthProfile(events);

@@ -266,3 +266,15 @@ html.amounts-hidden .amount{letter-spacing:.1em}
 .insight.warn{border-left-color:var(--warn)}.insight.good{border-left-color:var(--ok)}.insight.relation{border-left-color:var(--accent)}
 @media (prefers-color-scheme: dark){:root:not([data-theme=light]) .badge.good{background:#14532d;color:#bbf7d0}:root:not([data-theme=light]) .badge.bad{background:#7f1d1d;color:#fecaca}:root:not([data-theme=light]) .sh-cell.wrong{background:#7f1d1d}}
 .entry{display:flex;align-items:center;gap:12px;background:var(--card);border:1px solid var(--line);border-radius:12px;padding:10px 12px}
+/* ---- старт, слово дня, дыхание ---- */
+.steps{list-style:none;margin:6px 0 10px;padding:0;display:flex;flex-direction:column;gap:2px}
+.steps li{display:flex;align-items:center;gap:8px;min-height:36px}
+.steps li.done{color:var(--muted);text-decoration:line-through}
+.ob-mark{width:22px;text-align:center;color:var(--ok);font-weight:700}
+.wotd-row{margin:6px 0 0}
+.wotd-show{font-size:1.1rem;font-weight:600;text-decoration:none;color:var(--text)}
+.breath-circle{width:180px;height:180px;border-radius:50%;margin:30px auto;background:var(--accent);opacity:.85;transform:scale(.55);transition-property:transform;transition-timing-function:ease-in-out;transition-duration:4s}
+.breath-circle[data-phase=in]{transform:scale(1)}
+.breath-circle[data-phase=out]{transform:scale(.55)}
+.past{margin:6px 0;border-left:3px solid var(--line);padding-left:8px}
+@media (prefers-reduced-motion: reduce){.breath-circle{transition-duration:.01s !important}}

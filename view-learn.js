@@ -89,6 +89,7 @@ export function createLearnView() {
         ...l.body.map(par => el('p', { textContent: par })),
         el('p', { class: 'task' }, el('strong', { textContent: 'Задание: ' }), l.task),
         el('p', { class: 'muted', textContent: `Карточек в уроке: ${l.cards.length}` }),
+        el('button', { type: 'button', class: 'chip', dataset: { aiCheck: l.id }, textContent: 'Проверить мой ответ с ИИ', onclick: () => copyText(`Я прохожу урок «${l.title}» из курса «${t.title}».\nЗадание: ${l.task}\nМой ответ: <вставь свой ответ>\n\nПроверь ответ как доброжелательный наставник: что верно, что неверно или неполно, один совет и один следующий шаг. Объясняй простыми словами и не выдумывай факты.`) }),
         el('button', { type: 'button', class: isDone ? '' : 'primary', dataset: { done: l.id }, textContent: isDone ? 'Снять отметку «пройден»' : 'Отметить пройденным', onclick: () => toggleLesson(t, l, isDone) }));
       d.addEventListener('toggle', () => { if (d.open) openLessons.add(l.id); else openLessons.delete(l.id); });
       return d;
