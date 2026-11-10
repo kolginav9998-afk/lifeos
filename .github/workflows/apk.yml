@@ -28,6 +28,15 @@ jobs:
         run: |
           npx cap add android
           npx cap sync android
+      - name: Своя иконка приложения
+        run: |
+          cp -r assets/android-res/. android/app/src/main/res/
+          cat > android/app/src/main/res/values/ic_launcher_background.xml <<'XML'
+          <?xml version="1.0" encoding="utf-8"?>
+          <resources>
+              <color name="ic_launcher_background">#0F1115</color>
+          </resources>
+          XML
       - name: Собрать debug-APK
         working-directory: android
         run: ./gradlew --no-daemon assembleDebug

@@ -38,3 +38,8 @@ section[hidden]{display:none}
 .meta .overdue{color:var(--danger);font-weight:600}
 .meta .today{color:var(--accent);font-weight:600}
 .item.is-overdue{border-color:var(--danger)}
+.item.editing{flex-direction:column;align-items:stretch;gap:8px}
+.item.editing input[type=text]{padding:12px;border-radius:10px;border:1px solid var(--line);background:var(--bg);color:var(--text);font:inherit}
+.item .body{cursor:pointer}
+.item.editing .row{margin:4px 0 0}
+.item.editing .save{background:var(--accent);border-color:transparent;color:#fff}

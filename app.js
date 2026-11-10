@@ -1,10 +1,11 @@
-import { makeTask, completeTask, reopenTask, groupTasks, todayStr, dueLabel, repeatLabel, serialize, parseImport } from './events.js';
+import { makeTask, updateTask, completeTask, reopenTask, groupTasks, todayStr, dueLabel, repeatLabel, serialize, parseImport } from './events.js';
 import * as db from './db.js';
 import { isNative, platformName, saveTextFile } from './platform.js';
 
-const VERSION = 'R1.1';
+const VERSION = 'R1.2';
 const $ = id => document.getElementById(id);
 let events = [];
+let editingId = null;
 
 function el(tag, props = {}, ...kids) {
   const n = document.createElement(tag);
@@ -13,8 +14,35 @@ function el(tag, props = {}, ...kids) {
   return n;
 }
 
+function editor(ev) {
+  const p = ev.payload;
+  const form = el('form', { className: 'item editing' });
+  const text = el('input', { type: 'text', value: p.text, maxLength: 500, required: true, className: 'edit-text' });
+  const due = el('input', { type: 'date', value: p.due || '', className: 'edit-due' });
+  const rep = el('select', { className: 'edit-repeat' },
+    ...[['', 'не повторять'], ['daily', 'каждый день'], ['weekly', 'каждую неделю'], ['monthly', 'каждый месяц']]
+      .map(([v, t]) => el('option', { value: v, textContent: t })));
+  rep.value = p.repeat?.type || '';
+  const save = el('button', { type: 'submit', textContent: 'Сохранить', className: 'save' });
+  const cancel = el('button', { type: 'button', textContent: 'Отмена', className: 'cancel' });
+  cancel.onclick = () => { editingId = null; render(); };
+  form.onsubmit = async e => {
+    e.preventDefault();
+    try {
+      await db.put(updateTask(ev, { text: text.value, due: due.value || null, repeat: rep.value || null }));
+      editingId = null;
+      await refresh();
+    } catch (err) { say('Не удалось сохранить: ' + err.message); }
+  };
+  form.append(text, el('div', { className: 'opts-row' }, el('label', {}, 'Срок ', due), el('label', {}, 'Повтор ', rep)),
+    el('div', { className: 'row' }, save, cancel));
+  queueMicrotask(() => text.focus());
+  return form;
+}
+
 function item(ev, today) {
   const p = ev.payload;
+  if (editingId === ev.id && !p.done) return editor(ev);
   const lab = dueLabel(p.due, today);
   const li = el('li', { className: 'item' + (p.done ? ' done' : '') + (lab.cls === 'overdue' && !p.done ? ' is-overdue' : '') });
   const check = el('button', { className: 'check', type: 'button', textContent: p.done ? '✓' : '' });
@@ -37,6 +65,14 @@ function item(ev, today) {
   const rep = repeatLabel(p.repeat);
   if (rep) metaBits.push(document.createTextNode((metaBits.length ? ' · ' : '') + '↻ ' + rep));
   const body = el('div', { className: 'body' }, el('span', { className: 'text', textContent: p.text }));
+  if (!p.done) {
+    body.tabIndex = 0;
+    body.setAttribute('role', 'button');
+    body.setAttribute('aria-label', 'Изменить: ' + p.text);
+    const edit = () => { editingId = ev.id; render(); };
+    body.onclick = edit;
+    body.onkeydown = e => { if (e.key === 'Enter') edit(); };
+  }
   if (metaBits.length) body.append(el('span', { className: 'meta' }, ...metaBits));
   const del = el('button', { className: 'del', type: 'button', textContent: '✕' });
   del.setAttribute('aria-label', 'Удалить');
@@ -142,4 +178,4 @@ if (!isNative && 'serviceWorker' in navigator) {
 
 refresh().then(renderDiag);
 // вернулись в приложение — пересчитать «сегодня» (мог смениться день)
-document.addEventListener('visibilitychange', () => { if (!document.hidden) refresh(); });
+document.addEventListener('visibilitychange', () => { if (!document.hidden && !editingId) refresh(); });

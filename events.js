@@ -86,6 +86,22 @@ export function makeTask(text, now = Date.now(), opts = {}) {
   };
 }
 
+// Изменить текст/срок/повтор открытой задачи. id, время создания и происхождение не меняются.
+export function updateTask(ev, { text, due, repeat }, now = Date.now()) {
+  const clean = String(text ?? '').trim();
+  if (!clean) throw new Error('empty task');
+  let nd = due || null;
+  if (nd && !isYmd(nd)) throw new Error('bad date');
+  let rep = null;
+  if (repeat) {
+    if (!REPEAT_TYPES.includes(repeat)) throw new Error('bad repeat');
+    if (!nd) nd = todayStr(now);
+    rep = { type: repeat };
+    if (repeat === 'monthly') rep.day = Number(nd.split('-')[2]);
+  }
+  return { ...ev, payload: { ...ev.payload, text: clean, due: nd, repeat: rep, editedAt: now } };
+}
+
 // Отметить сделанной. Для повторяющейся создаётся следующая задача.
 export function completeTask(ev, now = Date.now()) {
   const updated = { ...ev, payload: { ...ev.payload, done: true, doneAt: now } };

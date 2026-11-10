@@ -122,6 +122,32 @@ await page.reload();
 await page.waitForFunction(() => document.querySelectorAll('#g-today .item').length === 2);
 assert.match(await page.textContent('#g-overdue'), /просроченная/);
 
+// ---- R1.2: редактирование ----
+await page.locator('#g-upcoming .item', { hasText: 'потом' }).locator('.body').click();
+await page.waitForSelector('form.item.editing');
+await page.fill('.edit-text', 'потом изменено');
+await page.fill('.edit-due', ymd(0));
+await page.selectOption('.edit-repeat', 'weekly');
+await page.click('.edit-text ~ .row .save, form.editing .save');
+await page.waitForFunction(() => document.querySelectorAll('#g-today .item').length === 3);
+assert.match(await page.textContent('#g-today'), /потом изменено[\s\S]*каждую неделю/);
+assert.equal(await page.locator('#g-upcoming .item').count(), 0);
+// отмена не меняет
+await page.locator('#g-today .item', { hasText: 'потом изменено' }).locator('.body').click();
+await page.fill('.edit-text', 'не должно сохраниться');
+await page.click('form.editing .cancel');
+await page.waitForSelector('form.editing', { state: 'detached' });
+assert.equal(await page.locator('.item', { hasText: 'не должно сохраниться' }).count(), 0);
+// пустой текст не сохраняется (браузер блокирует submit)
+await page.locator('#g-today .item', { hasText: 'потом изменено' }).locator('.body').click();
+await page.fill('.edit-text', '');
+await page.click('form.editing .save');
+assert.equal(await page.locator('form.editing').count(), 1, 'форма осталась открытой');
+await page.click('form.editing .cancel');
+// переживает перезапуск
+await page.reload();
+await page.waitForFunction(() => document.querySelectorAll('#g-today .item').length === 3);
+
 // манифест
 const man = await (await ctx.request.get(url + 'manifest.webmanifest')).json();
 assert.equal(man.display, 'standalone');

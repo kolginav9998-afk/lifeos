@@ -1,6 +1,6 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
-import { makeTask, completeTask, reopenTask, groupTasks, nextDue, dueLabel, addDays, daysBetween,
+import { makeTask, updateTask, completeTask, reopenTask, groupTasks, nextDue, dueLabel, addDays, daysBetween,
   todayStr, isYmd, serialize, parseImport } from '../events.js';
 
 const at = (y, m, d, h = 12) => new Date(y, m - 1, d, h).getTime();
@@ -132,4 +132,36 @@ test('импорт: битые записи пропускаются, чужой
   assert.equal(skipped, 3);
   assert.throws(() => parseImport('{"foo":1}'), /не резервная копия/);
   assert.throws(() => parseImport('не json'), /не JSON/);
+});
+
+test('updateTask: меняет текст и срок, сохраняет id/ts/source', () => {
+  const t = makeTask('старое', 100, { due: '2026-11-10' });
+  const u = updateTask(t, { text: '  новое ', due: '2026-11-15', repeat: null }, 200);
+  assert.equal(u.id, t.id);
+  assert.equal(u.ts, 100);
+  assert.equal(u.source, 'manual');
+  assert.equal(u.payload.text, 'новое');
+  assert.equal(u.payload.due, '2026-11-15');
+  assert.equal(u.payload.editedAt, 200);
+  assert.equal(t.payload.text, 'старое', 'исходный объект не мутирован');
+});
+test('updateTask: повтор без даты берёт сегодня; monthly запоминает число', () => {
+  const t = makeTask('a', 1);
+  const u = updateTask(t, { text: 'a', due: null, repeat: 'monthly' }, at(2026, 11, 10));
+  assert.equal(u.payload.due, '2026-11-10');
+  assert.deepEqual(u.payload.repeat, { type: 'monthly', day: 10 });
+});
+test('updateTask: перенос срока у monthly меняет «число месяца», снятие повтора убирает repeat', () => {
+  const t = makeTask('жильё', 1, { due: '2026-11-10', repeat: 'monthly' });
+  const moved = updateTask(t, { text: 'жильё', due: '2026-11-12', repeat: 'monthly' });
+  assert.deepEqual(moved.payload.repeat, { type: 'monthly', day: 12 });
+  assert.equal(completeTask(moved, at(2026, 11, 12)).next.payload.due, '2026-12-12');
+  const plain = updateTask(moved, { text: 'жильё', due: '2026-11-12', repeat: '' });
+  assert.equal(plain.payload.repeat, null);
+});
+test('updateTask: пустой текст, кривая дата и кривой повтор — ошибки', () => {
+  const t = makeTask('a', 1);
+  assert.throws(() => updateTask(t, { text: '  ', due: null, repeat: null }));
+  assert.throws(() => updateTask(t, { text: 'a', due: '2026-02-30', repeat: null }));
+  assert.throws(() => updateTask(t, { text: 'a', due: null, repeat: 'yearly' }));
 });

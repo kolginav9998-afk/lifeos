@@ -1,5 +1,5 @@
 // Офлайн-оболочка. При изменении файлов — поднять CACHE.
-const CACHE = 'lifeos-r1.1';
+const CACHE = 'lifeos-r1.2';
 const SHELL = ['./', 'index.html', 'style.css', 'app.js', 'events.js', 'db.js', 'platform.js',
   'manifest.webmanifest', 'icons/icon-192.png', 'icons/icon-512.png'];
 
