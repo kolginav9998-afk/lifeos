@@ -69,6 +69,17 @@ await page.setInputFiles('#import-input', file);
 await page.waitForFunction(() => document.querySelectorAll('#open-list .item').length === 4);
 assert.equal(await page.textContent('#done-count'), '1', 'импорт восстановил');
 
+// IndexedDB стёрт, а копия в localStorage жива — данные восстанавливаются
+await page.evaluate(() => new Promise(r => { const q = indexedDB.deleteDatabase('lifeos'); q.onsuccess = q.onerror = q.onblocked = () => r(); }));
+await page.reload();
+await page.waitForFunction(() => document.querySelectorAll('#open-list .item').length === 4);
+assert.match(await page.textContent('#diag'), /Запуск №\d+/);
+
+// и наоборот: стёрт localStorage, IndexedDB жив
+await page.evaluate(() => localStorage.removeItem('lifeos.events.v1'));
+await page.reload();
+await page.waitForFunction(() => document.querySelectorAll('#open-list .item').length === 4);
+
 // манифест
 const man = await (await ctx.request.get(url + 'manifest.webmanifest')).json();
 assert.equal(man.display, 'standalone');

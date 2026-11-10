@@ -1,7 +1,7 @@
 import { makeTask, toggleTask, splitTasks, serialize, parseImport } from './events.js';
 import * as db from './db.js';
 
-const VERSION = 'R0.1';
+const VERSION = 'R0.2';
 const $ = id => document.getElementById(id);
 let events = [];
 
@@ -47,7 +47,7 @@ $('add-form').addEventListener('submit', async e => {
   if (!text) return;
   input.value = '';            // чистим сразу, чтобы быстрый ввод не терялся
   await db.put(makeTask(text));
-  await refresh();
+  await refresh().then(renderDiag);
 });
 
 $('export-btn').onclick = () => {
@@ -65,13 +65,39 @@ $('import-input').onchange = async e => {
   try {
     const { events: evs, skipped } = parseImport(await file.text());
     await db.putMany(evs);
-    await refresh();
+    await refresh().then(renderDiag);
     say(`Импортировано: ${evs.length}` + (skipped ? `, пропущено битых: ${skipped}` : ''));
   } catch (err) { say('Ошибка: ' + err.message); }
 };
 
-// Защита данных от очистки браузером
-navigator.storage?.persist?.().catch(() => {});
+// Диагностика хранилища: видно, переживают ли данные закрытие приложения
+const META_KEY = 'lifeos.meta';
+function bumpLaunch() {
+  try {
+    const m = JSON.parse(localStorage.getItem(META_KEY) || 'null') || { first: Date.now(), launches: 0 };
+    m.launches += 1;
+    localStorage.setItem(META_KEY, JSON.stringify(m));
+    return m;
+  } catch { return null; }
+}
+const meta = bumpLaunch();
+
+async function renderDiag() {
+  let persisted = 'неизвестно';
+  try {
+    if (navigator.storage?.persist) persisted = (await navigator.storage.persist()) ? 'да' : 'нет';
+  } catch {}
+  const c = await db.counts();
+  const standalone = matchMedia('(display-mode: standalone)').matches || navigator.standalone;
+  const lines = [
+    meta ? `Запуск №${meta.launches} (первый: ${new Date(meta.first).toLocaleString('ru')})` : 'Запуски: счётчик недоступен',
+    `Режим: ${standalone ? 'установленное приложение' : 'вкладка браузера'}`,
+    `Записей: IndexedDB ${c.idb ?? 'ошибка'}, копия ${c.ls}`,
+    `Защита от очистки: ${persisted}`,
+    db.state.idbOk === false ? `Ошибка IndexedDB: ${db.state.idbError}` : '',
+  ].filter(Boolean);
+  $('diag').textContent = lines.join('\n');
+}
 
 function setStatus() {
   $('status').textContent = `${VERSION} · ${navigator.onLine ? 'онлайн' : 'офлайн'}`;
@@ -84,4 +110,4 @@ if ('serviceWorker' in navigator) {
   navigator.serviceWorker.register('sw.js').catch(() => {});
 }
 
-refresh();
+refresh().then(renderDiag);
