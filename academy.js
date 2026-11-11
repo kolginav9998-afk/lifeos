@@ -8,6 +8,7 @@ import analyst from './c-analyst.js';
 import engineer from './c-engineer.js';
 import health from './c-health.js';
 import ai from './c-ai.js';
+import { LESSON_GOALS } from './c-goals.js';
 import { summary, srsId, buildQueue, newState, isDue, MASTERED_BOX } from './srs.js';
 import { daysBetween } from './events.js';
 import { isSick } from './sick.js';
@@ -16,6 +17,7 @@ import { makeRng } from './stats.js';
 const english = { ...englishBase, deck: [...(englishBase.deck || []), ...englishWords] };   // колода слов лежит в отдельном файле (бюджет размера файла)
 export const TRACKS = [english, hebrew, health, ai, backend, data, analyst, engineer];
 export const trackById = id => TRACKS.find(t => t.id === id) || null;
+export const lessonGoal = id => LESSON_GOALS[id] ?? '';           // «после урока я смогу…»
 export const MY_TRACK = { id: 'my', title: 'Свои карточки', icon: '★', color: '#a16207' };
 
 // Короткий стабильный хэш (FNV-1a) для идентификаторов карточек колоды: порядок слов в колоде можно менять.

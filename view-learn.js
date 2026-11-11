@@ -3,10 +3,12 @@ import { el, fill, toast } from './ui.js';
 import { todayStr } from './events.js';
 import * as store from './store.js';
 import { TRACKS, trackById, trackProgress, doneLessons, makeLessonDone, lessonEventId, makeSrsEvent, makeUserCard, userCards, sessionQueue, todayLoad, studyDates, MY_TRACK,
-  leeches, comebackInfo, fifteenPlan, lessonNoteOf, makeLessonNote, examQueue, quizFor, cardsOfTrack, cardFace, lessonToRevisit, markRevisited, lessonTitle, retentionByInterval } from './academy.js';
+  leeches, comebackInfo, fifteenPlan, lessonNoteOf, makeLessonNote, examQueue, quizFor, cardsOfTrack, cardFace, lessonToRevisit, markRevisited, lessonTitle, retentionByInterval, lessonGoal } from './academy.js';
 import { newState, grade, studyStreak, INTERVALS } from './srs.js';
 import { canSpeak, foreignSide, speak } from './speech.js';
 import { openSpeaking, hasRunningSpeak, speakWeek, SPEAK_LANGS } from './speaking.js';
+import { plateauInfo } from './practice.js';
+import { practiceCard } from './view-learn-extra.js';
 
 const QUALITY_LABEL = { again: 'Забыл', hard: 'Трудно', good: 'Помню' };
 
@@ -95,7 +97,7 @@ export function createLearnView() {
       el('span', { class: 'track-ic', style: `background:${MY_TRACK.color}`, textContent: MY_TRACK.icon, 'aria-hidden': 'true' }),
       el('span', { class: 'track-body' }, el('strong', { textContent: MY_TRACK.title }), el('span', { class: 'muted', textContent: mine.length ? `Карточек: ${mine.length}` : 'Добавляй свои вопросы и ответы' })));
     const note = el('p', { class: 'muted', textContent: 'Курсы — учебный материал, а не медицинская, юридическая или финансовая консультация.' });
-    mount(head, comeback, fifteen, revisit, speaking, leech, el('h2', { textContent: 'Курсы' }), ...cards, my, note);
+    mount(head, comeback, fifteen, revisit, speaking, practiceCard(events, t0), leech, el('h2', { textContent: 'Курсы' }), ...cards, my, note);
   }
 
   // ---------- конспект урока и открытие урока ----------
@@ -118,6 +120,16 @@ export function createLearnView() {
       noteDrafts.delete(l.id);
       await store.save(makeLessonNote(l.id, text, today(), Date.now(), note));
       toast('Конспект сохранён');
+    } catch (e) { toast(e.message); }
+  }
+  // конспект → карточка одним нажатием: вопрос «<урок>: что главное?», ответ — твои слова. Повторное нажатие обновляет ту же карточку.
+  async function noteToCard(l) {
+    const text = (noteAreas.get(l.id)?.value ?? '').trim();
+    if (!text) { toast('Сначала запиши конспект своими словами'); return; }
+    try {
+      const id = `ucard:ln-${l.id}`, old = events.find(e => e.id === id);
+      await store.save(makeUserCard(`${l.title}: что главное?`, text, Date.now(), id));
+      toast(old ? 'Карточка обновлена' : 'Карточка добавлена в «Свои карточки»', { actionLabel: 'Отменить', onAction: () => (old ? store.save(old) : store.remove(id)) });
     } catch (e) { toast(e.message); }
   }
   function quizNode(t, l) {
@@ -170,14 +182,19 @@ export function createLearnView() {
       ...curve.map(b => el('div', { class: 'curve-row', dataset: { label: b.label } }, el('span', { class: 'curve-label', textContent: b.label }), bar(Math.round(b.rate * 100), 100), el('span', { class: 'muted', textContent: `${Math.round(b.rate * 100)}% (ответов: ${b.n})` })))) : null;
     const plan = el('details', { class: 'card' }, el('summary', { textContent: 'План по неделям' }),
       el('ul', { class: 'plain' }, ...t.plan.map(w => el('li', { textContent: `Неделя ${w.week}: ${w.focus}. Каждый день: ${w.daily}.` }))));
+    const pl = plateauInfo(events, t.id, t0);
+    const plateau = pl ? el('div', { class: 'card calm', id: 'plateau' }, el('strong', { textContent: 'Нового давно нет' }), el('p', { textContent: pl.text }),
+      pl.nextLesson ? el('button', { type: 'button', id: 'plateau-open', class: 'chip', textContent: 'Открыть следующий урок', onclick: () => openLesson(t.id, pl.nextLesson.id) }) : null) : null;
     const lessons = t.lessons.map((l, idx) => {
       const isDone = done.has(l.id);
       const d = el('details', { class: 'card lesson', dataset: { lesson: l.id }, open: openLessons.has(l.id) },
         el('summary', {}, el('span', { class: 'lesson-n', textContent: isDone ? '✓' : String(idx + 1) }), el('span', { textContent: ` ${l.title} · ${l.minutes} мин` })),
+        lessonGoal(l.id) ? el('p', { class: 'lesson-goal' }, el('strong', { textContent: 'После урока я смогу: ' }), lessonGoal(l.id)) : null,
         ...l.body.map(par => el('p', { textContent: par })),
         el('p', { class: 'task' }, el('strong', { textContent: 'Задание: ' }), l.task),
         el('label', { class: 'field' }, el('span', { class: 'rating-label', textContent: 'Мой конспект' }), noteBox(l)),
-        el('button', { type: 'button', class: 'chip note-save', dataset: { note: l.id }, textContent: 'Сохранить конспект', onclick: () => saveNote(l) }),
+        el('div', { class: 'row wrap' }, el('button', { type: 'button', class: 'chip note-save', dataset: { note: l.id }, textContent: 'Сохранить конспект', onclick: () => saveNote(l) }),
+          el('button', { type: 'button', class: 'chip note-card', dataset: { noteCard: l.id }, textContent: 'Конспект → карточка', onclick: () => noteToCard(l) })),
         quizNode(t, l),
         el('p', { class: 'muted', textContent: `Карточек в уроке: ${l.cards.length}` }),
         el('button', { type: 'button', class: 'chip', dataset: { aiCheck: l.id }, textContent: 'Проверить мой ответ с ИИ', onclick: () => copyText(`Я прохожу урок «${l.title}» из курса «${t.title}».\nЗадание: ${l.task}\nМой ответ: <вставь свой ответ>\n\nПроверь ответ как доброжелательный наставник: что верно, что неверно или неполно, один совет и один следующий шаг. Объясняй простыми словами и не выдумывай факты.`) }),
@@ -193,7 +210,7 @@ export function createLearnView() {
         el('p', { textContent: t.intro }),
         el('p', { class: 'muted', textContent: `Уроки ${p.lessons}/${p.lessonsTotal} · выучено карточек ${p.mastered}/${p.total}` + (p.retention !== null ? ` · помню ${Math.round(p.retention * 100)}%` : '') }),
         bar(p.lessons, p.lessonsTotal), startBtn, examBtn),
-      mentor, curveBox, plan, el('h2', { textContent: 'Уроки' }), ...lessons, sources);
+      plateau, mentor, curveBox, plan, el('h2', { textContent: 'Уроки' }), ...lessons, sources);
   }
 
   async function toggleLesson(t, l, wasDone) {

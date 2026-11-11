@@ -361,3 +361,8 @@ html.amounts-hidden .amount{letter-spacing:.1em}
 .h-plan{font-size:.85rem}
 #money-nudge .row{padding:4px 0;gap:8px}
 #auto-card summary{cursor:pointer;font-weight:600}
+
+.lesson-goal{margin:6px 0;padding:8px 10px;border-left:3px solid var(--accent);background:rgba(37,99,235,.06);border-radius:0 8px 8px 0}
+.prac-row{display:flex;flex-direction:column;gap:4px;padding:8px 0;border-top:1px solid var(--line)}
+.prac-done{color:var(--ok);font-size:.9rem}
+.note-card{margin-left:4px}
