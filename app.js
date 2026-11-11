@@ -21,6 +21,8 @@ import { createHealthView } from './view-health.js';
 import { createLearnView } from './view-learn.js';
 import { createWorkoutsView } from './view-workouts.js';
 import { createPlansView } from './view-plans.js';
+import { createPeopleView } from './view-people.js';
+import { createOkrView } from './view-okr.js';
 import { createTestsView } from './view-tests.js';
 import { createInsightsView } from './view-insights.js';
 import { createSettingsView } from './view-settings.js';
@@ -31,6 +33,7 @@ import * as appSync from './app-sync.js';
 const DEFS = [
   { id: 'today', group: 'today', title: 'Сегодня', sub: 'Задачи', make: ctx => createTodayView(ctx) },
   { id: 'habits', group: 'today', title: 'Привычки', sub: 'Привычки', make: () => createHabitsView() },
+  { id: 'people', group: 'today', title: 'Люди', sub: 'Люди', make: () => createPeopleView() },
   { id: 'diary', group: 'diary', title: 'Дневник', sub: 'Дневник', make: () => createDiaryView() },
   { id: 'health', group: 'diary', title: 'Здоровье', sub: 'Здоровье', make: () => createHealthView() },
   { id: 'workouts', group: 'diary', title: 'Тренировки', sub: 'Тренировки', make: () => createWorkoutsView() },
@@ -38,6 +41,7 @@ const DEFS = [
   { id: 'learn', group: 'grow', title: 'Учёба', sub: 'Учёба', make: () => createLearnView() },
   { id: 'tests', group: 'grow', title: 'Проверка', sub: 'Тесты', make: () => createTestsView() },
   { id: 'insights', group: 'grow', title: 'Аналитика', sub: 'Аналитика', make: () => createInsightsView() },
+  { id: 'okr', group: 'grow', title: 'Цели', sub: 'Цели', make: () => createOkrView() },
   { id: 'money', group: 'money', title: 'Деньги', sub: 'Деньги', make: ctx => createMoneyView(ctx) },
   { id: 'plans', group: 'money', title: 'Планы', sub: 'Планы', make: () => createPlansView() },
   { id: 'more', group: 'more', title: 'Настройки', sub: 'Настройки', make: ctx => createSettingsView(ctx) },

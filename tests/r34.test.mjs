@@ -309,3 +309,116 @@ test('лекарства: список, отметка «принял», при�
   assert.match(md, /- Витамин D 2000 МЕ, утром \(отмечено 2 из 11 дн\.\)/); assert.match(md, /- Магний, вечером/);
   assert.ok(!doctorSummary([], TODAY, { now: NOW }).includes('- Витамин'));
 });
+
+import { parseBirthday, makePerson, markContact, updateNote as updatePersonNote, peopleOf, nextBirthday, upcomingBirthdays, dueContacts, CADENCES } from '../people.js';
+
+test('люди: разбор даты рождения, ближайший день рождения (в т. ч. 29 февраля), возраст', () => {
+  assert.deepEqual(parseBirthday('12.03'), { md: '03-12', year: null }); assert.deepEqual(parseBirthday('5.3.1990'), { md: '03-05', year: 1990 }); assert.deepEqual(parseBirthday('1990-03-12'), { md: '03-12', year: 1990 });
+  assert.equal(parseBirthday(''), null); assert.deepEqual(parseBirthday('29.02'), { md: '02-29', year: null });
+  assert.throws(() => parseBirthday('31.04'), /нет/); assert.throws(() => parseBirthday('abc'), /например/); assert.throws(() => parseBirthday('1.1.1800'), /Год/); assert.throws(() => parseBirthday('13.13'), /нет/);
+  const p = makePerson({ name: ' Мама ', birthday: '25.11.1965', cadenceDays: 7 }, 1).payload;
+  assert.equal(p.name, 'Мама'); assert.equal(p.birthday, '11-25'); assert.equal(p.birthYear, 1965);
+  const nb = nextBirthday(p, '2026-11-20');
+  assert.deepEqual(nb, { date: '2026-11-25', inDays: 5, age: 61 });
+  assert.deepEqual(nextBirthday(p, '2026-11-25'), { date: '2026-11-25', inDays: 0, age: 61 });
+  assert.deepEqual(nextBirthday(p, '2026-11-26'), { date: '2027-11-25', inDays: 364, age: 62 });
+  assert.equal(nextBirthday({ birthday: '02-29', birthYear: null }, '2027-02-01').date, '2027-02-28', 'в невисокий год — 28 февраля');
+  assert.equal(nextBirthday({ birthday: '02-29', birthYear: null }, '2028-02-01').date, '2028-02-29');
+  assert.equal(nextBirthday({ birthday: null }, '2026-11-20'), null);
+  assert.throws(() => makePerson({ name: '' }), /имя/); assert.throws(() => makePerson({ name: 'a', cadenceDays: 5 }), /часто/);
+  assert.ok(CADENCES.length >= 6);
+});
+test('люди: ближайшие дни рождения и «давно не общались»', () => {
+  const a = makePerson({ name: 'Анна', birthday: '14.11', cadenceDays: 14 }, new Date(2026, 9, 1).getTime());
+  const b = makePerson({ name: 'Борис', birthday: '25.12', cadenceDays: 30 }, new Date(2026, 9, 1).getTime());
+  const c = makePerson({ name: 'Вера', cadenceDays: 0 }, new Date(2026, 9, 1).getTime());
+  const d = makePerson({ name: 'Глеб', cadenceDays: 7 }, new Date(2026, 10, 9).getTime());
+  const ev = [b, c, a, d];
+  assert.deepEqual(upcomingBirthdays(ev, '2026-11-11', 14).map(x => [x.person.payload.name, x.inDays]), [['Анна', 3]]);
+  assert.equal(upcomingBirthdays(ev, '2026-11-11', 60).length, 2);
+  const due = dueContacts(ev, '2026-11-11');
+  assert.deepEqual(due.map(x => x.person.payload.name), ['Анна', 'Борис'], 'Анна: 41 день при периоде 14; Борис: 41 при 30; Глеб — рано, Вера — без напоминаний');
+  assert.equal(due[0].never, true);
+  const a2 = markContact(a, '2026-11-10');
+  assert.equal(dueContacts([a2, b], '2026-11-11').map(x => x.person.payload.name).join(), 'Борис');
+  assert.equal(updatePersonNote(a, ' идея: книга ').payload.note, 'идея: книга');
+  assert.deepEqual(peopleOf([b, a, c]).map(x => x.payload.name), ['Анна', 'Борис', 'Вера']);
+  assert.throws(() => markContact(a, 'x'), /bad date/);
+});
+
+import { quarterEnd, quarterLabel, makeOkr, updateKr, setOkrStatus, okrsOf, okrProgress, okrPace, krRatio } from '../okr.js';
+
+test('цели: конец квартала, создание с проверками, обновление результатов, прогресс и темп', () => {
+  assert.equal(quarterEnd('2026-11-11'), '2026-12-31'); assert.equal(quarterEnd('2026-02-10'), '2026-03-31'); assert.equal(quarterEnd('2026-04-01'), '2026-06-30'); assert.equal(quarterEnd('2026-09-30'), '2026-09-30');
+  assert.equal(quarterLabel('2026-11-11'), '4-й квартал 2026');
+  const now = new Date(2026, 9, 1, 12).getTime();                    // 1 октября
+  const o = makeOkr({ title: ' Форма ', why: 'здоровье', krs: [{ text: 'Пробежать за месяц', target: '50', unit: 'км' }, { text: 'Вес', target: 5, unit: 'кг' }, { text: '', target: 1 }] }, now);
+  assert.equal(o.type, 'okr'); assert.equal(o.payload.title, 'Форма'); assert.equal(o.payload.due, '2026-12-31'); assert.equal(o.payload.krs.length, 2, 'пустые результаты отбрасываются');
+  assert.throws(() => makeOkr({ title: '', krs: [{ text: 'a', target: 1 }] }), /Назови/); assert.throws(() => makeOkr({ title: 'a', krs: [] }), /хотя бы один/);
+  assert.throws(() => makeOkr({ title: 'a', krs: [{ text: 'x', target: 0 }] }), /больше нуля/); assert.throws(() => makeOkr({ title: 'a', krs: Array.from({ length: 6 }, (_, i) => ({ text: 'k' + i, target: 1 })) }), /Не больше 5/);
+  assert.throws(() => makeOkr({ title: 'a', due: '2026-01-01', krs: [{ text: 'x', target: 1 }] }, now), /позже/); assert.throws(() => makeOkr({ title: 'a', due: '2026-02-30', krs: [{ text: 'x', target: 1 }] }, now), /неверно/);
+  let k0 = o.payload.krs[0].id, k1 = o.payload.krs[1].id;
+  let u = updateKr(o, k0, '25'); u = updateKr(u, k1, 5.5);
+  assert.equal(u.payload.krs[0].current, 25); assert.equal(krRatio(u.payload.krs[1]), 1, 'сверх цели — не больше 100%'); assert.equal(okrProgress(u), 0.75);
+  assert.equal(okrProgress(o), 0, 'исходная запись не меняется');
+  assert.throws(() => updateKr(o, 'нет', 1), /Нет такого/); assert.throws(() => updateKr(o, k0, -1), /не меньше нуля/);
+  // темп: 1 октября → 31 декабря (91 день)
+  assert.equal(okrPace(o, '2026-10-01').state, 'on');
+  assert.equal(okrPace(u, '2026-10-16').state, 'ahead');
+  assert.equal(okrPace(o, '2026-11-15').state, 'behind');
+  const half = updateKr(updateKr(o, k0, 25), k1, 2.5);
+  assert.equal(okrPace(half, '2026-11-15').state, 'on');
+  assert.equal(okrPace(o, '2027-01-05').state, 'overdue');
+  assert.equal(okrPace(updateKr(updateKr(o, k0, 50), k1, 5), '2026-11-01').state, 'done');
+  const done = setOkrStatus(u, 'done');
+  assert.equal(done.payload.status, 'done'); assert.throws(() => setOkrStatus(u, 'x'), /bad status/);
+  assert.deepEqual(okrsOf([done, o]).map(x => x.payload.status), ['done', 'active']); assert.equal(okrsOf([done, o], 'active').length, 1);
+});
+
+import { habitReview, reviewDue, REVIEW_TEXT, updateHabit } from '../habits.js';
+
+test('привычки: «кем я становлюсь», ежемесячный пересмотр по регулярности', () => {
+  const start = new Date(2026, 9, 1).getTime();
+  const h1 = makeHabit({ name: 'Зарядка', identity: ' я человек, который двигается ' }, start);
+  assert.equal(h1.payload.identity, 'я человек, который двигается');
+  assert.equal(makeHabit({ name: 'x' }, start).payload.identity, '');
+  const edited = updateHabit(h1, { name: 'Зарядка 2', anchor: '', minimum: '', full: '' });
+  assert.equal(edited.payload.identity, 'я человек, который двигается', 'без поля identity при правке оно сохраняется');
+  assert.equal(updateHabit(h1, { name: 'a', anchor: '', minimum: '', full: '', identity: '' }).payload.identity, '');
+  const hs = ['Часто', 'Средне', 'Редко', 'Никогда', 'Новая'].map((n, i) => makeHabit({ name: n }, i === 4 ? new Date(2026, 10, 25).getTime() : start));
+  const ev = [...hs];
+  const TD = '2026-11-30';
+  const dayN = n => { const d = new Date(2026, 10, 30 - n, 12); return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`; };
+  for (let i = 0; i < 30; i++) { if (i % 10 !== 0) ev.push(makeHabitLog(hs[0], dayN(i), 'full', 1)); if (i % 2 === 0) ev.push(makeHabitLog(hs[1], dayN(i), 'full', 1)); if (i === 3) ev.push(makeHabitLog(hs[2], dayN(i), 'min', 1)); }
+  const r = habitReview(ev, TD);
+  assert.deepEqual(Object.fromEntries(r.map(x => [x.h.payload.name, x.advice])), { Часто: 'keep', Средне: 'ok', Редко: 'ease', Никогда: 'archive' }, 'новая привычка (меньше 14 дней) в пересмотр не попадает');
+  assert.equal(r.find(x => x.advice === 'archive').text, REVIEW_TEXT.archive);
+  assert.equal(reviewDue('2026-12-03', '2026-11'), true); assert.equal(reviewDue('2026-12-03', '2026-12'), false); assert.equal(reviewDue('2026-12-08', ''), false, 'после седьмого числа — не навязываем');
+});
+
+import { makeThought, thoughtsOf, relief, reliefStats, EMOTIONS, THOUGHT_NOTE, PROMPTS } from '../thoughts.js';
+import { FLAGS, SLOTS, dailyTable } from '../diary.js';
+
+test('дневник мыслей: запись с проверками, облегчение, статистика', () => {
+  const a = makeThought({ date: '2026-11-10', situation: ' Начальник не ответил ', thought: ' Он мной недоволен ', emotion: 'тревога', before: '8', alt: 'Он просто занят', after: 4 }, 1);
+  assert.equal(a.type, 'thought'); assert.equal(a.payload.situation, 'Начальник не ответил'); assert.equal(a.payload.before, 8); assert.equal(a.payload.after, 4); assert.equal(relief(a), 4);
+  assert.throws(() => makeThought({ thought: 'ab' }), /мысль/); assert.throws(() => makeThought({ thought: 'abc', emotion: 'восторг' }), /эмоцию/); assert.throws(() => makeThought({ thought: 'abc', before: 11 }), /от 0 до 10/);
+  assert.equal(makeThought({ thought: 'abc' }, 2).payload.emotion, 'другое'); assert.equal(relief(makeThought({ thought: 'abc', before: 5 }, 2)), null);
+  const b = makeThought({ date: '2026-11-11', thought: 'Я не справлюсь', before: 6, after: 7 }, 3);
+  const ev = [a, b, makeThought({ date: '2026-11-09', thought: 'Всё плохо', before: 7, after: 7 }, 4)];
+  assert.deepEqual(thoughtsOf(ev).map(t => t.payload.date), ['2026-11-11', '2026-11-10', '2026-11-09']);
+  const st = reliefStats(ev); assert.equal(st.n, 3); assert.equal(st.helped, 1); assert.ok(Math.abs(st.avg - (4 - 1 + 0) / 3) < 1e-9);
+  assert.equal(reliefStats([]), null);
+  assert.ok(EMOTIONS.includes('тревога') && PROMPTS.length === 6 && /специалист|врач/.test(THOUGHT_NOTE));
+});
+test('быстрая отметка питания: флаги сохраняются только как «да», считается балл дня', () => {
+  assert.deepEqual(SLOTS.e.flags, ['veg', 'protein', 'sweets']); assert.ok(FLAGS.veg && FLAGS.protein && FLAGS.sweets);
+  const e1 = makeCheckin('e', '2026-11-10', { mood: 4, veg: true, protein: true, sweets: false }, '', 1);
+  assert.equal(e1.payload.veg, true); assert.equal(e1.payload.protein, true); assert.equal('sweets' in e1.payload, false);
+  assert.equal(makeCheckin('e', '2026-11-10', { veg: true }, '', 1).payload.veg, true, 'одной отметки питания достаточно для записи');
+  assert.throws(() => makeCheckin('e', '2026-11-10', { veg: false }, '', 1), /хотя бы одно/);
+  const e2 = makeCheckin('e', '2026-11-11', { mood: 3, sweets: true }, '', 1);
+  const rows = dailyTable([e1, e2, makeCheckin('m', '2026-11-12', { mood: 3 }, '', 1)]);
+  assert.equal(rows.find(r => r.date === '2026-11-10').foodScore, 2); assert.equal(rows.find(r => r.date === '2026-11-11').foodScore, -1);
+  assert.equal(rows.find(r => r.date === '2026-11-12').foodScore, undefined, 'нет вечерней отметки — нет и балла');
+});

@@ -60,7 +60,7 @@ export function analyzeRuns(runs) {
 }
 
 // ---------- таблица по дням ----------
-const PREV = ['caffeine', 'alcohol', 'exercise', 'screen', 'water', 'outdoors'];
+const PREV = ['caffeine', 'alcohol', 'exercise', 'screen', 'water', 'outdoors', 'foodScore'];
 export function dailyRows(events, runs = runsOf(events), analysis = analyzeRuns(runs)) {
   const diary = new Map(dailyTable(events).map(r => [r.date, r]));
   // сводки по дням из других разделов: фокус, тренировки, привычки, задачи
@@ -91,7 +91,7 @@ export function dailyRows(events, runs = runsOf(events), analysis = analyzeRuns(
 export const FACTORS = [
   ['sleepHours', 'Сон, часов'], ['sleepQuality', 'Качество сна'], ['moodMorning', 'Настроение утром'], ['energyMorning', 'Энергия утром'], ['stressMorning', 'Стресс утром'],
   ['prev_caffeine', 'Кофе накануне'], ['prev_alcohol', 'Алкоголь накануне'], ['prev_exercise', 'Тренировка накануне'], ['prev_screen', 'Экран накануне'], ['prev_water', 'Вода накануне'], ['prev_outdoors', 'Прогулка накануне'],
-  ['focusMin', 'Фокус, минут'], ['workoutMin', 'Тренировка (журнал), минут'], ['habitsDone', 'Выполнено привычек'], ['prev_focusMin', 'Фокус накануне'], ['prev_workoutMin', 'Тренировка (журнал) накануне'],
+  ['foodScore', 'Питание (овощи и белок минус сладкое)'], ['prev_foodScore', 'Питание накануне'], ['focusMin', 'Фокус, минут'], ['workoutMin', 'Тренировка (журнал), минут'], ['habitsDone', 'Выполнено привычек'], ['prev_focusMin', 'Фокус накануне'], ['prev_workoutMin', 'Тренировка (журнал) накануне'],
 ];
 export const OUTCOMES = [['composite', 'общий результат'], ...Object.entries(DOMAINS).map(([k, l]) => ['z_' + k, `«${l.toLowerCase()}»`]),
   ['moodEvening', '«настроение вечером»'], ['energyEvening', '«энергия вечером»'], ['stressEvening', '«стресс вечером»'], ['focus', '«фокус»'], ['productivity', '«продуктивность»'], ['sleepQuality', '«качество сна»']];

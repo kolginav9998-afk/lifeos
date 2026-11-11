@@ -12,6 +12,8 @@ import { parseCapture, captureLabel, buildCapture } from './capture.js';
 import { strengthDays, doneWorkouts, WEEKLY_STRENGTH_GOAL } from './workouts.js';
 import { openFocus, hasRunningFocus, focusMinutes } from './focus.js';
 import { makeNote, templateText } from './notes.js';
+import { upcomingBirthdays, dueContacts } from './people.js';
+import { okrsOf, okrPace } from './okr.js';
 import * as vault from './vault.js';
 import * as store from './store.js';
 
@@ -273,6 +275,11 @@ export function createTodayView({ go }) {
     if (!events.some(e => e.type === 'checkin' && e.payload.date === today && e.payload.slot === 'm')) chips.push(el('button', { type: 'button', id: 'checkin-chip', class: 'chip', textContent: 'Отметка утра', onclick: () => go('diary') }));
     if (!events.some(e => e.type === 'testrun' && e.payload.date === today)) chips.push(el('button', { type: 'button', id: 'test-chip', class: 'chip', textContent: 'Проверка дня', onclick: () => go('tests') }));
     chips.push(el('button', { type: 'button', id: 'heavy-chip', class: 'chip', textContent: getPref('heavyDay') ? 'Тяжёлый день: включён' : 'Тяжёлый день', 'aria-pressed': String(!!getPref('heavyDay')), onclick: () => { setPref('heavyDay', !getPref('heavyDay')); render(); } }));
+    const goalsOn = okrsOf(events, 'active');
+    if (goalsOn.length) chips.push(el('button', { type: 'button', id: 'okr-chip', class: 'chip', textContent: `Цели: ${goalsOn.length}${goalsOn.some(g => okrPace(g, today).state === 'behind') ? ' ⚠' : ''}`, onclick: () => go('okr') }));
+    const bds = upcomingBirthdays(events, today, 7), dueP = dueContacts(events, today);
+    if (bds.length) chips.push(el('button', { type: 'button', id: 'bday-chip', class: 'chip', textContent: `🎂 ${bds[0].person.payload.name}: ${bds[0].inDays === 0 ? 'сегодня' : bds[0].inDays === 1 ? 'завтра' : `через ${bds[0].inDays} дн.`}${bds.length > 1 ? ` (+${bds.length - 1})` : ''}`, onclick: () => go('people') }));
+    if (dueP.length) chips.push(el('button', { type: 'button', id: 'contact-chip', class: 'chip', textContent: `Написать: ${dueP.length}`, onclick: () => go('people') }));
     const fm = focusMinutes(events, today);
     chips.push(el('button', { type: 'button', id: 'focus-chip', class: 'chip', textContent: fm ? `Фокус: ${fm} мин` : 'Фокус', onclick: () => startFocus() }));
     if (doneWorkouts(events).length) chips.push(el('button', { type: 'button', id: 'strength-chip', class: 'chip', textContent: `Силовые: ${strengthDays(events, today)}/${WEEKLY_STRENGTH_GOAL}`, onclick: () => go('workouts') }));

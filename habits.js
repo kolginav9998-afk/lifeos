@@ -5,20 +5,20 @@ import { todayStr, addDays, daysBetween, isYmd, newId } from './events.js';
 const clean = (s, n) => String(s ?? '').trim().slice(0, n);
 export const habitLogId = (habitId, date) => `${habitId}:${date}`;   // одна отметка в день на привычку
 
-export function makeHabit({ name, anchor = '', minimum = '', full = '' }, now = Date.now()) {
+export function makeHabit({ name, anchor = '', minimum = '', full = '', identity = '' }, now = Date.now()) {
   const n = clean(name, 120);
   if (!n) throw new Error('empty habit');
   return {
     id: newId(), type: 'habit', ts: now,
-    payload: { name: n, anchor: clean(anchor, 200), minimum: clean(minimum, 200), full: clean(full, 200), startDate: todayStr(now), archived: false },
+    payload: { name: n, anchor: clean(anchor, 200), minimum: clean(minimum, 200), full: clean(full, 200), identity: clean(identity, 120), startDate: todayStr(now), archived: false },
     source: 'manual', confidence: 1, evidence: [],
   };
 }
 
-export function updateHabit(ev, { name, anchor, minimum, full }, now = Date.now()) {
+export function updateHabit(ev, { name, anchor, minimum, full, identity }, now = Date.now()) {
   const n = clean(name, 120);
   if (!n) throw new Error('empty habit');
-  return { ...ev, payload: { ...ev.payload, name: n, anchor: clean(anchor, 200), minimum: clean(minimum, 200), full: clean(full, 200), editedAt: now } };
+  return { ...ev, payload: { ...ev.payload, name: n, anchor: clean(anchor, 200), minimum: clean(minimum, 200), full: clean(full, 200), identity: identity === undefined ? (ev.payload.identity ?? '') : clean(identity, 120), editedAt: now } };
 }
 
 export const archiveHabit = (ev, archived = true) => ({ ...ev, payload: { ...ev.payload, archived } });
@@ -94,3 +94,19 @@ export const HABIT_TEMPLATES = [
   { name: 'Прогулка', anchor: 'после обеда', minimum: 'выйти на улицу', full: '20 минут пешком' },
   { name: 'Английский', anchor: 'после завтрака', minimum: '5 слов', full: '15 минут практики' },
 ];
+
+// Ежемесячный пересмотр: по регулярности за 30 дней предлагаем оставить, облегчить или убрать в архив.
+export const REVIEW_TEXT = {
+  keep: 'Работает: держи как есть.',
+  ok: 'Нормально. Если пропуски повторяются, сделай минимум ещё меньше.',
+  ease: 'Похоже, слишком тяжело. Уменьши минимум до двух минут или привяжи к другому «после чего».',
+  archive: 'За месяц ни одной отметки. Либо вернись с минимума, либо убери в архив без вины.',
+};
+export function habitReview(events, today) {
+  return activeHabits(events, today).filter(({ st, h }) => daysBetween(h.payload.startDate, today) >= 14).map(({ h, st }) => {
+    const advice = st.hits === 0 ? 'archive' : st.consistency >= 0.8 ? 'keep' : st.consistency >= 0.4 ? 'ok' : 'ease';
+    return { h, st, advice, text: REVIEW_TEXT[advice] };
+  });
+}
+// Первые семь дней месяца, если за этот месяц пересмотр ещё не делали.
+export const reviewDue = (today, doneYm) => Number(today.slice(8)) <= 7 && doneYm !== today.slice(0, 7);

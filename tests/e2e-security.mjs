@@ -76,9 +76,9 @@ assert.ok(JSON.parse(raw.ls).every(r => r.ct), 'и копия в localStorage т
 assert.equal(new Set(raw.idb.map(r => r.iv)).size, raw.idb.length, 'у каждой записи свой IV');
 
 // приложение продолжает работать, новые записи тоже шифруются
-await addTask(page, 'ещё одна секретная мысль');
+await addTask(page, 'ещё одна секретная затея');
 disk = await diskText(page);
-assert.ok(!disk.includes('мысль'));
+assert.ok(!disk.includes('затея'));
 assert.equal(await page.locator('#lock-top').isVisible(), true, 'кнопка «заблокировать» появилась');
 
 // =====================================================================
@@ -88,7 +88,7 @@ await page.click('#lock-top');
 await until(page, () => !document.getElementById('lock').hidden);
 assert.equal(await page.locator('#app').isVisible(), false);
 let body = await page.evaluate(() => document.body.textContent);
-assert.ok(!body.includes('секретная') && !body.includes('сейфа') && !body.includes('мысль'), 'в странице нет данных, пока заблокировано');
+assert.ok(!body.includes('секретная') && !body.includes('сейфа') && !body.includes('затея'), 'в странице нет данных, пока заблокировано');
 
 await page.fill('#lock-input', 'проверка-показа');
 await page.click('#lock-reveal');
@@ -115,7 +115,7 @@ await unlock(page, PW);
 await until(page, () => !document.getElementById('app').hidden);
 await tab(page, 'today');
 await until(page, () => [...document.querySelectorAll('.item .text')].some(n => n.textContent === 'секретная задача про зарплату'));
-assert.ok([...(await page.locator('.item .text').allTextContents())].includes('ещё одна секретная мысль'), 'все данные на месте после входа');
+assert.ok([...(await page.locator('.item .text').allTextContents())].includes('ещё одна секретная затея'), 'все данные на месте после входа');
 await tab(page, 'notes');
 await waitCount(page, '.note', 1);
 assert.equal(errors.filter(e => !/401|Failed to load resource/.test(e)).length, 0, errors.join('\n'));

@@ -17,9 +17,10 @@ export const NUMBERS = {
   screen: { label: 'Экран', min: 0, max: 24, step: 0.5, unit: 'ч', start: 3 },
   outdoors: { label: 'На улице', min: 0, max: 600, step: 5, unit: 'мин', start: 30 },
 };
+export const FLAGS = { veg: 'Овощи или фрукты были', protein: 'Белок был', sweets: 'Сладкое было' };      // быстрая отметка питания: только «да» (без счёта калорий)
 export const SLOTS = {
   m: { label: 'Утро', ratings: ['sleepQuality', 'energy', 'mood', 'stress'], numbers: ['sleepHours'] },
-  e: { label: 'Вечер', ratings: ['mood', 'energy', 'stress', 'focus', 'productivity', 'social'], numbers: ['caffeine', 'alcohol', 'water', 'exercise', 'screen', 'outdoors'] },
+  e: { label: 'Вечер', ratings: ['mood', 'energy', 'stress', 'focus', 'productivity', 'social'], numbers: ['caffeine', 'alcohol', 'water', 'exercise', 'screen', 'outdoors'], flags: ['veg', 'protein', 'sweets'] },
 };
 
 export const checkinId = (date, slot) => `ci:${date}:${slot}`;
@@ -47,6 +48,7 @@ export function makeCheckin(slot, date, fields = {}, note = '', now = Date.now()
     if (!Number.isInteger(v) || v < 1 || v > 5) throw new Error(`${RATINGS[k]}: оценка от 1 до 5`);
     payload[k] = v;
   }
+  for (const k of def.flags || []) if (fields[k] === true) payload[k] = true;
   for (const k of def.numbers) {
     const v = fields[k];
     if (v === undefined || v === null || v === '') continue;
@@ -114,7 +116,8 @@ export function dailyTable(events) {
     const m = checkinOf(events, date, 'm')?.payload ?? {}, ev = checkinOf(events, date, 'e')?.payload ?? {};
     return { date, sleepHours: m.sleepHours, sleepQuality: m.sleepQuality, moodMorning: m.mood, energyMorning: m.energy, stressMorning: m.stress,
       moodEvening: ev.mood, energyEvening: ev.energy, stressEvening: ev.stress, focus: ev.focus, productivity: ev.productivity, social: ev.social,
-      caffeine: ev.caffeine, alcohol: ev.alcohol, water: ev.water, exercise: ev.exercise, screen: ev.screen, outdoors: ev.outdoors };
+      caffeine: ev.caffeine, alcohol: ev.alcohol, water: ev.water, exercise: ev.exercise, screen: ev.screen, outdoors: ev.outdoors,
+      foodScore: Object.keys(ev).length ? (ev.veg ? 1 : 0) + (ev.protein ? 1 : 0) - (ev.sweets ? 1 : 0) : undefined };
   });
 }
 

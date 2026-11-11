@@ -305,3 +305,10 @@ html.amounts-hidden .amount{letter-spacing:.1em}
 .med{display:flex;align-items:center;gap:8px;padding:4px 0}
 .med.off{opacity:.6}
 .goal .goal-amt{flex:1 1 100%}
+/* ---- цели и люди ---- */
+.kr-row{display:grid;grid-template-columns:1fr 84px 62px;gap:6px}
+.kr{display:flex;flex-direction:column;gap:4px;padding:8px 0;border-top:1px solid var(--line)}
+.kr-now{max-width:120px}
+.okr.behind{border-left:4px solid var(--warn)}.okr.done,.okr.ahead{border-left:4px solid var(--ok)}.okr.overdue{border-left:4px solid var(--danger)}
+.pp-due-row{padding:6px 0;border-top:1px solid var(--line)}
+.pp summary{justify-content:space-between;gap:8px;color:var(--text)}

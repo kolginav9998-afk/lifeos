@@ -8,6 +8,7 @@ import * as store from './store.js';
 import { openBreathing } from './breathing.js';
 import { sleepPanel, REGULARITY_TEXT } from './reports.js';
 import { WHEN, MEDS_NOTE, makeMed, medsOf, makeMedLog, medLogId, takenOn } from './meds.js';
+import { EMOTIONS, THOUGHT_NOTE, PROMPTS, makeThought, thoughtsOf, relief, reliefStats } from './thoughts.js';
 
 const num = x => String(Math.round(x * 100) / 100).replace('.', ',');
 const signed = x => (x > 0 ? '+' : x < 0 ? '−' : '') + num(Math.abs(x));
@@ -21,6 +22,23 @@ export function createHealthView() {
   // ----- сводка -----
   const summary = el('div', { id: 'health-summary', class: 'card' });
   const sleepCard = el('div', { id: 'sleep-card', class: 'card', hidden: true });
+  // дневник мыслей: форма создаётся один раз, чтобы введённое не терялось
+  const thCard = el('div', { id: 'thought-card', class: 'card' });
+  const thSit = el('input', { id: 'th-situation', type: 'text', maxLength: 300, placeholder: 'Что случилось? Где, когда, с кем?', autocomplete: 'off' });
+  const thText = el('textarea', { id: 'th-thought', rows: 2, maxLength: 600, placeholder: 'Какая мысль пришла первой?' });
+  const thEmo = el('select', { id: 'th-emotion', 'aria-label': 'Эмоция' }, ...EMOTIONS.map(x => el('option', { value: x, textContent: x })));
+  const thBefore = el('input', { id: 'th-before', type: 'number', min: '0', max: '10', placeholder: '0–10', 'aria-label': 'Сила эмоции сейчас' });
+  const thAlt = el('textarea', { id: 'th-alt', rows: 2, maxLength: 600, placeholder: 'Как посмотреть точнее и добрее? Что сказал бы друг?' });
+  const thAfter = el('input', { id: 'th-after', type: 'number', min: '0', max: '10', placeholder: '0–10', 'aria-label': 'Сила эмоции после' });
+  const thErr = el('p', { class: 'error', id: 'th-err' });
+  const thForm = el('form', { class: 'form-stack' }, thSit, thText, el('div', { class: 'row wrap' }, thEmo, el('label', {}, 'Сила сейчас: ', thBefore)), thAlt, el('label', {}, 'Что чувствую теперь: ', thAfter),
+    el('button', { type: 'submit', id: 'th-add', class: 'primary', textContent: 'Записать' }), thErr);
+  thForm.onsubmit = async e => {
+    e.preventDefault();
+    try { await store.save(makeThought({ situation: thSit.value, thought: thText.value, emotion: thEmo.value, before: thBefore.value, alt: thAlt.value, after: thAfter.value })); for (const x of [thSit, thText, thBefore, thAlt, thAfter]) x.value = ''; thErr.textContent = ''; toast('Записано'); }
+    catch (err) { thErr.textContent = err.message; }
+  };
+  const thDetails = el('details', { id: 'th-form-box' }, el('summary', { textContent: 'Записать мысль' }), el('ol', { class: 'plain muted' }, ...PROMPTS.map(t => el('li', { textContent: t }))), thForm);   // создаётся один раз: не закрывается при обновлении данных
   const medsCard = el('div', { id: 'meds-card', class: 'card' });
   const mName = el('input', { id: 'med-name', type: 'text', maxLength: 60, placeholder: 'Название', autocomplete: 'off' });
   const mDose = el('input', { id: 'med-dose', type: 'text', maxLength: 40, placeholder: 'Доза (как назначено)', autocomplete: 'off' });
@@ -98,7 +116,7 @@ export function createHealthView() {
   const breathHost = el('div', { id: 'breath-host', class: 'overlay', hidden: true, tabIndex: -1, role: 'dialog', 'aria-modal': 'true', 'aria-label': 'Дыхание' });
   const breathCard = el('div', { class: 'card tight row' }, el('span', { class: 'grow', textContent: 'Дыхание 4–6: успокоиться за пару минут' }),
     el('button', { type: 'button', id: 'breath-start', class: 'chip', textContent: 'Начать', onclick: () => { openBreathing(breathHost); breathHost.focus({ preventScroll: true }); } }));
-  root.append(summary, sleepCard, medsCard, form, list, empty, hpBox, el('div', { class: 'row' }, csv), breathCard, breathHost);
+  root.append(summary, sleepCard, medsCard, thCard, form, list, empty, hpBox, el('div', { class: 'row' }, csv), breathCard, breathHost);
 
   function renderSummary(today) {
     const hpf = healthProfile(events);
@@ -148,6 +166,16 @@ export function createHealthView() {
       el('details', {}, el('summary', { textContent: 'Добавить' }), medForm));
   }
 
+  function renderThoughts() {
+    const list = thoughtsOf(events).slice(0, 5), st = reliefStats(events);
+    thCard.replaceChildren(el('strong', { textContent: 'Мысли и эмоции' }), el('p', { class: 'muted', textContent: THOUGHT_NOTE }),
+      st ? el('p', { class: 'muted', id: 'th-stats', textContent: `Стало легче ${st.helped} из ${st.n} раз (в среднем на ${String(Math.round(st.avg * 10) / 10).replace('.', ',')} балла из 10).` }) : null,
+      thDetails,
+      ...list.map(t => el('div', { class: 'th-row', dataset: { id: t.id } }, el('strong', { textContent: `${t.payload.date} · ${t.payload.emotion}` }), el('span', { class: 'muted', textContent: relief(t) !== null ? ` · ${t.payload.before} → ${t.payload.after}` : '' }),
+        el('p', { class: 'muted', textContent: `Мысль: ${t.payload.thought}${t.payload.alt ? ` — Иначе: ${t.payload.alt}` : ''}` }),
+        el('button', { type: 'button', class: 'chip danger', textContent: 'Удалить', onclick: async () => { const old = await store.remove(t.id); toast('Удалено', old ? { actionLabel: 'Вернуть', onAction: () => store.save(old) } : {}); } }))));
+  }
+
   function card(k, today) {
     const m = measuresOf(events, k.key);
     const main = dailySeries(events, k.key);
@@ -180,6 +208,7 @@ export function createHealthView() {
     renderSummary(today);
     renderSleep(today);
     renderMeds(today);
+    renderThoughts();
     const keys = measureKeys(events);
     list.replaceChildren(...keys.map(k => card(k, today)));
     empty.hidden = keys.length > 0;

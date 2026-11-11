@@ -1,6 +1,6 @@
 import { el, toast } from './ui.js';
 import { todayStr } from './events.js';
-import { HABIT_TEMPLATES, makeHabit, updateHabit, archiveHabit, makeHabitLog, habitStats, habitCalendar, activeHabits, logsOf } from './habits.js';
+import { HABIT_TEMPLATES, makeHabit, updateHabit, archiveHabit, makeHabitLog, habitStats, habitCalendar, activeHabits, logsOf, habitReview, reviewDue } from './habits.js';
 import { getPref, setPref } from './prefs.js';
 import * as store from './store.js';
 
@@ -22,26 +22,28 @@ export function createHabitsView() {
   const name = el('input', { id: 'habit-name', type: 'text', placeholder: 'Привычка, например «Python»', maxLength: 120, required: true, autocomplete: 'off' });
   const anchor = el('input', { id: 'habit-anchor', type: 'text', placeholder: 'После чего? Например «после завтрака»', maxLength: 200, autocomplete: 'off' });
   const minimum = el('input', { id: 'habit-min', type: 'text', placeholder: 'Версия на 2 минуты: «открыть редактор»', maxLength: 200, autocomplete: 'off' });
+  const identity = el('input', { id: 'habit-identity', type: 'text', placeholder: 'Кем я становлюсь: «я человек, который двигается каждый день»', maxLength: 120, autocomplete: 'off' });
   const full = el('input', { id: 'habit-full', type: 'text', placeholder: 'Полная версия: «20 минут практики»', maxLength: 200, autocomplete: 'off' });
   const templates = el('div', { id: 'habit-templates', class: 'chips' }, ...HABIT_TEMPLATES.map(t =>
     el('button', { type: 'button', class: 'chip tpl', textContent: t.name, onclick: () => { name.value = t.name; anchor.value = t.anchor; minimum.value = t.minimum; full.value = t.full; name.focus(); } })));
-  const form = el('form', { id: 'habit-form', class: 'form-stack' }, el('span', { class: 'muted', textContent: 'Быстрый старт — выбери заготовку и поправь под себя:' }), templates, name, anchor, minimum, full,
+  const form = el('form', { id: 'habit-form', class: 'form-stack' }, el('span', { class: 'muted', textContent: 'Быстрый старт — выбери заготовку и поправь под себя:' }), templates, name, anchor, minimum, full, identity,
     el('button', { type: 'submit', class: 'primary', textContent: 'Добавить привычку' }));
   const addBox = el('details', { id: 'habit-add', class: 'card habit-add' }, el('summary', { textContent: '＋ Новая привычка' }), form);
   form.onsubmit = async e => {
     e.preventDefault();
     try {
-      await store.save(makeHabit({ name: name.value, anchor: anchor.value, minimum: minimum.value, full: full.value }));
-      name.value = anchor.value = minimum.value = full.value = '';
+      await store.save(makeHabit({ name: name.value, anchor: anchor.value, minimum: minimum.value, full: full.value, identity: identity.value }));
+      name.value = anchor.value = minimum.value = full.value = identity.value = '';
       addBox.open = false;
     } catch (err) { toast('Не удалось добавить: ' + err.message); }
   };
 
+  const reviewBox = el('details', { id: 'habit-review', class: 'card', hidden: true });
   const list = el('div', { id: 'habit-list' });
   const empty = el('p', { class: 'muted', hidden: true, textContent: 'Привычек пока нет. Начни с одной маленькой.' });
   const archivedList = el('div', { id: 'habit-archive' });
   const archivedBlock = el('details', { hidden: true }, el('summary', { textContent: 'В архиве' }), archivedList);
-  root.append(intro, addBox, heavyRow, list, empty, archivedBlock);
+  root.append(intro, addBox, heavyRow, reviewBox, list, empty, archivedBlock);
 
   async function mark(h, st, level) {
     const today = todayStr();
@@ -69,13 +71,14 @@ export function createHabitsView() {
     const a = el('input', { type: 'text', value: p.anchor, maxLength: 200, placeholder: 'После чего?' });
     const m = el('input', { type: 'text', value: p.minimum, maxLength: 200, placeholder: 'Версия на 2 минуты' });
     const f = el('input', { type: 'text', value: p.full, maxLength: 200, placeholder: 'Полная версия' });
-    const f2 = el('form', { class: 'card form-stack editing', dataset: { id: h.id } }, n, a, m, f,
+    const idn = el('input', { type: 'text', value: p.identity ?? '', maxLength: 120, placeholder: 'Кем я становлюсь', class: 'edit-identity' });
+    const f2 = el('form', { class: 'card form-stack editing', dataset: { id: h.id } }, n, a, m, f, idn,
       el('div', { class: 'row' },
         el('button', { type: 'submit', class: 'primary save', textContent: 'Сохранить' }),
         el('button', { type: 'button', class: 'cancel', textContent: 'Отмена', onclick: () => stopEdit() })));
     f2.onsubmit = async e => {
       e.preventDefault();
-      try { await store.save(updateHabit(h, { name: n.value, anchor: a.value, minimum: m.value, full: f.value })); stopEdit(); }
+      try { await store.save(updateHabit(h, { name: n.value, anchor: a.value, minimum: m.value, full: f.value, identity: idn.value })); stopEdit(); }
       catch (err) { toast('Не удалось сохранить: ' + err.message); }
     };
     queueMicrotask(() => n.focus());
@@ -92,6 +95,7 @@ export function createHabitsView() {
     const c = el('article', { class: 'card habit' + (st.doneToday ? ' is-done' : ''), dataset: { id: h.id } });
     c.append(el('div', { class: 'h-head' }, el('strong', { class: 'h-name', textContent: p.name }),
       p.anchor ? el('span', { class: 'muted', textContent: ' · после: ' + p.anchor }) : null));
+    if (p.identity) c.append(el('div', { class: 'muted h-identity', textContent: `Я — ${p.identity.replace(/^я\s+/i, '')}` }));
     if (!archived) {
       const fullBtn = el('button', { type: 'button', class: 'h-full' + (st.level === 'full' ? ' on' : ''), textContent: (st.level === 'full' ? '✓ ' : '') + (p.full ? `Сделал: ${p.full}` : 'Сделал полностью'), onclick: () => mark(h, st, 'full') });
       const minBtn = el('button', { type: 'button', class: 'h-min' + (st.level === 'min' ? ' on' : ''), textContent: (st.level === 'min' ? '✓ ' : '') + (p.minimum ? `Минимум: ${p.minimum}` : 'Сделал минимум (2 минуты)'), onclick: () => mark(h, st, 'min') });
@@ -112,6 +116,23 @@ export function createHabitsView() {
     return c;
   }
 
+  function renderReview(today) {
+    const items = habitReview(events, today);
+    reviewBox.hidden = items.length === 0;
+    if (!items.length) return;
+    const due = reviewDue(today, getPref('habitReview'));
+    if (!reviewBox.dataset.touched) reviewBox.open = due;
+    reviewBox.replaceChildren(el('summary', { textContent: due ? 'Пора пересмотреть привычки (раз в месяц)' : 'Пересмотр привычек' }),
+      el('p', { class: 'muted', textContent: 'Посмотри на последние 30 дней и реши по каждой привычке: оставить, облегчить или убрать.' }),
+      ...items.map(({ h, st, advice, text }) => el('div', { class: `review-row ${advice}`, dataset: { id: h.id, advice } },
+        el('strong', { textContent: h.payload.name }), el('span', { class: 'muted', textContent: ` — ${pct(st.consistency)} за 30 дн. (${st.hits} из ${st.span})` }), el('p', { class: 'hint', textContent: text }),
+        el('div', { class: 'row wrap' },
+          el('button', { type: 'button', class: 'chip rv-edit', textContent: 'Облегчить', onclick: () => { editingId = h.id; editorEl = null; render(); } }),
+          el('button', { type: 'button', class: 'chip rv-arch', textContent: 'В архив', onclick: () => store.save(archiveHabit(h, true)) })))),
+      el('button', { type: 'button', id: 'habit-review-done', class: 'primary', textContent: 'Пересмотр сделан', onclick: () => { setPref('habitReview', today.slice(0, 7)); reviewBox.dataset.touched = ''; reviewBox.open = false; toast('Ок. Следующий пересмотр — в начале следующего месяца.'); render(); } }));
+    reviewBox.ontoggle = () => { reviewBox.dataset.touched = '1'; };
+  }
+
   function render() {
     const today = todayStr();
     heavy.checked = !!getPref('heavyDay');
@@ -122,6 +143,7 @@ export function createHabitsView() {
     if (!any) addBox.open = true;
     else if (!hadAny) addBox.open = false;      // появились привычки (например, из копии) — прячем форму
     hadAny = any;
+    renderReview(today);
     list.replaceChildren(...act.map(({ h, st }) => card(h, st, today)));
     empty.hidden = act.length > 0 || any;
     const arch = events.filter(e => e.type === 'habit' && e.payload.archived);

@@ -1,6 +1,6 @@
 import { el, toast, dateRu, ratingRow, stepper } from './ui.js';
 import { todayStr, addDays } from './events.js';
-import { makeCheckin, makeDiary, checkinOf, diaryOf, recentDays, sleepFromTimes, SLOTS, RATINGS, NUMBERS, hashtags, questionOfDay, onThisDay } from './diary.js';
+import { makeCheckin, makeDiary, checkinOf, diaryOf, recentDays, sleepFromTimes, SLOTS, RATINGS, NUMBERS, FLAGS, hashtags, questionOfDay, onThisDay } from './diary.js';
 import { makeMeasure } from './health.js';
 import * as store from './store.js';
 
@@ -40,12 +40,15 @@ export function createDiaryView() {
   const eW = {};
   for (const f of SLOTS.e.ratings) eW[f] = ratingRow(RATINGS[f], f, null, () => { dirty.e = true; });
   for (const f of SLOTS.e.numbers) eW[f] = stepper({ label: NUMBERS[f].label, field: f, ...NUMBERS[f] }, () => { dirty.e = true; });
+  const eF = {};
+  for (const f of SLOTS.e.flags) { const cb = el('input', { type: 'checkbox', id: `ci-flag-${f}`, onchange: () => { dirty.e = true; } }); eF[f] = cb; }
+  const flagRow = el('div', { class: 'flags', id: 'ci-flags' }, el('span', { class: 'rating-label', textContent: 'Питание сегодня' }), ...SLOTS.e.flags.map(f => el('label', { class: 'check-label' }, eF[f], ` ${FLAGS[f]}`)));
   const eNote = el('textarea', { id: 'ci-e-note', rows: 2, maxLength: 1000, placeholder: 'Что помогло и что мешало сегодня?' });
   eNote.oninput = () => { dirty.e = true; };
   const eSave = el('button', { id: 'ci-e-save', type: 'button', class: 'primary', textContent: 'Сохранить вечер' });
   const eSum = el('summary', { id: 'ci-e-sum' });
   const eBox = el('details', { id: 'ci-e', class: 'card' }, eSum,
-    ...SLOTS.e.ratings.map(f => eW[f]), el('div', { class: 'grid2' }, ...SLOTS.e.numbers.map(f => eW[f])), eNote, eSave);
+    ...SLOTS.e.ratings.map(f => eW[f]), el('div', { class: 'grid2' }, ...SLOTS.e.numbers.map(f => eW[f])), flagRow, eNote, eSave);
 
   // ----- дневник -----
   const dText = el('textarea', { id: 'diary-text', rows: 5, maxLength: 20000, placeholder: 'О чём думаешь, что произошло, что понял… (теги: #работа #семья)' });
@@ -97,6 +100,7 @@ export function createDiaryView() {
       const prev = checkinOf(events, date, 'e');
       const fields = {};
       for (const f of [...SLOTS.e.ratings, ...SLOTS.e.numbers]) fields[f] = eW[f].value;
+      for (const f of SLOTS.e.flags) fields[f] = eF[f].checked;
       await store.save(makeCheckin('e', date, fields, eNote.value, Date.now(), prev));
       dirty.e = false; toast('Вечер сохранён');
     } catch (e) { toast(e.message); }
@@ -124,6 +128,7 @@ export function createDiaryView() {
     }
     if (!dirty.e) {
       for (const f of [...SLOTS.e.ratings, ...SLOTS.e.numbers]) eW[f].setValue(ce[f] ?? null);
+      for (const f of SLOTS.e.flags) eF[f].checked = !!ce[f];
       eNote.value = ce.note ?? '';
     }
     if (!dirty.d) {

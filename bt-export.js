@@ -50,7 +50,7 @@ export function buildTables(events) {
   for (const e of events) if (e.type === 'measure' && e.payload.kind === 'weight') (wt[e.payload.date] ||= []).push(e.payload.value);
   const dayCols = ['date', 'runs', 'composite', ...Object.keys(DOMAINS).map(d => 'z_' + d),
     'sleepHours', 'sleepQuality', 'moodMorning', 'energyMorning', 'stressMorning', 'moodEvening', 'energyEvening', 'stressEvening', 'focus', 'productivity', 'social',
-    'caffeine', 'alcohol', 'water', 'exercise', 'screen', 'outdoors', 'habitsDone', 'tasksDone', 'focusMin', 'weightKg'];
+    'caffeine', 'alcohol', 'water', 'exercise', 'screen', 'outdoors', 'foodScore', 'habitsDone', 'tasksDone', 'focusMin', 'weightKg'];
   const dayRows = days.map(r => ({ ...r, focusMin: focusMinutes(events, r.date), habitsDone: habitsByDate[r.date] ?? 0, tasksDone: tasksByDate[r.date] ?? 0, weightKg: wt[r.date] ? wt[r.date].reduce((a, b) => a + b, 0) / wt[r.date].length : null }));
   T.daily = { cols: dayCols, rows: dayRows };
 

@@ -18,6 +18,7 @@ export function dayLog(events, date) {
     else if (e.type === 'testrun' && p.date === date) out.push({ ts: p.startedAt, kind: 'Проверка', text: `${p.mode === 'quick' ? 'Быстрая' : p.mode === 'full' ? 'Полная' : 'Отдельный тест'} — тестов: ${Object.values(p.tests).filter(t => !t.skipped).length}${p.aborted ? ', прервана' : ''}`, id: e.id });
     else if (e.type === 'workout' && p.done && p.date === date) out.push({ ts: p.finishedAt || e.ts, kind: 'Тренировка', text: `${p.name} — подходов: ${p.exercises.reduce((n, x) => n + x.sets.length, 0)}${p.minutes ? `, ${p.minutes} мин` : ''}`, id: e.id });
     else if (e.type === 'focus' && p.date === date) out.push({ ts: e.ts, kind: 'Фокус', text: `${p.minutes} мин${p.label ? ' — ' + p.label : ''}${p.completed ? '' : ' (остановлено)'}`, id: e.id });
+    else if (e.type === 'thought' && p.date === date) out.push({ ts: e.ts, kind: 'Мысль', text: `${p.emotion}: ${p.thought.length > 60 ? p.thought.slice(0, 57) + '…' : p.thought}`, id: e.id });
     else if (e.type === 'breath' && p.date === date) out.push({ ts: e.ts, kind: 'Дыхание', text: `${Math.round(p.seconds / 60 * 10) / 10} мин${p.before && p.after ? `, стресс ${p.before} → ${p.after}` : ''}`, id: e.id });
     else if (e.type === 'note' && todayStr(e.ts) === date) out.push({ ts: e.ts, kind: 'Заметка', text: p.text.split('\n').find(l => l.trim()) || '', id: e.id });
   }
