@@ -86,7 +86,9 @@ export function revealable(input) {
 }
 
 // Мини-график по ряду чисел (null — разрыв). Рисуется из DOM-узлов, без innerHTML.
-export function sparkline(values, { width = 140, height = 36 } = {}) {
+// Мини-график. band — серая полоса нормы {lo, hi} (в тех же единицах, что и values); marks — вертикальные отметки событий
+// [{ i, kind, label }], где i — номер точки; подпись видна при касании (title) и читается экранным диктором.
+export function sparkline(values, { width = 140, height = 36, band = null, marks = [] } = {}) {
   const svg = document.createElementNS(SVG_NS, 'svg');
   svg.setAttribute('viewBox', `0 0 ${width} ${height}`); svg.setAttribute('width', width); svg.setAttribute('height', height);
   svg.setAttribute('class', 'spark'); svg.setAttribute('role', 'img'); svg.setAttribute('aria-label', 'График');
@@ -95,6 +97,20 @@ export function sparkline(values, { width = 140, height = 36 } = {}) {
   const lo = Math.min(...nums), hi = Math.max(...nums), span = hi - lo || 1, pad = 3;
   const x = i => pad + (i * (width - 2 * pad)) / Math.max(1, values.length - 1);
   const y = v => height - pad - ((v - lo) / span) * (height - 2 * pad);
+  if (band && Number.isFinite(band.lo) && Number.isFinite(band.hi) && band.hi >= lo && band.lo <= hi) {      // полоса нормы рисуется под линией
+    const top = y(Math.min(hi, band.hi)), bottom = y(Math.max(lo, band.lo));
+    const r = document.createElementNS(SVG_NS, 'rect');
+    r.setAttribute('x', pad); r.setAttribute('width', width - 2 * pad); r.setAttribute('y', top.toFixed(1)); r.setAttribute('height', Math.max(1, bottom - top).toFixed(1)); r.setAttribute('class', 'spark-band');
+    const t = document.createElementNS(SVG_NS, 'title'); t.textContent = 'Серая полоса — твой обычный диапазон'; r.append(t);
+    svg.append(r);
+  }
+  for (const m of marks) {
+    if (!(m.i >= 0 && m.i < values.length)) continue;
+    const l = document.createElementNS(SVG_NS, 'line');
+    l.setAttribute('x1', x(m.i).toFixed(1)); l.setAttribute('x2', x(m.i).toFixed(1)); l.setAttribute('y1', pad); l.setAttribute('y2', height - pad); l.setAttribute('class', `spark-mark ${m.kind || ''}`.trim());
+    const t = document.createElementNS(SVG_NS, 'title'); t.textContent = m.label || 'Событие'; l.append(t);
+    svg.append(l);
+  }
   let seg = [];
   const flush = () => {
     if (seg.length > 1) { const p = document.createElementNS(SVG_NS, 'polyline'); p.setAttribute('points', seg.join(' ')); p.setAttribute('class', 'spark-line'); svg.append(p); }

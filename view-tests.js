@@ -1,4 +1,5 @@
 // Экран «Тесты»: запуск ежедневной проверки (быстрой, полной, отдельных тестов), результаты и история.
+import { normBand } from './bt-extra.js';
 import { el, toast, sparkline, dateRu } from './ui.js';
 import { todayStr } from './events.js';
 import * as store from './store.js';
@@ -53,7 +54,7 @@ export function createTestsView() {
         el('div', { class: 'grow' }, el('strong', { textContent: t.title }), el('div', { class: 'muted', textContent: t.desc }),
           s.latest ? el('div', { class: 'muted', textContent: `последний: ${fmtPrimary(t.id, { [t.primary.key]: s.latest.value / (t.primary.scale ?? 1) })}` }) : null,
           (() => { const b = bestResult(runs, t.id); return b && b.n >= 3 ? el('div', { class: 'muted test-record', textContent: `рекорд: ${fmtPrimary(t.id, { [t.primary.key]: b.value / (t.primary.scale ?? 1) })} (${dateRu(b.date)})` }) : null; })()),
-        s.series.length > 1 ? sparkline(s.series.map(p => (t.primary.better === 'lower' ? -p.value : p.value)), { width: 70, height: 28 }) : null,
+        s.series.length > 1 ? sparkline(s.series.map(p => (t.primary.better === 'lower' ? -p.value : p.value)), { width: 70, height: 28, band: normBand(t, s.baseline) }) : null,
         el('button', { type: 'button', class: 'chip', id: `bt-single-${t.id}`, textContent: 'Пройти', onclick: () => start(singlePlan(t.id)) }));
     });
 

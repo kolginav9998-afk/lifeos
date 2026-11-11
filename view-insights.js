@@ -9,6 +9,8 @@ import { analyzeRuns, insights, dailyRows, zText, zWord } from './bt-analytics.j
 import { buildExport, toCsvExcel, buildTables } from './bt-export.js';
 import { monthReport, doctorSummary } from './reports.js';
 import { shiftMonth, monthLabel } from './money.js';
+import { normBand, eventMarks, variabilityTrend, CV_TESTS } from './bt-extra.js';
+import { weekCompareCard, panel90Card, topFactorsCard } from './view-insights-extra.js';
 
 const CONF = { low: 'предварительно', mid: 'вероятно', high: 'устойчиво' };
 
@@ -103,18 +105,21 @@ export function createInsightsView() {
         last.composite != null ? el('p', { class: 'muted', textContent: `Итого: ${zWord(last.composite)} (${zText(last.composite)})` }) : null));
     }
 
+    parts.push(weekCompareCard(events, todayStr()), topFactorsCard(events, todayStr()));
+
     const list = insights(events);
     parts.push(el('h2', { textContent: 'Подсказки' }), ...list.map(i => el('div', { class: `card insight ${i.kind}`, dataset: { id: i.id } },
       el('strong', { textContent: i.title }), el('p', { textContent: i.text }), el('span', { class: 'chip static', textContent: CONF[i.conf] ?? '' }))));
 
     const withData = TESTS.filter(t => an.perTest[t.id].series.length);
     if (withData.length) {
-      parts.push(el('h2', { textContent: 'Динамика по тестам' }), el('div', { class: 'list' }, ...withData.map(t => {
-        const s = an.perTest[t.id];
+      parts.push(el('h2', { textContent: 'Динамика по тестам' }), el('p', { class: 'muted', id: 'dyn-legend', textContent: 'Серая полоса — твой обычный диапазон (норма ±1σ). Вертикальные черты — события: режим болезни, начало курса, эксперимент (подпись при касании).' }), el('div', { class: 'list' }, ...withData.map(t => {
+        const s = an.perTest[t.id], vt = CV_TESTS.includes(t.id) ? variabilityTrend(s.series.map(p => p.value)) : null;
         return el('div', { class: 'entry', dataset: { test: t.id } },
-          el('div', { class: 'grow' }, el('strong', { textContent: t.title }), el('div', { class: 'muted', textContent: `${t.primary.label}: ${fmtPrimary(t.id, { [t.primary.key]: s.latest.value / (t.primary.scale ?? 1) })}` + (s.baseline ? ` · норма ${fmtNum(s.baseline.median, t.primary.digits)}` : '') + ` · замеров ${s.n}` })),
-          s.series.length > 1 ? sparkline(s.series.map(p => (t.primary.better === 'lower' ? -p.value : p.value)), { width: 96, height: 32 }) : null);
-      })));
+          el('div', { class: 'grow' }, el('strong', { textContent: t.title }), el('div', { class: 'muted', textContent: `${t.primary.label}: ${fmtPrimary(t.id, { [t.primary.key]: s.latest.value / (t.primary.scale ?? 1) })}` + (s.baseline ? ` · норма ${fmtNum(s.baseline.median, t.primary.digits)}` : '') + ` · замеров ${s.n}` }),
+            vt?.recent ? el('div', { class: 'muted cv-line', textContent: `Разброс результатов: ${Math.round(vt.recent.cv * 100)}% от среднего` + (vt.trend === 'steadier' ? ', стал меньше' : vt.trend === 'noisier' ? ', стал больше' : '') }) : null),
+          s.series.length > 1 ? sparkline(s.series.map(p => (t.primary.better === 'lower' ? -p.value : p.value)), { width: 96, height: 32, band: normBand(t, s.baseline), marks: eventMarks(events, s.series) }) : null);
+      })), panel90Card(events, todayStr()));
     }
 
     parts.push(el('h2', { textContent: 'Эксперименты' }), expForm, ...experimentNodes(dailyRows(events, runs, an)));

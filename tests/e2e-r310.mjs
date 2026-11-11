@@ -85,6 +85,51 @@ assert.match(await text('#plateau'), /Нового давно нет/); assert.m
 await page.click('#plateau-open');
 await until(page, () => document.querySelector('.lesson[data-lesson="en-03"][open]'));
 
+
+// ---------- аналитика: полоса нормы, сравнение недель, факторы месяца, панель 90 дней, отметки событий ----------
+await tab(page, 'insights');
+assert.equal(await page.locator('#week-compare .cmp-row[data-key="composite"]').count(), 0, 'проверок ещё нет — строки нет');
+assert.equal(await page.locator('#week-compare .cmp-row[data-key="study"]').count(), 1, 'минуты учёбы из дневника практики уже есть');
+assert.match(await text('#top-factors'), /Нужно хотя бы 12 дней/);
+await page.evaluate(async () => {
+  const store = await import('./store.js'), ev = await import('./events.js'), core = await import('./bt-core.js'), dr = await import('./diary.js'), st = await import('./stats.js');
+  const rng = st.makeRng(77), out = [], t0 = ev.todayStr();
+  for (let i = 44; i >= 0; i--) {
+    const d = ev.addDays(t0, -i), startedAt = new Date(`${d}T09:00:00`).getTime(), sleep = 5 + Math.round(rng() * 40) / 10, q = (sleep - 7) * 2 + (rng() - 0.5);
+    const m = {
+      reaction: { n: 5, median: Math.round(360 - 20 * q), mean: 380, sd: 40, best: 300, lapses: 0, falseStarts: 0 },
+      gonogo: { n: 16, hits: 11, omissions: 1, commissions: 1, correctRejections: 3, accuracy: 0.87, inhibition: 0.75, medianRT: 400, dPrime: +(1.5 + 0.3 * q).toFixed(2) },
+      stroop: { n: 12, correct: 11, accuracy: 0.92, meanCongruent: 700, meanIncongruent: 900, interference: Math.round(220 - 15 * q), errorsIncongruent: 1 },
+      digits: { forward: 6, backward: 4, total: Math.round(10 + q), attempts: 8 },
+      math: { n: 12, correct: 10, accuracy: 0.83, meanMs: 3000, perMinute: +(9 + q).toFixed(1), maxLevel: 3 },
+    }, results = {};
+    for (const [id, mm] of Object.entries(m)) results[id] = { metrics: mm, ms: 30000, trials: [] };
+    out.push(core.makeRunEvent(core.makeRun({ mode: 'quick', startedAt, durationMs: 300000, state: null, results }), startedAt), dr.makeCheckin('m', d, { sleepHours: sleep, mood: 3 + (i % 3), stress: 1 + (i % 4) }, '', startedAt + 1000));
+  }
+  out.push({ id: 'sick:e2e', type: 'sick', ts: Date.now(), payload: { from: ev.addDays(t0, -12), to: ev.addDays(t0, -10) }, source: 'manual', confidence: 1, evidence: [] });
+  await store.saveMany(out);
+});
+await until(page, () => document.querySelector('#week-compare .cmp-row'), null, 15000);
+assert.ok(await page.locator('#week-compare .cmp-row').count() >= 3);
+assert.match(await text('#week-compare'), /Результат проверок/); assert.match(await text('#week-compare'), /Сон/);
+assert.match(await text('#week-compare'), /В этих периодах были дни режима болезни: 3/, 'режим болезни объясняет часть различий');
+assert.equal(await page.locator('#week-compare .cmp-arrow').first().getAttribute('role'), 'img');
+await until(page, () => document.querySelector('#top-factors .factor-row'), null, 15000);
+assert.equal(await page.locator('#top-factors .factor-row').first().getAttribute('data-key'), 'sleepHours');
+assert.equal(await page.locator('#top-factors .factor-row').first().getAttribute('data-level'), 'possible');
+assert.match(await text('#top-factors .factor-row'), /1\. Сон, часов/); assert.match(await text('#top-factors'), /не доказывают причину/);
+await page.locator('#panel90').evaluate(d => { d.open = true; });
+assert.ok(await page.locator('#panel90 .cmp-row').count() >= 2); assert.match(await text('#panel90'), /Последние 90 дней против предыдущих 90/);
+assert.match(await text('#dyn-legend'), /Серая полоса/);
+assert.ok(await page.locator('.entry[data-test="reaction"] svg .spark-band').count() === 1, 'полоса нормы на графике реакции');
+assert.ok(await page.locator('.entry[data-test="reaction"] svg .spark-mark.sick').count() === 1, 'отметка режима болезни на графике');
+assert.match(await page.locator('.entry[data-test="reaction"] svg .spark-mark.sick title').textContent(), /режим болезни/);
+assert.match(await text('.entry[data-test="reaction"] .cv-line'), /^Разброс результатов: \d+% от среднего/);
+assert.equal(await page.locator('.entry[data-test="gonogo"] .cv-line').count(), 0, 'у d′ коэффициент вариации не показываем');
+await tab(page, 'tests');
+await until(page, () => document.querySelector('.test-row[data-test="reaction"] svg .spark-band'));
+assert.ok(!/null|undefined/.test(await page.locator('#view-insights').evaluate(n => n.textContent)));
+
 assert.deepEqual(errors, [], 'нет ошибок в консоли:\n' + errors.join('\n'));
 await t.close();
 console.log('E2E R3.10 OK');
