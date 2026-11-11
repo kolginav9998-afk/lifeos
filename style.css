@@ -513,3 +513,7 @@ details[open]>summary::after{transform:rotate(-135deg) translateY(-1px)}
 .ring-track{fill:none;stroke:var(--soft)}
 .ring-bar{fill:none;stroke:url(#ring-grad);stroke-linecap:round;transition:stroke-dashoffset .7s cubic-bezier(.2,.8,.2,1)}
 .ring-txt{font:800 21px system-ui,sans-serif;fill:var(--text);font-variant-numeric:tabular-nums}
+
+/* уведомление не перехватывает нажатия по тому, что под ним (кроме своей кнопки «Отменить») */
+.toast{pointer-events:none}
+.toast button{pointer-events:auto}
