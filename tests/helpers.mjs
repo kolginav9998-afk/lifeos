@@ -25,7 +25,8 @@ export async function launch({ viewport = { width: 390, height: 844 }, ctxOption
     });
   }).listen(0);
   const url = `http://localhost:${server.address().port}/`;
-  const browser = await chromium.launch();
+  // В облачной сборке, если браузер Playwright не поставился, тесты идут на Google Chrome, уже стоящем на машине (PW_CHROMIUM_PATH).
+  const browser = await chromium.launch(process.env.PW_CHROMIUM_PATH ? { executablePath: process.env.PW_CHROMIUM_PATH } : {});
   const ctx = await browser.newContext({ viewport, acceptDownloads: true, locale: 'ru-RU', ...ctxOptions });
   const page = await ctx.newPage();
   const errors = [];

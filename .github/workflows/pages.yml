@@ -24,22 +24,21 @@ jobs:
 
   e2e:
     runs-on: ubuntu-latest
+    timeout-minutes: 45
     steps:
       - uses: actions/checkout@v4
       - uses: actions/setup-node@v4
         with: { node-version: 22 }
-      - name: Установить Chromium для браузерных тестов
+      - name: Установить браузер для браузерных тестов
         run: |
           npm install --no-save --no-package-lock playwright@1.63.0
-          # Системные пакеты берутся с зеркала Ubuntu; при его сбое повторяем, а потом ставим только сам браузер (для проверок шрифты не нужны)
-          ok=0
-          for i in 1 2 3; do
-            if npx playwright install --with-deps chromium; then ok=1; break; fi
-            echo "Установка с системными пакетами не удалась (попытка $i из 3)"; sleep 30
-          done
-          if [ "$ok" != 1 ]; then
-            echo "Зеркало Ubuntu недоступно: ставлю только браузер"
-            npx playwright install chromium
+          # Браузер Playwright ставится из интернета; при сбое зеркал или сети (бывает) берём Google Chrome, уже стоящий на машине.
+          if ! timeout 420 npx playwright install --with-deps chromium; then
+            echo "Не удалось поставить браузер Playwright: использую установленный Google Chrome"
+            CHROME="$(command -v google-chrome || command -v google-chrome-stable || true)"
+            [ -n "$CHROME" ] || { echo "Google Chrome на машине не найден"; exit 1; }
+            echo "PW_CHROMIUM_PATH=$CHROME" >> "$GITHUB_ENV"
+            "$CHROME" --version
           fi
       - name: Браузерные тесты (задачи, модули, безопасность)
         run: npm run test:e2e
