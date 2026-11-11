@@ -40,7 +40,7 @@ export function createInsightsView() {
   const eChange = el('textarea', { id: 'exp-change', rows: 2, maxLength: 300, placeholder: 'Что именно меняется в фазе B?' });
   const eMetric = el('select', { id: 'exp-metric', 'aria-label': 'Показатель' }, ...Object.entries(METRICS).map(([k, m]) => el('option', { value: k, textContent: m.label })));
   const eDays = el('select', { id: 'exp-days', 'aria-label': 'Длительность' }, ...DAYS_OPTIONS.map(d => el('option', { value: String(d), textContent: `${d} дней (по неделе A и B)` })));
-  const eStart = el('input', { id: 'exp-date', type: 'date', value: todayStr() });
+  const eStart = el('input', { id: 'experiment-start', type: 'date', value: todayStr() });
   const eErr = el('p', { class: 'error', id: 'exp-err' });
   preset.onchange = () => { const p = PRESETS.find(x => x.id === preset.value); if (p) { eTitle.value = p.title; eChange.value = p.change; eMetric.value = p.metric; eDays.value = String(p.days); } };
   const startExp = async () => {

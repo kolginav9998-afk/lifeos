@@ -48,13 +48,13 @@ const lessonMin = await page.evaluate(async () => (await import('./academy.js'))
 assert.match(await text('.prac-row[data-track="english"] .prac-sum'), new RegExp(`^${lessonMin + 20} мин$`));
 assert.match(await text('.prac-row[data-track="english"]'), new RegExp(`уроки ${lessonMin}, говорение 20`));
 assert.match(await text('#practice-total'), new RegExp(`Всего за 7 дней: ${lessonMin + 20} мин`));
-await page.locator('#goal-box').evaluate(d => { d.open = true; });
-await page.fill('#goal-minutes', '5'); await page.click('#goal-save'); assert.match(await text('#goal-err'), /Цель на неделю: от 10 до 1000 минут/);
-await page.selectOption('#goal-track', 'english'); await page.fill('#goal-minutes', '60'); await page.click('#goal-save'); await toast(/Цель на неделю задана/);
+await page.locator('#lgoal-box').evaluate(d => { d.open = true; });
+await page.fill('#lgoal-minutes', '5'); await page.click('#lgoal-save'); assert.match(await text('#lgoal-err'), /Цель на неделю: от 10 до 1000 минут/);
+await page.selectOption('#lgoal-track', 'english'); await page.fill('#lgoal-minutes', '60'); await page.click('#lgoal-save'); await toast(/Цель на неделю задана/);
 await until(page, () => /из 60 мин/.test(document.querySelector('.prac-row[data-track="english"] .prac-sum')?.textContent ?? ''));
 assert.equal((await evs('learngoal'))[0].payload.minutes, 60);
-await page.locator('#goal-box').evaluate(d => { d.open = true; });
-await page.selectOption('#goal-track', 'hebrew'); await page.fill('#goal-minutes', '15'); await page.click('#goal-save');
+await page.locator('#lgoal-box').evaluate(d => { d.open = true; });
+await page.selectOption('#lgoal-track', 'hebrew'); await page.fill('#lgoal-minutes', '15'); await page.click('#lgoal-save');
 await until(page, () => document.querySelector('.prac-row[data-track="hebrew"]'));
 assert.match(await text('.prac-row[data-track="hebrew"]'), /0 из 15 мин/); assert.match(await text('.prac-row[data-track="hebrew"]'), /пока без занятий/);
 await clearToast();

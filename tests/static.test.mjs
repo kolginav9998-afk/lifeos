@@ -96,3 +96,16 @@ test('replaceChildren не получает null: DOM рисует его как
     }
   }
 });
+
+// Два экрана с одним и тем же id в разметке: тесты и вспомогательные технологии берут первый попавшийся (так «Учёба» и «Планы» однажды разделили goal-err).
+test('идентификаторы элементов не повторяются в разных файлах', () => {
+  const root = path.resolve(import.meta.dirname, '..');
+  const seen = new Map(), DATA_KEYS = new Set(['empty', 'health']);               // не элементы: ключ данных и id курса
+  for (const f of fs.readdirSync(root).filter(x => x.endsWith('.js'))) {
+    const src = fs.readFileSync(path.join(root, f), 'utf8');
+    for (const m of src.matchAll(/\bid: '([a-zA-Z][\w-]*)'/g)) { if (!DATA_KEYS.has(m[1])) (seen.get(m[1]) ?? seen.set(m[1], new Set()).get(m[1])).add(f); }
+  }
+  for (const m of fs.readFileSync(path.join(root, 'index.html'), 'utf8').matchAll(/\bid="([a-zA-Z][\w-]*)"/g)) (seen.get(m[1]) ?? seen.set(m[1], new Set()).get(m[1])).add('index.html');
+  const dups = [...seen].filter(([, files]) => files.size > 1).map(([id, files]) => `${id}: ${[...files].join(', ')}`);
+  assert.deepEqual(dups, [], 'переименуй один из элементов');
+});

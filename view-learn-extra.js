@@ -15,10 +15,10 @@ export function practiceCard(events, today) {
     r.goal ? bar(Math.min(r.total, r.goal), r.goal) : null,
     el('span', { class: 'muted', textContent: parts(r) || 'пока без занятий' }),
     r.goal && r.left === 0 ? el('span', { class: 'prac-done', textContent: 'Цель недели выполнена ✓' }) : null));
-  const sel = el('select', { id: 'goal-track', 'aria-label': 'Курс' }, ...TRACKS.map(t => el('option', { value: t.id, textContent: t.title })));
-  const mins = el('input', { id: 'goal-minutes', type: 'number', inputMode: 'numeric', min: String(GOAL_MIN), max: String(GOAL_MAX), placeholder: 'Минут в неделю', autocomplete: 'off', 'aria-label': 'Минут в неделю' });
-  const err = el('p', { class: 'error', id: 'goal-err' });
-  const form = el('form', { class: 'form-stack' }, sel, mins, el('button', { type: 'submit', id: 'goal-save', class: 'primary', textContent: 'Задать цель' }), err);
+  const sel = el('select', { id: 'lgoal-track', 'aria-label': 'Курс' }, ...TRACKS.map(t => el('option', { value: t.id, textContent: t.title })));
+  const mins = el('input', { id: 'lgoal-minutes', type: 'number', inputMode: 'numeric', min: String(GOAL_MIN), max: String(GOAL_MAX), placeholder: 'Минут в неделю', autocomplete: 'off', 'aria-label': 'Минут в неделю' });
+  const err = el('p', { class: 'error', id: 'lgoal-err' });
+  const form = el('form', { class: 'form-stack' }, sel, mins, el('button', { type: 'submit', id: 'lgoal-save', class: 'primary', textContent: 'Задать цель' }), err);
   form.noValidate = true;                                  // сообщения об ошибке показываем сами, на русском
   form.onsubmit = async e => {
     e.preventDefault();
@@ -27,6 +27,6 @@ export function practiceCard(events, today) {
   return el('div', { class: 'card', id: 'practice-card' }, el('strong', { textContent: 'Практика за неделю' }),
     w.rows.length ? el('p', { class: 'muted', id: 'practice-total', textContent: `Всего за 7 дней: ${w.total} мин` }) : el('p', { class: 'muted', textContent: 'Пока нет занятий за неделю. После первого урока, повторения карточек или говорения здесь появятся минуты по курсам.' }),
     ...rows,
-    el('details', { id: 'goal-box' }, el('summary', { textContent: 'Задать недельную цель по курсу' }), form),
+    el('details', { id: 'lgoal-box' }, el('summary', { textContent: 'Задать недельную цель по курсу' }), form),
     el('p', { class: 'muted', textContent: `Уроки считаются по плану, говорение — по записанному времени, карточки — по ${CARD_SECONDS} секунд на ответ (оценка).` }));
 }
