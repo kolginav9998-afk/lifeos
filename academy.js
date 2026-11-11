@@ -254,6 +254,28 @@ export function lessonToRevisit(events, today) {
 }
 export const markRevisited = (ev, date) => ({ ...ev, payload: { ...ev.payload, revisited: date } });
 
+
+// ---------- кривая забывания: как часто вспоминаешь через разные промежутки ----------
+// По истории ответов на карточку (дата и оценка) берём соседние ответы: промежуток между ними и вспомнил ли с первого раза.
+export const CURVE_BUCKETS = [[1, 1, '1 день'], [2, 3, '2–3 дня'], [4, 7, '4–7 дней'], [8, 14, '8–14 дней'], [15, 30, '15–30 дней'], [31, 100000, 'больше месяца']];
+export function retentionByInterval(events, trackId = null) {
+  let ids = null;
+  if (trackId === 'my') ids = new Set(userCards(events).map(c => c.id));
+  else if (trackId) { const t = trackById(trackId); ids = new Set(t ? cardsOfTrack(t).map(c => c.id) : []); }
+  const acc = CURVE_BUCKETS.map(([from, to, label]) => ({ from, to, label, n: 0, ok: 0 }));
+  for (const st of statesOf(events)) {
+    if (ids && !ids.has(st.card)) continue;
+    const h = st.hist || [];
+    for (let i = 1; i < h.length; i++) {
+      const gap = daysBetween(h[i - 1][0], h[i][0]);
+      if (gap < 1) continue;
+      const b = acc.find(x => gap >= x.from && gap <= x.to);
+      if (b) { b.n++; if (h[i][1] > 0) b.ok++; }
+    }
+  }
+  return acc.filter(b => b.n > 0).map(b => ({ ...b, rate: b.ok / b.n }));
+}
+
 export { newState, isDue };
 
 let lessonIndex = null;

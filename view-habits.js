@@ -25,17 +25,18 @@ export function createHabitsView() {
   const anchor = el('input', { id: 'habit-anchor', type: 'text', placeholder: 'После чего? Например «после завтрака»', maxLength: 200, autocomplete: 'off' });
   const minimum = el('input', { id: 'habit-min', type: 'text', placeholder: 'Версия на 2 минуты: «открыть редактор»', maxLength: 200, autocomplete: 'off' });
   const identity = el('input', { id: 'habit-identity', type: 'text', placeholder: 'Кем я становлюсь: «я человек, который двигается каждый день»', maxLength: 120, autocomplete: 'off' });
+  const plan = el('input', { id: 'habit-plan', type: 'text', placeholder: 'Если помешает: «если нет времени, то хотя бы 5 минут»', maxLength: 200, autocomplete: 'off' });
   const full = el('input', { id: 'habit-full', type: 'text', placeholder: 'Полная версия: «20 минут практики»', maxLength: 200, autocomplete: 'off' });
   const templates = el('div', { id: 'habit-templates', class: 'chips' }, ...HABIT_TEMPLATES.map(t =>
     el('button', { type: 'button', class: 'chip tpl', textContent: t.name, onclick: () => { name.value = t.name; anchor.value = t.anchor; minimum.value = t.minimum; full.value = t.full; name.focus(); } })));
-  const form = el('form', { id: 'habit-form', class: 'form-stack' }, el('span', { class: 'muted', textContent: 'Быстрый старт — выбери заготовку и поправь под себя:' }), templates, name, anchor, minimum, full, identity,
+  const form = el('form', { id: 'habit-form', class: 'form-stack' }, el('span', { class: 'muted', textContent: 'Быстрый старт — выбери заготовку и поправь под себя:' }), templates, name, anchor, minimum, full, identity, plan,
     el('button', { type: 'submit', class: 'primary', textContent: 'Добавить привычку' }));
   const addBox = el('details', { id: 'habit-add', class: 'card habit-add' }, el('summary', { textContent: '＋ Новая привычка' }), form);
   form.onsubmit = async e => {
     e.preventDefault();
     try {
-      await store.save(makeHabit({ name: name.value, anchor: anchor.value, minimum: minimum.value, full: full.value, identity: identity.value }));
-      name.value = anchor.value = minimum.value = full.value = identity.value = '';
+      await store.save(makeHabit({ name: name.value, anchor: anchor.value, minimum: minimum.value, full: full.value, identity: identity.value, plan: plan.value }));
+      name.value = anchor.value = minimum.value = full.value = identity.value = plan.value = '';
       addBox.open = false;
     } catch (err) { toast('Не удалось добавить: ' + err.message); }
   };
@@ -74,13 +75,14 @@ export function createHabitsView() {
     const m = el('input', { type: 'text', value: p.minimum, maxLength: 200, placeholder: 'Версия на 2 минуты' });
     const f = el('input', { type: 'text', value: p.full, maxLength: 200, placeholder: 'Полная версия' });
     const idn = el('input', { type: 'text', value: p.identity ?? '', maxLength: 120, placeholder: 'Кем я становлюсь', class: 'edit-identity' });
-    const f2 = el('form', { class: 'card form-stack editing', dataset: { id: h.id } }, n, a, m, f, idn,
+    const pl = el('input', { type: 'text', value: p.plan ?? '', maxLength: 200, placeholder: 'Если помешает, то…', class: 'edit-plan' });
+    const f2 = el('form', { class: 'card form-stack editing', dataset: { id: h.id } }, n, a, m, f, idn, pl,
       el('div', { class: 'row' },
         el('button', { type: 'submit', class: 'primary save', textContent: 'Сохранить' }),
         el('button', { type: 'button', class: 'cancel', textContent: 'Отмена', onclick: () => stopEdit() })));
     f2.onsubmit = async e => {
       e.preventDefault();
-      try { await store.save(updateHabit(h, { name: n.value, anchor: a.value, minimum: m.value, full: f.value, identity: idn.value })); stopEdit(); }
+      try { await store.save(updateHabit(h, { name: n.value, anchor: a.value, minimum: m.value, full: f.value, identity: idn.value, plan: pl.value })); stopEdit(); }
       catch (err) { toast('Не удалось сохранить: ' + err.message); }
     };
     queueMicrotask(() => n.focus());
@@ -98,6 +100,7 @@ export function createHabitsView() {
     c.append(el('div', { class: 'h-head' }, el('strong', { class: 'h-name', textContent: p.name }),
       p.anchor ? el('span', { class: 'muted', textContent: ' · после: ' + p.anchor }) : null));
     if (p.identity) c.append(el('div', { class: 'muted h-identity', textContent: `Я — ${p.identity.replace(/^я\s+/i, '')}` }));
+    if (p.plan) c.append(el('div', { class: 'muted h-plan', textContent: `Если помешает: ${p.plan.replace(/^если\s+(помешает\s*[:,—-]?\s*)?/i, '')}` }));
     if (!archived) {
       const fullBtn = el('button', { type: 'button', class: 'h-full' + (st.level === 'full' ? ' on' : ''), textContent: (st.level === 'full' ? '✓ ' : '') + (p.full ? `Сделал: ${p.full}` : 'Сделал полностью'), onclick: () => mark(h, st, 'full') });
       const minBtn = el('button', { type: 'button', class: 'h-min' + (st.level === 'min' ? ' on' : ''), textContent: (st.level === 'min' ? '✓ ' : '') + (p.minimum ? `Минимум: ${p.minimum}` : 'Сделал минимум (2 минуты)'), onclick: () => mark(h, st, 'min') });

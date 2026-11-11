@@ -5,7 +5,7 @@ import * as store from './store.js';
 import { isNative } from './platform.js';
 import { VERSION } from './version.js';
 import { PLANS, singlePlan, TESTS, TEST_BY_ID, makeRun, makeRunEvent, runsOf, runId, fmtPrimary, fmtMetric, setEffort, EFFORT_LABEL } from './bt-core.js';
-import { analyzeRuns, zText, zWord, selfCompare } from './bt-analytics.js';
+import { analyzeRuns, zText, zWord, selfCompare, bestResult } from './bt-analytics.js';
 import { createRunner } from './bt-ui.js';
 import { cardPool, statesOf } from './academy.js';
 import { studyStreak } from './srs.js';
@@ -51,7 +51,8 @@ export function createTestsView() {
       const s = an.perTest[t.id];
       return el('div', { class: 'entry test-row', dataset: { test: t.id } },
         el('div', { class: 'grow' }, el('strong', { textContent: t.title }), el('div', { class: 'muted', textContent: t.desc }),
-          s.latest ? el('div', { class: 'muted', textContent: `последний: ${fmtPrimary(t.id, { [t.primary.key]: s.latest.value / (t.primary.scale ?? 1) })}` }) : null),
+          s.latest ? el('div', { class: 'muted', textContent: `последний: ${fmtPrimary(t.id, { [t.primary.key]: s.latest.value / (t.primary.scale ?? 1) })}` }) : null,
+          (() => { const b = bestResult(runs, t.id); return b && b.n >= 3 ? el('div', { class: 'muted test-record', textContent: `рекорд: ${fmtPrimary(t.id, { [t.primary.key]: b.value / (t.primary.scale ?? 1) })} (${dateRu(b.date)})` }) : null; })()),
         s.series.length > 1 ? sparkline(s.series.map(p => (t.primary.better === 'lower' ? -p.value : p.value)), { width: 70, height: 28 }) : null,
         el('button', { type: 'button', class: 'chip', id: `bt-single-${t.id}`, textContent: 'Пройти', onclick: () => start(singlePlan(t.id)) }));
     });

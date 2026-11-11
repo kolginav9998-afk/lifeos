@@ -4,7 +4,7 @@ _Файл создан из `registry.js` и сверяется с ним тес
 
 Все данные Life OS — журнал событий `{id, type, ts, payload, source, confidence, evidence}`. Новые типы только добавляются; записи прошлых версий читаются всегда, а незнакомые типы сохраняются и не мешают.
 
-Всего типов: 40. «В выгрузке» — попадают ли данные этой записи в ZIP для аналитики (числа и отметки, названия привычек и упражнений). Тексты дневника, заметок, мыслей и решений, а также деньги в выгрузку не входят.
+Всего типов: 43. «В выгрузке» — попадают ли данные этой записи в ZIP для аналитики (числа и отметки, названия привычек и упражнений). Тексты дневника, заметок, мыслей и решений, а также деньги в выгрузку не входят.
 
 ## Дела
 
@@ -17,7 +17,7 @@ _Файл создан из `registry.js` и сверяется с ним тес
 
 | Тип | Что это | Поля | Приватность | В выгрузке | Модуль |
 |---|---|---|---|---|---|
-| `habit` | Привычка | name, anchor, minimum, full, identity, startDate, archived | личный текст | да | `habits.js` |
+| `habit` | Привычка | name, anchor, minimum, full, identity, plan, startDate, archived | личный текст | да | `habits.js` |
 | `habit_log` | Отметка привычки | habitId, date, level (full|min) | числа и отметки | да | `habits.js` |
 
 ## Деньги
@@ -31,6 +31,8 @@ _Файл создан из `registry.js` и сверяется с ним тес
 | `goal` | Копилка | title, targetMinor, dueDate | деньги | нет | `planning.js` |
 | `goalmove` | Взнос в копилку | goalId, amountMinor, date, note | деньги | нет | `planning.js` |
 | `sub` | Подписка | name, amountMinor, period, day, month, active | деньги | нет | `planning.js` |
+| `wish` | Хочу купить (отсрочка на сутки) | text, amountMinor, date, until, status, resolvedDate | деньги | нет | `wishes.js` |
+| `debt` | Долг или заём | who, amountMinor, direction, due, note, date, paidMinor, settled, settledDate | деньги | нет | `debts.js` |
 
 ## Заметки и дневник
 
@@ -92,6 +94,7 @@ _Файл создан из `registry.js` и сверяется с ним тес
 | `dayreview` | Вечерний обзор | date, win, miss, learn | личный текст | нет | `reflect.js` |
 | `weekreflect` | Итоги недели | week, went, blocked, change | личный текст | нет | `reflect.js` |
 | `decision` | Решение | date, title, why, expect, revisit, closed{date, verdict, outcome} | личный текст | нет | `reflect.js` |
+| `parked` | Отложенная мысль | date, forDate, text, done, doneDate | личный текст | нет | `parked.js` |
 | `ritual` | Вечерний ритуал | date, steps | числа и отметки | нет | `reflect.js` |
 | `joy` | Радость | date, text | личный текст | нет | `reflect.js` |
 | `charger` | Что заряжает | text | личный текст | нет | `reflect.js` |

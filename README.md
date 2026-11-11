@@ -15,7 +15,7 @@ node --test tests/events.test.mjs          # юнит-тесты
 node tests/e2e.mjs                         # браузер, офлайн, экспорт/импорт (нужен playwright)
 ```
 
-Инструкция: [docs/GUIDE.md](docs/GUIDE.md) · Идеи и план этапов: [docs/IDEAS.md](docs/IDEAS.md) · Типы данных: [docs/EVENTS.md](docs/EVENTS.md) · Выпуск и откат: [docs/RELEASE.md](docs/RELEASE.md) · Решения по архитектуре: [docs/ADR.md](docs/ADR.md) · Требования с числами: [docs/QUALITY.md](docs/QUALITY.md) · Глоссарий: [docs/GLOSSARY.md](docs/GLOSSARY.md) · Связи данных: [docs/ER.md](docs/ER.md) · Шаблон задачи ИИ-помощнику: [docs/AI-TASK.md](docs/AI-TASK.md)
+Инструкция: [docs/GUIDE.md](docs/GUIDE.md) · Идеи и план этапов: [docs/IDEAS.md](docs/IDEAS.md) · Типы данных: [docs/EVENTS.md](docs/EVENTS.md) · Выпуск и откат: [docs/RELEASE.md](docs/RELEASE.md) · Решения по архитектуре: [docs/ADR.md](docs/ADR.md) · Требования с числами: [docs/QUALITY.md](docs/QUALITY.md) · Глоссарий: [docs/GLOSSARY.md](docs/GLOSSARY.md) · Связи данных: [docs/ER.md](docs/ER.md) · Шаблон задачи ИИ-помощнику: [docs/AI-TASK.md](docs/AI-TASK.md) · Диаграммы состояний: [docs/STATES.md](docs/STATES.md) · Разбор выгрузки на компьютере: [docs/analysis/README.md](docs/analysis/README.md)
 
 ## Возможности
 Задачи (сроки, повторы, разбор дат в тексте), привычки, расходы и доходы, заметки, дневник и здоровье,
@@ -27,7 +27,7 @@ node tests/e2e.mjs                         # браузер, офлайн, эк�
 
 ## Тесты
 ```bash
-npm test               # юнит-тесты и статические проверки (190+)
+npm test               # юнит-тесты и статические проверки (340+)
 npm run test:e2e       # браузерные сценарии: задачи, модули, безопасность, синхронизация, здоровье, учёба, проверки (нужен playwright)
 npm run icons          # пересоздать иконки из assets/icon-source.webp
 ```

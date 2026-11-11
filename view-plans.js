@@ -4,6 +4,7 @@ import { todayStr } from './events.js';
 import * as store from './store.js';
 import { parseAmount, categoriesUsed, monthLabel, monthOf } from './money.js';
 import { limitStatus, makeLimit, limitId, makeGoal, makeGoalMove, goalProgress, makeSub, subsOf, subsTotals, nextCharge, monthlyCost, subPayment, forecast, DEFAULT_CATEGORIES } from './planning.js';
+import { createPlansExtras } from './view-plans-extra.js';
 
 const pct = r => `${Math.round(r * 100)}%`;
 const bar = (ratio, cls = '') => el('div', { class: `progress ${cls}`.trim(), role: 'img', 'aria-label': pct(ratio) }, el('span', { style: `--w:${Math.min(100, Math.round(ratio * 100))}%` }));
@@ -11,6 +12,7 @@ const bar = (ratio, cls = '') => el('div', { class: `progress ${cls}`.trim(), ro
 export function createPlansView() {
   let events = [];
   const root = el('section', { id: 'view-plans', class: 'view' });
+  const extras = createPlansExtras();
 
   // формы создаются один раз, чтобы введённое не терялось при обновлении данных
   const limCat = el('select', { id: 'lim-cat', 'aria-label': 'Категория' });
@@ -112,7 +114,7 @@ export function createPlansView() {
 
   function render() {
     const today = todayStr();
-    root.replaceChildren(renderForecast(today), renderLimits(today), renderGoals(today), renderSubs(today));
+    root.replaceChildren(renderForecast(today), renderLimits(today), renderGoals(today), renderSubs(today), extras.root);
   }
-  return { root, update(evs) { events = evs; if (!root.hidden) render(); }, show() { render(); } };
+  return { root, update(evs) { events = evs; extras.update(evs); if (!root.hidden) render(); }, show() { render(); } };
 }

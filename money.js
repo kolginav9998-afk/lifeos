@@ -133,3 +133,14 @@ export function moneyToCsv(events) {
   return '\ufeff' + lines.join('\r\n') + '\r\n';
 }
 export const expensesToCsv = moneyToCsv;
+
+// Необычно крупная трата: сумма сильно выше обычной для категории (медиана за 90 дней, не меньше пяти прежних трат).
+// Возвращает {median, count} или null. Только предупреждение, ничего не блокирует.
+export function unusualExpense(events, expense, { days = 90, minCount = 5 } = {}) {
+  const p = expense.payload, from = new Date(`${p.date}T12:00:00`).getTime() - days * 86400000;
+  const prev = events.filter(e => e.type === 'expense' && e.id !== expense.id && e.payload.category === p.category && new Date(`${e.payload.date}T12:00:00`).getTime() >= from && e.payload.date <= p.date).map(e => e.payload.amountMinor).sort((a, b) => a - b);
+  if (prev.length < minCount) return null;
+  const mid = Math.floor(prev.length / 2), median = prev.length % 2 ? prev[mid] : Math.round((prev[mid - 1] + prev[mid]) / 2);
+  return p.amountMinor >= Math.max(median * 3, median + 10000, 50000) ? { median, count: prev.length } : null;
+}
+export const unusualText = (u, category) => `Это заметно больше обычного для «${category}» (обычно около ${formatMoney(u.median)}). Если это опечатка, отмени запись.`;

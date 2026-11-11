@@ -30,3 +30,12 @@ export function caffeineHint(events, today, minCups = 3) {
   if (!Number.isFinite(c) || c < minCups) return null;
   return { cups: c, text: `Ночь была тяжёлой, а вчера было ${c} ${cups(c)} кофе или чая. Попробуй сегодня закончить с кофе и чаем до 14:00: так обычно легче засыпать. Это совет на пробу, а не вывод: проверь его экспериментом.` };
 }
+
+// Несколько дней подряд низкий фокус вечером: возможно, нужен день отдыха (подсказка, не вывод).
+export function restDayHint(events, today, days = 4) {
+  for (let i = 0; i < days; i++) {
+    const f = checkinOf(events, addDays(today, -i), 'e')?.payload.focus;
+    if (!Number.isFinite(f) || f > 2) return null;
+  }
+  return { days, text: `${days} вечера подряд ты отметил низкий фокус. Это может быть усталость, а не лень. Подумай про день полегче: «Тяжёлый день» оставит только главное.` };
+}

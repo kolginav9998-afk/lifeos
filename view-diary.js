@@ -1,10 +1,11 @@
-import { el, toast, dateRu, ratingRow, stepper } from './ui.js';
+import { el, fill, toast, dateRu, ratingRow, stepper } from './ui.js';
 import { todayStr, addDays } from './events.js';
 import { makeCheckin, makeDiary, checkinOf, diaryOf, recentDays, sleepFromTimes, SLOTS, RATINGS, NUMBERS, FLAGS, hashtags, questionOfDay, onThisDay } from './diary.js';
 import { makeMeasure } from './health.js';
 import * as store from './store.js';
 import { openFreeWrite } from './freewrite.js';
 import { diaryStats } from './writing.js';
+import { moodHeat } from './diary.js';
 
 export function createDiaryView() {
   let events = [];
@@ -86,7 +87,9 @@ export function createDiaryView() {
   // ----- история -----
   const strip = el('div', { id: 'mood-strip', class: 'mood-strip', 'aria-label': 'Настроение за 14 дней' });
   const hist = el('div', { id: 'diary-history', class: 'hist' });
-  const histBox = el('div', { class: 'card' }, el('strong', { textContent: 'Последние дни' }), strip, hist);
+  const heat = el('div', { id: 'mood-heat', class: 'mood-heat', role: 'img', 'aria-label': 'Настроение за 12 недель' });
+  const histBox = el('div', { class: 'card' }, el('strong', { textContent: 'Последние дни' }), strip, hist, el('strong', { class: 'heat-title', textContent: 'Настроение за 12 недель' }), heat,
+    el('p', { class: 'muted', textContent: 'Чем темнее клетка, тем лучше день. Серые клетки: отметок не было.' }));
 
   root.append(nav, mBox, eBox, dBox, histBox, fwHost);
 
@@ -150,6 +153,7 @@ export function createDiaryView() {
       dG.forEach((inp, i) => { inp.value = d.gratitude?.[i] ?? ''; });
       paintTags();
     }
+    fill(heat, ...moodHeat(events, todayStr()).map(col => el('div', { class: 'mh-col' }, ...col.map(c => el('span', { class: `mh-cell mh-${c.level}${c.future ? ' future' : ''}`, title: `${dateRu(c.date)}: ${c.mood !== null ? String(Math.round(c.mood * 10) / 10).replace('.', ',') : c.future ? '' : 'нет отметок'}` })))));
     const st = diaryStats(events, todayStr());
     stats.textContent = `Слов сегодня: ${st.wordsToday}${st.streak ? ` · записей подряд: ${st.streak}` : ''}`;
     qText.textContent = questionOfDay(date);

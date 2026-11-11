@@ -1,6 +1,6 @@
-import { el, toast, dateRu } from './ui.js';
+import { el, fill, toast, dateRu } from './ui.js';
 import { todayStr } from './events.js';
-import { makeNote, updateNote, noteTitle, sortedNotes, MAX_NOTE, NOTE_TEMPLATES, templateText, noteTags, tagCloud, resolveLinks, backlinks } from './notes.js';
+import { makeNote, updateNote, noteTitle, sortedNotes, MAX_NOTE, NOTE_TEMPLATES, templateText, noteTags, tagCloud, resolveLinks, backlinks, pastNote } from './notes.js';
 import { normalize } from './search.js';
 import * as store from './store.js';
 
@@ -32,7 +32,25 @@ export function createNotesView() {
   const tagBar = el('div', { id: 'note-tags', class: 'chips' });
   const list = el('div', { id: 'note-list' });
   const empty = el('p', { class: 'muted', hidden: true, textContent: 'Заметок пока нет.' });
-  root.append(form, filter, tagBar, list, empty);
+  // случайная заметка из прошлого (старше 30 дней): можно перечитать и открыть
+  let pastId = null;
+  const pastBox = el('div', { id: 'note-past-box', class: 'card calm', hidden: true });
+  const pastBtn = el('button', { type: 'button', id: 'note-past', class: 'chip', textContent: 'Случайная заметка из прошлого', onclick: () => showPast() });
+  const pastRow = el('div', { class: 'row', hidden: true }, pastBtn);
+  function showPast() {
+    const n = pastNote(events, Date.now(), Math.floor(Math.random() * 1e6));
+    if (!n) { clearPast(); return; }
+    pastId = n.id;
+    const t = n.payload.text.length > 500 ? n.payload.text.slice(0, 500) + '…' : n.payload.text;
+    fill(pastBox, el('strong', { textContent: `Из прошлого · ${dateRu(todayStr(n.ts))}` }), el('p', { class: 'note-body', id: 'note-past-text', textContent: t }),
+      el('div', { class: 'row wrap' },
+        el('button', { type: 'button', id: 'note-past-open', class: 'chip', textContent: 'Открыть', onclick: () => { editingId = n.id; editorEl = null; clearPast(); render(); } }),
+        el('button', { type: 'button', id: 'note-past-next', class: 'chip', textContent: 'Ещё одну', onclick: () => showPast() }),
+        el('button', { type: 'button', id: 'note-past-close', class: 'chip', textContent: 'Закрыть', onclick: () => clearPast() })));
+    pastBox.hidden = false;
+  }
+  function clearPast() { pastId = null; pastBox.hidden = true; pastBox.replaceChildren(); }
+  root.append(form, pastRow, pastBox, filter, tagBar, list, empty);
 
   function stopEdit() { editingId = null; editorEl = null; render(); }
 
@@ -80,6 +98,8 @@ export function createNotesView() {
   }
 
   function render() {
+    pastRow.hidden = !pastNote(events);                                       // кнопка нужна, только если есть заметки старше 30 дней
+    if (pastId && !events.some(e => e.id === pastId)) clearPast();
     const q = normalize(filter.value).trim();
     const all = sortedNotes(events);
     const shown = q ? all.filter(n => q.split(/\s+/).every(t => normalize(n.payload.text).includes(t))) : all;

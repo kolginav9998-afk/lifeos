@@ -138,9 +138,13 @@ export function monthReport(events, ym, { now = Date.now() } = {}) {
     L.push('## Дневник', `- Записей: ${diary.length} из ${days.length} дней${top.length ? `; частые темы: ${top.join(', ')}` : ''}`, '');
   }
 
-  // подсказки аналитики (только заголовки и числа)
+  // наблюдения аналитики: заголовки и осторожные пояснения (числа и метод, без личных текстов)
   const ins = insights(events, now).filter(i => !['empty', 'need-more', 'need-checkins', 'no-relations'].includes(i.id)).slice(0, 4);
-  if (ins.length) { L.push('## Что заметила аналитика'); for (const i of ins) L.push(`- ${i.title}`); L.push(''); }
+  if (ins.length) {
+    L.push('## Что заметила аналитика (осторожно)');
+    for (const i of ins) L.push(`- **${i.title}.** ${i.text}`);
+    L.push('', '_Это связи и наблюдения по моим данным, а не доказанные причины. Чем больше дней с отметками, тем они надёжнее._', '');
+  }
   L.push('## Мои выводы и планы на следующий месяц', '', '- ', '- ', '- ', '');
   return L.join('\n');
 }

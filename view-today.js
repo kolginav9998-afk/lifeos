@@ -5,7 +5,7 @@ import { getPref, setPref } from './prefs.js';
 import { activeHabits } from './habits.js';
 import { weekReview } from './review.js';
 import { dayLog } from './journal.js';
-import { spentBetween } from './money.js';
+import { spentBetween, unusualExpense, unusualText } from './money.js';
 import { todayLoad, wordOfDay } from './academy.js';
 import { activeExperiments, phaseOf } from './experiments.js';
 import { parseCapture, captureLabel, buildCapture } from './capture.js';
@@ -15,10 +15,15 @@ import { makeNote, templateText } from './notes.js';
 import { upcomingBirthdays, dueContacts } from './people.js';
 import { okrsOf, okrPace } from './okr.js';
 import { makeIntention, intentionOf, decisionsDue, lowMoodNotice, LOW_MOOD_TEXT } from './reflect.js';
-import { lightDayHint, overloadHint, caffeineHint } from './hints.js';
+import { lightDayHint, overloadHint, caffeineHint, restDayHint } from './hints.js';
+import { unseenChanges } from './changelog.js';
+import { VERSION } from './version.js';
 import { activeSick, startSick, endSick } from './sick.js';
 import { checkupsDue } from './prevent.js';
 import { planDay, planText, rankTasks } from './planday.js';
+import { parkedDue, finishPark } from './parked.js';
+import { createMoneyNudge } from './view-money-nudge.js';
+import { createDeviceHints } from './view-device-hints.js';
 import * as vault from './vault.js';
 import * as store from './store.js';
 
@@ -121,6 +126,10 @@ export function createTodayView({ go }) {
     if (caf) out.push(hintCard('hint-caffeine', caf.text,
       el('button', { type: 'button', id: 'hint-caffeine-exp', class: 'chip', textContent: 'Проверить экспериментом', onclick: () => { setPref('caffeineAsked', today); go('insights'); } }),
       el('button', { type: 'button', class: 'chip', textContent: 'Понял', onclick: () => { setPref('caffeineAsked', today); render(); } })));
+    const rest = !heavy && !sickEv && getPref('restAsked') !== today && restDayHint(events, today);
+    if (rest) out.push(hintCard('hint-rest', rest.text,
+      el('button', { type: 'button', id: 'hint-rest-on', class: 'chip', textContent: 'Включить «Тяжёлый день»', onclick: () => { setPref('heavyDay', true); setPref('restAsked', today); render(); } }),
+      el('button', { type: 'button', class: 'chip', textContent: 'Понял', onclick: () => { setPref('restAsked', today); render(); } })));
     const over = !heavy && !sickEv && getPref('overloadAsked') !== today && overloadHint(events, today);
     if (over) out.push(hintCard('hint-overload', over.text,
       el('button', { type: 'button', id: 'hint-overload-on', class: 'chip', textContent: 'Оставить три главных', onclick: () => { setPref('heavyDay', true); setPref('overloadAsked', today); render(); } }),
@@ -130,6 +139,35 @@ export function createTodayView({ go }) {
       el('button', { type: 'button', id: 'hint-lowmood-hide', class: 'chip', textContent: 'Понятно, напомнить через неделю', onclick: () => { setPref('lowMoodUntil', addDays(today, 7)); render(); } })));
     hintsBox.replaceChildren(...out);
   }
+
+  // что нового: один раз после обновления
+  const whatsNew = el('div', { id: 'whatsnew', class: 'card calm', hidden: true });
+  function renderWhatsNew() {
+    const last = getPref('lastSeenVersion');
+    if (!last) { setPref('lastSeenVersion', VERSION); whatsNew.hidden = true; return; }       // первая установка: ничего не показываем
+    const list = unseenChanges(last, VERSION);
+    whatsNew.hidden = !list.length;
+    if (!list.length) { whatsNew.replaceChildren(); return; }
+    fill(whatsNew, el('strong', { textContent: `Что нового в ${VERSION}` }),
+      ...list.flatMap(c => [list.length > 1 ? el('div', { class: 'muted', textContent: c.version }) : null, el('ul', { class: 'plain' }, ...c.items.map(t => el('li', { textContent: t })))]),
+      el('button', { type: 'button', id: 'whatsnew-ok', class: 'chip', textContent: 'Понятно', onclick: () => { setPref('lastSeenVersion', VERSION); renderWhatsNew(); } }));
+  }
+
+  // отложенное: то, что вчера записали «на потом»
+  const parkedBox = el('div', { id: 'parked', class: 'card calm', hidden: true });
+  function renderParked(today) {
+    const due = parkedDue(events, today);
+    parkedBox.hidden = !due.length;
+    if (parkedBox.hidden) { parkedBox.replaceChildren(); return; }
+    fill(parkedBox, el('strong', { textContent: 'Отложенное: самое время вернуться' }),
+      ...due.map(e => el('div', { class: 'row park-due', dataset: { id: e.id } }, el('span', { class: 'grow', textContent: e.payload.text }),
+        el('button', { type: 'button', class: 'chip park-done', textContent: 'Разобрал', onclick: () => store.save(finishPark(e)) }),
+        el('button', { type: 'button', class: 'chip park-snooze', textContent: 'Ещё на день', onclick: () => store.save({ ...e, payload: { ...e.payload, forDate: addDays(today, 1) } }) }))));
+  }
+
+  // деньги: желания, которые отлежали сутки, и просроченные долги
+  const moneyNudge = createMoneyNudge({ go });
+  const deviceHints = createDeviceHints({ go });
 
   // план дня: предложение по порядку и времени (не сохраняется)
   const planCard = el('details', { id: 'plan-day', class: 'card', hidden: true });
@@ -190,7 +228,8 @@ export function createTodayView({ go }) {
           const ev = buildCapture(c, { habits });
           input.value = ''; updateHint(); updateCapture();
           await store.save(ev);
-          toast(`Добавлено: ${captureLabel(c)}`, { actionLabel: 'Отменить', onAction: () => store.remove(ev.id) });
+          const odd = ev.type === 'expense' ? unusualExpense(events, ev) : null;
+          toast(odd ? unusualText(odd, ev.payload.category) : `Добавлено: ${captureLabel(c)}`, { actionLabel: 'Отменить', onAction: () => store.remove(ev.id) });
         } catch (err) { toast('Не удалось добавить: ' + err.message); }
       } }));
     cap.hidden = false;
@@ -252,7 +291,7 @@ export function createTodayView({ go }) {
     toast(`Удалено сделанных: ${ids.length}`, { actionLabel: 'Отменить', onAction: () => store.saveMany(old) });
   };
 
-  root.append(hello, dateLine, summary, hintsBox, intentionBox, planCard, onboarding, wotd, focusHost, form, minimum, review, journal, ...Object.values(sections).map(s => s.sec), empty, doneBlock);
+  root.append(hello, dateLine, whatsNew, summary, hintsBox, deviceHints.root, parkedBox, moneyNudge.root, intentionBox, planCard, onboarding, wotd, focusHost, form, minimum, review, journal, ...Object.values(sections).map(s => s.sec), empty, doneBlock);
 
   // ----- элементы списка -----
   async function removeTask(ev) {
@@ -383,6 +422,7 @@ export function createTodayView({ go }) {
     if (r.health.strengthDays) hl.push(`Силовых дней: ${r.health.strengthDays} из ${WEEKLY_STRENGTH_GOAL}`);
     if (r.health.moodAvg !== null) hl.push(`Настроение: в среднем ${f1(r.health.moodAvg)} из 5`);
     if (hl.length) lines.push(el('p', { id: 'review-health', class: 'muted', textContent: hl.join(' · ') }));
+    lines.push(el('p', { id: 'review-active', class: 'muted', textContent: `Дней с делом за ${r.active.of} дней: ${r.active.count}${r.active.streak ? ` · подряд: ${r.active.streak}` : ''}. Считается любое дело: минимум привычки, задача, урок, отметка, фокус.` }));
     if (r.focus.minutes) lines.push(el('p', { id: 'review-focus', class: 'muted', textContent: `Фокус: ${r.focus.minutes} мин за неделю (сессий: ${r.focus.sessions}, дней: ${r.focus.days})` }));
     if (r.growth.lessons || r.growth.reviews || r.growth.tests) lines.push(el('p', { id: 'review-growth', class: 'muted', textContent: `Развитие: уроков ${r.growth.lessons}, ответов на карточки ${r.growth.reviews}, проверок ${r.growth.tests}` }));
     lines.push(el('button', { type: 'button', id: 'plan-week', class: 'chip', textContent: 'Составить план недели (заметка)', onclick: async () => { await store.save(makeNote(templateText('weekly', todayStr()))); toast('План недели создан в заметках', { actionLabel: 'Открыть', onAction: () => go('notes') }); } }));
@@ -417,7 +457,7 @@ export function createTodayView({ go }) {
     renderWotd(today);
     const g = groupTasks(events, today);
     const heavy = !!getPref('heavyDay');
-    renderIntention(today); renderHints(today, heavy); renderPlan(today);
+    renderWhatsNew(); renderIntention(today); renderHints(today, heavy); renderParked(today); moneyNudge.update(events); deviceHints.update(events); renderPlan(today);
     renderMinimum(g, today, heavy);
     for (const key of Object.keys(sections)) {
       sections[key].sec.hidden = heavy || g[key].length === 0;

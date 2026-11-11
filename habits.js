@@ -6,20 +6,20 @@ import { sickDays } from './sick.js';
 const clean = (s, n) => String(s ?? '').trim().slice(0, n);
 export const habitLogId = (habitId, date) => `${habitId}:${date}`;   // одна отметка в день на привычку
 
-export function makeHabit({ name, anchor = '', minimum = '', full = '', identity = '' }, now = Date.now()) {
+export function makeHabit({ name, anchor = '', minimum = '', full = '', identity = '', plan = '' }, now = Date.now()) {
   const n = clean(name, 120);
   if (!n) throw new Error('empty habit');
   return {
     id: newId(), type: 'habit', ts: now,
-    payload: { name: n, anchor: clean(anchor, 200), minimum: clean(minimum, 200), full: clean(full, 200), identity: clean(identity, 120), startDate: todayStr(now), archived: false },
+    payload: { name: n, anchor: clean(anchor, 200), minimum: clean(minimum, 200), full: clean(full, 200), identity: clean(identity, 120), plan: clean(plan, 200), startDate: todayStr(now), archived: false },
     source: 'manual', confidence: 1, evidence: [],
   };
 }
 
-export function updateHabit(ev, { name, anchor, minimum, full, identity }, now = Date.now()) {
+export function updateHabit(ev, { name, anchor, minimum, full, identity, plan }, now = Date.now()) {
   const n = clean(name, 120);
   if (!n) throw new Error('empty habit');
-  return { ...ev, payload: { ...ev.payload, name: n, anchor: clean(anchor, 200), minimum: clean(minimum, 200), full: clean(full, 200), identity: identity === undefined ? (ev.payload.identity ?? '') : clean(identity, 120), editedAt: now } };
+  return { ...ev, payload: { ...ev.payload, name: n, anchor: clean(anchor, 200), minimum: clean(minimum, 200), full: clean(full, 200), identity: identity === undefined ? (ev.payload.identity ?? '') : clean(identity, 120), plan: plan === undefined ? (ev.payload.plan ?? '') : clean(plan, 200), editedAt: now } };
 }
 
 export const archiveHabit = (ev, archived = true) => ({ ...ev, payload: { ...ev.payload, archived } });

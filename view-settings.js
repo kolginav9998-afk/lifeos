@@ -17,6 +17,8 @@ import { account } from './app-sync.js';
 import { describeError } from './account.js';
 import { tasksToIcs } from './ics.js';
 import { dataChecks } from './datacheck.js';
+import { storageStatus } from './storageinfo.js';
+import { clockHint } from './devicetime.js';
 
 const TYPE_NAMES = { task: 'задачи', habit: 'привычки', habit_log: 'отметки привычек', expense: 'расходы', income: 'доходы', note: 'заметки' };
 const AUTOLOCK = [[0, 'сразу при сворачивании'], [1, 'через 1 минуту'], [5, 'через 5 минут'], [15, 'через 15 минут'], [60, 'через час'], [-1, 'никогда']];
@@ -181,7 +183,7 @@ export function createSettingsView({ lockNow, applyTheme, applyMode = () => {}, 
       const r = await readBackup(text, password);
       await store.saveMany(r.events);
       pendingImport = null; impRow.hidden = true; impPass.value = '';
-      toast(`Восстановлено записей: ${r.events.length}` + (r.skipped ? `, пропущено повреждённых: ${r.skipped}` : ''));
+      toast(`Восстановлено записей: ${r.events.length}` + (r.skipped ? `, пропущено повреждённых: ${r.skipped}` : '') + (r.migrated?.length ? `. Формат копии обновлён (версия ${r.migrated[0].from} → ${r.migrated.at(-1).to})` : ''));
     } catch (err) {
       if (err instanceof NeedPasswordError || err instanceof BadBackupPasswordError) { impRow.hidden = false; toast(err.message); }
       else { pendingImport = null; impRow.hidden = true; toast('Ошибка: ' + err.message); }
@@ -228,6 +230,17 @@ export function createSettingsView({ lockNow, applyTheme, applyMode = () => {}, 
     const bt = el('select', { id: 'remind-bed' }, ...[[-1, 'не напоминать'], [1290, 'в 21:30'], [1320, 'в 22:00'], [1350, 'в 22:30'], [1380, 'в 23:00'], [1410, 'в 23:30']].map(([v, t]) => el('option', { value: String(v), textContent: t })));
     const wk = el('select', { id: 'remind-week' }, ...[[-1, 'не напоминать'], [17, 'в 17:00'], [18, 'в 18:00'], [19, 'в 19:00'], [20, 'в 20:00']].map(([v, t]) => el('option', { value: String(v), textContent: t })));
     th.value = String(getPref('taskHour')); hh.value = String(getPref('habitHour')); eh.value = String(getPref('eveningHour')); bt.value = String(getPref('bedtimeMin')); wk.value = String(getPref('weeklyHour'));
+    const qf = el('select', { id: 'remind-quiet-from', 'aria-label': 'Тихие часы с' }, ...[[-1, 'не нужны'], [21, 'с 21:00'], [22, 'с 22:00'], [23, 'с 23:00']].map(([v, t]) => el('option', { value: String(v), textContent: t })));
+    const qt = el('select', { id: 'remind-quiet-to', 'aria-label': 'Тихие часы до' }, ...[6, 7, 8, 9].map(h => el('option', { value: String(h), textContent: `до ${String(h).padStart(2, '0')}:00` })));
+    qf.value = String(getPref('quietFrom')); qt.value = String(getPref('quietTo'));
+    qf.onchange = () => { setPref('quietFrom', Number(qf.value)); if (getPref('remindersOn')) run(false); };
+    qt.onchange = () => { setPref('quietTo', Number(qt.value)); if (getPref('remindersOn')) run(false); };
+    const DAY = { 1: 'пн', 2: 'вт', 3: 'ср', 4: 'чт', 5: 'пт', 6: 'сб', 0: 'вс' };
+    const offDays = el('div', { id: 'remind-off', class: 'row wrap' }, ...[1, 2, 3, 4, 5, 6, 0].map(d => el('label', { class: 'check-label' },
+      el('input', { type: 'checkbox', id: `off-${d}`, checked: (getPref('daysOff') || []).includes(d), onchange: e => {
+        const cur = new Set(getPref('daysOff') || []); if (e.target.checked) cur.add(d); else cur.delete(d);
+        setPref('daysOff', [...cur].sort()); if (getPref('remindersOn')) run(false);
+      } }), ` ${DAY[d]}`)));
     const status = el('p', { id: 'remind-status', class: 'muted', textContent: getPref('remindersOn') ? 'Включено' : 'Выключено' });
     const run = async ask => {
       const r = await notify.resync({ ask });
@@ -251,6 +264,8 @@ export function createSettingsView({ lockNow, applyTheme, applyMode = () => {}, 
     remindBox.replaceChildren(
       el('label', { class: 'check-label' }, on, ' Напоминать о задачах и привычках'),
       el('label', {}, 'О задачах на день: ', th), el('label', {}, 'О привычках: ', hh), el('label', {}, 'Вечерняя отметка и повторение: ', eh), el('label', {}, 'Подготовка ко сну: ', bt), el('label', {}, 'Итоги недели (воскресенье): ', wk), status, test,
+      el('div', { class: 'row wrap' }, el('label', {}, 'Тихие часы: ', qf), el('label', {}, ' ', qt)), el('p', { class: 'muted', textContent: 'В тихие часы уведомления молчат (кроме подготовки ко сну).' }),
+      el('span', { class: 'rating-label', textContent: 'Выходные дни без уведомлений:' }), offDays,
       el('p', { class: 'muted', textContent: 'Если уведомления не приходят, на Huawei разреши приложению автозапуск и работу в фоне (Настройки → Батарея → Запуск приложений).' }));
   }
 
@@ -265,6 +280,9 @@ export function createSettingsView({ lockNow, applyTheme, applyMode = () => {}, 
     let meta = null;
     try { meta = JSON.parse(localStorage.getItem('lifeos.meta') || 'null'); } catch { /* нет */ }
     const c = await db.counts();
+    let space = null;
+    try { const est = await navigator.storage?.estimate?.(); space = est ? storageStatus(est) : null; } catch { /* нет API */ }
+    const clock = clockHint({ events: store.state.events, backFrom: getPref('clockBackFrom') });
     const standalone = matchMedia('(display-mode: standalone)').matches || navigator.standalone;
     diag.textContent = [
       `Версия ${VERSION}`,
@@ -273,6 +291,7 @@ export function createSettingsView({ lockNow, applyTheme, applyMode = () => {}, 
       startupText(),
       `Записей: IndexedDB ${c.idb ?? 'ошибка'}, копия ${c.ls}`,
       `Защита от очистки: ${persisted}`,
+      space ? space.line : '', space?.text ? `⚠ ${space.text}` : '', clock ? `⚠ ${clock.text}` : '',
       `Пароль: ${{ none: 'не задан', locked: 'задан (заблокировано)', unlocked: 'задан (открыто)' }[vault.status()]}`,
       db.state.idbOk === false ? `Ошибка IndexedDB: ${db.state.idbError}` : '',
       ...(errorLog.length ? ['Последние ошибки:', ...errorLog] : []),

@@ -2,6 +2,7 @@
 // Поля source/confidence/evidence есть с первого дня (контроль достоверности).
 // Даты — локальные строки 'YYYY-MM-DD' (без часовых поясов, чтобы "10-е число" было 10-м).
 
+import { MIGRATIONS, migrateEvents } from './migrate.js';
 export const SCHEMA_VERSION = 1;
 export const REPEAT_TYPES = ['daily', 'weekly', 'monthly'];
 export const MAX_TEXT = 500;
@@ -184,14 +185,16 @@ export function cleanEvent(e) {
   };
 }
 
-// Возвращает только валидные события; мусор отбрасывает и считает.
-export function parseImport(text) {
+// Возвращает только валидные события; мусор отбрасывает и считает. Копии старых схем приводятся к текущей (migrate.js).
+// Параметры нужны тестам: подставить свою версию схемы и свои миграции.
+export function parseImport(text, { schemaVersion = SCHEMA_VERSION, migrations = MIGRATIONS } = {}) {
   let data;
   try { data = JSON.parse(text); } catch { throw new Error('Это не JSON-файл'); }
   if (!data || data.app !== 'lifeos' || !Array.isArray(data.events)) {
     throw new Error('Это не резервная копия Life OS');
   }
-  if (Number.isFinite(data.schema) && data.schema > SCHEMA_VERSION) throw new Error('Копия сделана более новой версией Life OS. Обнови приложение и восстанови копию снова.');
+  const from = Number.isFinite(data.schema) ? data.schema : 1;           // у самых первых копий поля schema нет
+  if (from > schemaVersion) throw new Error('Копия сделана более новой версией Life OS. Обнови приложение и восстанови копию снова.');
   if (data.events.length > MAX_IMPORT_EVENTS) throw new Error('Слишком много записей в файле');
   const valid = [];
   let skipped = 0;
@@ -199,5 +202,13 @@ export function parseImport(text) {
     const c = cleanEvent(e);
     if (c) valid.push(c); else skipped++;
   }
-  return { events: valid, skipped };
+  if (from >= schemaVersion) return { events: valid, skipped, migrated: [] };
+  let moved;
+  try { moved = migrateEvents(valid, from, schemaVersion, migrations); } catch (e) { throw new Error(`Не удалось привести копию к текущему формату: ${e.message}`); }
+  const events = [];
+  for (const e of moved.events) {
+    const c = cleanEvent(e);                                              // миграция не должна нарушить правила записей
+    if (c) events.push(c); else skipped++;
+  }
+  return { events, skipped, migrated: moved.applied };
 }

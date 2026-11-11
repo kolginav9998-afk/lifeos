@@ -101,6 +101,17 @@ export function dayMood(events, date) {
   const vals = ['m', 'e'].map(s => checkinOf(events, date, s)?.payload.mood).filter(Number.isFinite);
   return vals.length ? vals.reduce((a, b) => a + b, 0) / vals.length : null;
 }
+// Календарь-тепловая карта настроения: недели по столбцам (с понедельника), дни по строкам. level 0 — нет отметок, 1–5 — настроение дня.
+export function moodHeat(events, today, weeks = 12) {
+  const [y, m, d] = today.split('-').map(Number), dow = (new Date(y, m - 1, d).getDay() + 6) % 7;
+  const start = addDays(today, -dow - 7 * (weeks - 1));
+  return Array.from({ length: weeks }, (_, w) => Array.from({ length: 7 }, (_, i) => {
+    const date = addDays(start, w * 7 + i);
+    if (date > today) return { date, future: true, mood: null, level: 0 };
+    const mood = dayMood(events, date);
+    return { date, future: false, mood, level: mood === null ? 0 : Math.min(5, Math.max(1, Math.round(mood))) };
+  }));
+}
 export function dayDigest(events, date) {
   const m = checkinOf(events, date, 'm')?.payload, e = checkinOf(events, date, 'e')?.payload, d = diaryOf(events, date)?.payload;
   return { date, mood: dayMood(events, date), sleep: m?.sleepHours ?? null, energy: e?.energy ?? m?.energy ?? null, stress: e?.stress ?? m?.stress ?? null, text: d?.text || d?.highlight || '', hasAny: !!(m || e || d) };

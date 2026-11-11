@@ -1,6 +1,7 @@
 // Экран «Рефлексия»: вечерний обзор, итоги недели, журнал решений, копилка радостей и «что меня заряжает».
 import { el, fill, toast, dateRu } from './ui.js';
 import { todayStr, addDays } from './events.js';
+import { makePark, finishPark, parkedLater, parkedDue } from './parked.js';
 import * as store from './store.js';
 import { getPref, setPref } from './prefs.js';
 import {
@@ -20,6 +21,28 @@ export function createReflectView() {
 
   // ----- предупреждение о долго низком настроении -----
   const lowBox = el('div', { id: 'lowmood', class: 'card calm', hidden: true });
+
+  // ----- отложенные мысли: записать и отпустить до завтра -----
+  const parkText = el('textarea', { id: 'park-text', rows: 2, maxLength: 300, placeholder: 'Что крутится в голове? Запиши и отпусти до завтра.' });
+  const parkFor = el('input', { id: 'park-for', type: 'date', 'aria-label': 'Вернуться к этому' });
+  const parkErr = el('p', { class: 'error', id: 'park-err' });
+  const parkForm = el('form', { class: 'form-stack' }, parkText, el('label', {}, 'Вернуться: ', parkFor), el('button', { type: 'submit', id: 'park-add', class: 'primary', textContent: 'Отложить' }), parkErr);
+  parkForm.onsubmit = async e => {
+    e.preventDefault();
+    try { await store.save(makePark({ text: parkText.value, forDate: parkFor.value || undefined })); parkText.value = ''; parkFor.value = addDays(todayStr(), 1); parkErr.textContent = ''; toast('Отложено. Утром это вернётся на экран «Сегодня».'); }
+    catch (x) { parkErr.textContent = x.message; }
+  };
+  const parkCard = el('div', { class: 'card', id: 'park-card' });
+  function renderPark(today) {
+    if (!parkFor.value || parkFor.value < today) parkFor.value = addDays(today, 1);
+    const later = parkedLater(events, today), due = parkedDue(events, today);
+    fill(parkCard, el('strong', { textContent: 'Отложить на потом' }),
+      el('p', { class: 'muted', textContent: 'Тревожную мысль или заботу не нужно держать в голове ночью. Запиши и вернись к ней в назначенный день.' }), parkForm,
+      ...due.map(e => el('div', { class: 'row park-row due', dataset: { id: e.id } }, el('span', { class: 'grow', textContent: e.payload.text }),
+        el('button', { type: 'button', class: 'chip park-done', textContent: 'Разобрал', onclick: () => store.save(finishPark(e)) }))),
+      ...later.map(e => el('div', { class: 'row park-row', dataset: { id: e.id } }, el('span', { class: 'muted', textContent: dateRu(e.payload.forDate) }), el('span', { class: 'grow', textContent: e.payload.text }),
+        el('button', { type: 'button', class: 'chip danger', 'aria-label': 'Удалить', textContent: '✕', onclick: async () => { const old = await store.remove(e.id); toast('Удалено', old ? { actionLabel: 'Вернуть', onAction: () => store.save(old) } : {}); } }))));
+  }
 
   // ----- вечерний обзор -----
   const rv = Object.fromEntries(DAY_QUESTIONS.map(([k, q]) => [k, area(`rv-${k}`, 'Одна-две строки', 2)]));
@@ -146,7 +169,7 @@ export function createReflectView() {
       chgForm, chgErr);
   }
 
-  root.append(lowBox, rvCard, ritCard, wkCard, decCard, joyCard, chgCard);
+  root.append(lowBox, parkCard, rvCard, ritCard, wkCard, decCard, joyCard, chgCard);
 
   function renderLow(today) {
     const n = lowMoodNotice(events, today);
@@ -159,7 +182,7 @@ export function createReflectView() {
 
   function render() {
     const today = todayStr(), ws = weekStart(today);
-    renderLow(today);
+    renderLow(today); renderPark(today);
     if (!dirty.rv) {
       const r = dayReviewOf(events, today)?.payload ?? {};
       for (const [k] of DAY_QUESTIONS) rv[k].value = r[k] ?? '';

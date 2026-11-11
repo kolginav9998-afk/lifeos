@@ -50,10 +50,30 @@ export function weekReview(events, today) {
   };
 
   return {
-    from, to: today, tasksDone, prevDone, perDay, habits, health, growth, focus,
+    from, to: today, tasksDone, prevDone, perDay, habits, health, growth, focus, active: activeDays(events, today),
     spent: spentBetween(events, from, today),
     income: sumBetween(events, 'income', from, today),
     spentPrev: spentBetween(events, prevFrom, prevTo),
     notes: events.filter(e => e.type === 'note' && localDate(e.ts) >= from).length,
   };
+}
+
+// Главная метрика: сколько дней за последний месяц ты сделал хотя бы что-то из своего списка (минимум привычки, задача, фокус, урок, отметка…).
+const ACTION_BY_DATE = ['habit_log', 'focus', 'lesson', 'checkin', 'diary', 'speak', 'thought', 'breath', 'dayreview', 'intention'];
+export function actionDates(events) {
+  const set = new Set();
+  for (const e of events) {
+    if (ACTION_BY_DATE.includes(e.type) && e.payload?.date) set.add(e.payload.date);
+    else if (e.type === 'workout' && e.payload?.done && e.payload.date) set.add(e.payload.date);
+    else if (e.type === 'task' && e.payload?.done && e.payload.doneAt) set.add(localDate(e.payload.doneAt));
+  }
+  return set;
+}
+export function activeDays(events, today, days = 30) {
+  const set = actionDates(events);
+  let count = 0;
+  for (let i = 0; i < days; i++) if (set.has(addDays(today, -i))) count++;
+  let d = set.has(today) ? today : addDays(today, -1), streak = 0;                  // сегодня можно ещё не делать: серия не сгорает до конца дня
+  while (set.has(d)) { streak++; d = addDays(d, -1); }
+  return { count, of: days, streak };
 }

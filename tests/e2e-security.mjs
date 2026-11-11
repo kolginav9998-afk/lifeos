@@ -90,6 +90,7 @@ await page.evaluate(async () => {
   const th = await import('./thoughts.js'); const pe = await import('./people.js'); const ok = await import('./okr.js'); const me = await import('./meds.js'); const pv = await import('./prevent.js');
   const em = await import('./emergency.js'); const ac = await import('./academy.js'); const hl = await import('./health.js'); const hb = await import('./habits.js'); const mo = await import('./money.js');
   const pl = await import('./planning.js'); const fo = await import('./focus.js'); const sp = await import('./speaking.js'); const sk = await import('./sick.js');
+  const wi = await import('./wishes.js'); const de = await import('./debts.js'); const pk = await import('./parked.js'); const nt = await import('./notes.js');
   const today = ev.todayStr(), now = Date.now(), Z = 'зюзя';
   const lesson = ac.TRACKS[0].lessons[0];
   await store.saveMany([
@@ -100,9 +101,11 @@ await page.evaluate(async () => {
     ok.makeOkr({ title: Z + ' цель квартала', why: Z + ' зачем', krs: [{ text: Z + ' результат', target: '5', unit: 'шт' }] }, now), me.makeMed({ name: Z + '-витамин', dose: Z + ' доза', when: 'morning' }, now),
     pv.makeCheckup({ name: Z + '-врач', months: 12 }, now), em.makeEmergency({ allergies: Z + ' аллергия', contactName: 'Зюзя', contactPhone: '+7 900 111-22-33' }, now),
     ac.makeLessonNote(lesson.id, Z + ' конспект урока', today, now), ac.makeUserCard(Z + ' вопрос', Z + ' ответ', now, 'ucard:z', Z + ' ассоциация'),
-    hl.makeMeasure({ kind: 'custom', name: Z + '-показатель', value: '5', unit: 'шт' }, now), hb.makeHabit({ name: Z + '-привычка', anchor: Z + ' якорь', identity: Z + ' идентичность' }, now),
+    hl.makeMeasure({ kind: 'custom', name: Z + '-показатель', value: '5', unit: 'шт' }, now), hb.makeHabit({ name: Z + '-привычка', anchor: Z + ' якорь', identity: Z + ' идентичность', plan: Z + ' если помешает' }, now),
     mo.makeExpense({ amount: 12345, category: 'Еда', note: Z + ' расход', date: today }, now), pl.makeSub({ name: Z + '-подписка', amountMinor: 10000 }, now), pl.makeGoal({ title: Z + '-копилка', targetMinor: 100000 }, now),
     fo.makeFocus({ date: today, minutes: 30, label: Z + ' фокус' }, now), sp.makeSpeak({ lang: 'english', seconds: 300, topic: Z + ' тема' }, now),
+    wi.makeWish({ text: Z + ' желание', amountMinor: 100000 }, now - 25 * 3600000), de.makeDebt({ who: Z + '-должник', amountMinor: 50000, direction: 'owe_me', due: ev.addDays(today, -2), note: Z + ' долг' }, now),
+    pk.makePark({ text: Z + ' отложенная мысль', forDate: today }, now), nt.makeNote(Z + ' старая заметка из прошлого', now - 40 * 86400000),
   ]);
 });
 for (const id of ['today', 'habits', 'people', 'diary', 'health', 'workouts', 'notes', 'reflect', 'learn', 'tests', 'insights', 'okr', 'money', 'plans', 'more']) await tab(page, id);
@@ -116,6 +119,8 @@ await clickJs('#subnav button[data-view="health"]'); await until(page, () => !do
 await clickJs('#em-show'); await until(page, () => !document.getElementById('em-overlay').hidden);
 await clickJs('#tabs button[data-tab="grow"]'); await until(page, () => !document.getElementById('view-learn').hidden);
 await clickJs('#speak-english'); await until(page, () => !document.getElementById('speak-host').hidden);
+await clickJs('#tabs button[data-tab="diary"]'); await clickJs('#subnav button[data-view="notes"]'); await until(page, () => !document.getElementById('view-notes').hidden);
+await clickJs('#note-past'); await until(page, () => !document.getElementById('note-past-box').hidden);       // окно с «заметкой из прошлого» тоже должно очиститься
 await page.evaluate(() => document.getElementById('lock-top').click());                 // кнопка закрыта окном, как и при автоблокировке по таймеру
 await until(page, () => !document.getElementById('lock').hidden);
 assert.equal(await page.locator('#app').isVisible(), false);
@@ -151,7 +156,7 @@ await tab(page, 'today');
 await until(page, () => [...document.querySelectorAll('.item .text')].some(n => n.textContent === 'секретная задача про зарплату'));
 assert.ok([...(await page.locator('.item .text').allTextContents())].includes('ещё одна секретная затея'), 'все данные на месте после входа');
 await tab(page, 'notes');
-await waitCount(page, '.note', 1);
+await waitCount(page, '.note', 2);          // секретная заметка и старая заметка из проверки блокировки
 assert.equal(errors.filter(e => !/401|Failed to load resource/.test(e)).length, 0, errors.join('\n'));
 
 // =====================================================================
@@ -234,7 +239,7 @@ await until(page, () => /Восстановлено записей/.test(documen
 await tab(page, 'today');
 await until(page, () => [...document.querySelectorAll('.item .text')].some(n => n.textContent === 'секретная задача про зарплату'));
 await tab(page, 'notes');
-await waitCount(page, '.note', 1);
+await waitCount(page, '.note', 2);
 
 // =====================================================================
 // 6. Отключение защиты

@@ -4,6 +4,7 @@ import { formatMoney, makeExpense, makeIncome, DEFAULT_CATEGORIES } from './mone
 import { makeMeasure, MEASURES, formatMeasure } from './health.js';
 import { makeNote } from './notes.js';
 import { makeHabitLog } from './habits.js';
+import { makeUserCard } from './academy.js';
 import { todayStr, addDays } from './events.js';
 
 const norm = s => String(s ?? '').normalize('NFKC').toLowerCase().replace(/ё/g, 'е');
@@ -109,6 +110,10 @@ export function parseCapture(input, ctx = {}) {
   const n = original.match(/^(?:заметка|идея|мысль|запомни|note)\s*[:\-—]\s*(.+)$/iu) || original.match(/^(?:заметка|идея|мысль|запомни)\s+(.{3,})$/iu);
   if (n) return { kind: 'note', data: { text: n[1].trim() }, confidence: 'high' };
 
+  // слово или факт для повторения: «слово: take off — взлетать»
+  const w = original.match(/^(?:слово|word|карточка|card)\s*[:\-—]\s*(.+?)\s+(?:[—–=]|-)\s+(.+)$/iu);
+  if (w) return { kind: 'card', data: { q: w[1].trim(), a: w[2].trim() }, confidence: 'high' };
+
   // замеры здоровья
   const ms = parseMeasure(t, original);
   if (ms) return { kind: 'measure', data: ms, confidence: 'high' };
@@ -153,6 +158,7 @@ export function captureLabel(c) {
     case 'measure': return `замер: ${MEASURES[d.kind].label} ${formatMeasure({ ...d, unit: MEASURES[d.kind].unit })}`;
     case 'note': return `заметка «${d.text.length > 40 ? d.text.slice(0, 37) + '…' : d.text}»`;
     case 'habit': return `привычка «${d.name}» — ${d.level === 'min' ? 'минимум' : 'сделано'}`;
+    case 'card': return `карточку «${d.q.length > 30 ? d.q.slice(0, 27) + '…' : d.q}» → «${d.a.length > 30 ? d.a.slice(0, 27) + '…' : d.a}»`;
     default: return c.kind;
   }
 }
@@ -165,6 +171,7 @@ export function buildCapture(c, { habits = [], now = Date.now() } = {}) {
     case 'income': return makeIncome({ amount: d.amountMinor, category: d.category, note: d.note, date: d.date }, now);
     case 'measure': return makeMeasure({ kind: d.kind, value: d.value, value2: d.value2, date: todayStr(now) }, now);
     case 'note': return makeNote(d.text, now);
+    case 'card': return makeUserCard(d.q, d.a, now);
     case 'habit': { const h = habits.find(x => x.id === d.habitId); if (!h) throw new Error('Привычка не найдена'); return makeHabitLog({ id: h.id }, todayStr(now), d.level, now); }
     default: throw new Error('Неизвестный тип записи');
   }

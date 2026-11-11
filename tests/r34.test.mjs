@@ -253,13 +253,13 @@ test('проверка данных: необычный сон, скачки в�
   ev.push(makeTask('давнее', 1, { due: day(-90) }), makeTask('недавнее', 1, { due: day(-5) }));
   const h = makeHabit({ name: 'Старая привычка' }, new Date(2026, 5, 1).getTime()); ev.push(h);
   for (let i = 0; i < 4; i++) ev.push(makeRunEvent(makeRun({ mode: 'quick', startedAt: new Date(2026, 10, 20 + i, 9).getTime(), durationMs: 1, results: {} }), NOW));
-  const r = dataChecks(ev, TODAY);
+  const r = dataChecks(ev, TODAY, NOW);
   const ids = r.map(x => x.id);
   for (const id of ['sleep-range', 'sleep-times', 'weight-jump', 'expense-dups', 'stale-tasks', 'idle-habits', 'gaps']) assert.ok(ids.includes(id), `нет проверки ${id}: ${ids}`);
   assert.ok(!ids.includes('ok'));
   assert.match(r.find(x => x.id === 'sleep-range').text, /15 ч/); assert.match(r.find(x => x.id === 'weight-jump').text, /72 → 78/);
   assert.match(r.find(x => x.id === 'expense-dups').text, /×2/); assert.match(r.find(x => x.id === 'stale-tasks').text, /: 1\./);
-  const clean = dataChecks([makeCheckin('m', day(-1), { sleepHours: 7 }, '', NOW)], TODAY);
+  const clean = dataChecks([makeCheckin('m', day(-1), { sleepHours: 7 }, '', NOW)], TODAY, NOW);
   assert.deepEqual(clean.map(x => x.id), ['ok']);
 });
 

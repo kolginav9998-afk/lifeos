@@ -45,7 +45,8 @@ test('слои: логика не импортирует экраны, инте�
   const UI_LAYER = new Set(['ui.js', 'store.js', 'db.js', 'platform.js', 'vault.js', 'app.js', 'app-sync.js', 'notify.js', 'errlog.js']);
   const PURE = ['events.js', 'stats.js', 'srs.js', 'habits.js', 'money.js', 'health.js', 'diary.js', 'reflect.js', 'sick.js', 'prevent.js', 'emergency.js', 'bp.js', 'hints.js', 'registry.js', 'writing.js', 'speech.js',
     'reports.js', 'export.js', 'planning.js', 'people.js', 'okr.js', 'academy.js', 'bt-core.js', 'bt-logic.js', 'bt-analytics.js', 'bt-export.js', 'capture.js', 'quick.js', 'ics.js', 'datacheck.js', 'search.js',
-    'journal.js', 'planday.js', 'review.js', 'reminders.js', 'meds.js', 'notes.js', 'thoughts.js', 'experiments.js', 'zip.js', 'cryptoutil.js'];
+    'journal.js', 'planday.js', 'review.js', 'reminders.js', 'meds.js', 'notes.js', 'thoughts.js', 'experiments.js', 'zip.js', 'cryptoutil.js',
+    'parked.js', 'wishes.js', 'debts.js', 'automation.js', 'changelog.js', 'migrate.js', 'devicetime.js', 'storageinfo.js'];
   const bad = [];
   for (const f of PURE) {
     assert.ok(graph.has(f), `${f}: файла нет`);
@@ -54,12 +55,14 @@ test('слои: логика не импортирует экраны, инте�
   assert.deepEqual(bad, [], 'чистая логика зависит от интерфейса');
 });
 
-test('экраны не импортируют друг друга (кроме дочернего блока «Здоровья»), никто не импортирует app.js', () => {
+// Экран может подключать только свои дочерние блоки (разбиение больших экранов на файлы), чужие экраны — никогда.
+const CHILD_BLOCKS = { 'view-health.js': ['view-health-extra.js'], 'view-plans.js': ['view-plans-extra.js'], 'view-today.js': ['view-money-nudge.js', 'view-device-hints.js'] };
+test('экраны не импортируют друг друга (кроме своих дочерних блоков), никто не импортирует app.js', () => {
   const bad = [];
   for (const [f, deps] of graph) {
     for (const d of deps) {
       if (d === 'app.js') bad.push(`${f} → app.js`);
-      if (f.startsWith('view-') && d.startsWith('view-') && !(f === 'view-health.js' && d === 'view-health-extra.js')) bad.push(`${f} → ${d}`);
+      if (f.startsWith('view-') && d.startsWith('view-') && !(CHILD_BLOCKS[f] || []).includes(d)) bad.push(`${f} → ${d}`);
     }
   }
   assert.deepEqual(bad, []);

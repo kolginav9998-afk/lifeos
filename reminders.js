@@ -15,7 +15,7 @@ export const TEST_ID = 9000;
 export const atLocal = (ymd, hour, minute = 0) => { const [y, m, d] = ymd.split('-').map(Number); return new Date(y, m - 1, d, hour, minute, 0).getTime(); };
 const plural = (n, one, few, many) => { const a = Math.abs(n) % 100, b = a % 10; return a > 10 && a < 20 ? many : b > 1 && b < 5 ? few : b === 1 ? one : many; };
 
-export function planReminders(events, now, { taskHour = 9, habitHour = 20, eveningHour = -1, bedtimeMin = -1, weeklyHour = -1 } = {}) {
+export function planReminders(events, now, { taskHour = 9, habitHour = 20, eveningHour = -1, bedtimeMin = -1, weeklyHour = -1, quietFrom = -1, quietTo = 7, daysOff = [] } = {}) {
   const today = todayStr(now);
   const open = events.filter(e => e.type === 'task' && !e.payload.done && e.payload.due);
   const habits = activeHabits(events, today);
@@ -54,5 +54,14 @@ export function planReminders(events, now, { taskHour = 9, habitHour = 20, eveni
       if (!marked && at > now) out.push({ id: EVENING_ID_BASE + i, at, title: 'Life OS', body: 'Вечер: отметка дня и пара карточек на повторение.' });
     }
   }
-  return out;
+  return out.filter(r => allowedTime(r, { quietFrom, quietTo, daysOff }));
+}
+
+// Тихие часы (кроме подготовки ко сну) и выходные дни без уведомлений. Часы тихого времени могут переходить через полночь: с 22 до 7.
+export function allowedTime(r, { quietFrom = -1, quietTo = 7, daysOff = [] } = {}) {
+  const d = new Date(r.at);
+  if (daysOff.includes(d.getDay())) return false;
+  if (quietFrom < 0 || (r.id >= BEDTIME_ID_BASE && r.id < BEDTIME_ID_BASE + 100)) return true;
+  const h = d.getHours() + d.getMinutes() / 60;
+  return quietFrom > quietTo ? !(h >= quietFrom || h < quietTo) : !(h >= quietFrom && h < quietTo);
 }

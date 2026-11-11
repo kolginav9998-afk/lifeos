@@ -1,7 +1,7 @@
 import { el, toast, dateRu, icon, moneyText } from './ui.js';
 import { todayStr } from './events.js';
 import { makeEntry, updateExpense, summarizeMonth, shiftMonth, monthLabel, monthOf, categoriesUsed, makeBudget, budgetOf, parseAmount,
-  monthTotals, balanceOfMonth, frequentEntries, KINDS } from './money.js';
+  monthTotals, balanceOfMonth, frequentEntries, KINDS, unusualExpense, unusualText } from './money.js';
 import { getPref, setPref } from './prefs.js';
 import * as store from './store.js';
 
@@ -80,7 +80,12 @@ export function createMoneyView({ exportCsv }) {
     try {
       const fields = { amount: amount.value, category: category.value, note: note.value, date: date.value };
       if (editing) await store.save(updateExpense(editing, fields));
-      else await store.save(makeEntry(kind, fields));
+      else {
+        const ev = makeEntry(kind, fields);
+        await store.save(ev);
+        const odd = ev.type === 'expense' ? unusualExpense(events, ev) : null;      // мягкое предупреждение о возможной опечатке
+        if (odd) toast(unusualText(odd, ev.payload.category), { actionLabel: 'Отменить', onAction: () => store.remove(ev.id) });
+      }
       const month = monthOf(fields.date || todayStr());
       stopEdit();
       if (month !== ym) ym = month;

@@ -7,7 +7,7 @@
 // Тексты дневника, заметок, мыслей, решений и подобное в выгрузку не входят, деньги тоже.
 export const REGISTRY = {
   task: { label: 'Задача', group: 'Дела', module: 'events.js', privacy: 'text', analytics: true, fields: 'text, due, repeat, priority, done, doneAt' },
-  habit: { label: 'Привычка', group: 'Привычки', module: 'habits.js', privacy: 'text', analytics: true, fields: 'name, anchor, minimum, full, identity, startDate, archived' },
+  habit: { label: 'Привычка', group: 'Привычки', module: 'habits.js', privacy: 'text', analytics: true, fields: 'name, anchor, minimum, full, identity, plan, startDate, archived' },
   habit_log: { label: 'Отметка привычки', group: 'Привычки', module: 'habits.js', privacy: 'numbers', analytics: true, fields: 'habitId, date, level (full|min)' },
   expense: { label: 'Расход', group: 'Деньги', module: 'money.js', privacy: 'money', analytics: false, fields: 'amountMinor, currency, category, note, date' },
   income: { label: 'Доход', group: 'Деньги', module: 'money.js', privacy: 'money', analytics: false, fields: 'amountMinor, currency, category, note, date' },
@@ -16,6 +16,8 @@ export const REGISTRY = {
   goal: { label: 'Копилка', group: 'Деньги', module: 'planning.js', privacy: 'money', analytics: false, fields: 'title, targetMinor, dueDate' },
   goalmove: { label: 'Взнос в копилку', group: 'Деньги', module: 'planning.js', privacy: 'money', analytics: false, fields: 'goalId, amountMinor, date, note' },
   sub: { label: 'Подписка', group: 'Деньги', module: 'planning.js', privacy: 'money', analytics: false, fields: 'name, amountMinor, period, day, month, active' },
+  wish: { label: 'Хочу купить (отсрочка на сутки)', group: 'Деньги', module: 'wishes.js', privacy: 'money', analytics: false, fields: 'text, amountMinor, date, until, status, resolvedDate' },
+  debt: { label: 'Долг или заём', group: 'Деньги', module: 'debts.js', privacy: 'money', analytics: false, fields: 'who, amountMinor, direction, due, note, date, paidMinor, settled, settledDate' },
   note: { label: 'Заметка', group: 'Заметки и дневник', module: 'notes.js', privacy: 'text', analytics: false, fields: 'text' },
   diary: { label: 'Запись дневника', group: 'Заметки и дневник', module: 'diary.js', privacy: 'text', analytics: false, fields: 'date, text, highlight, gratitude, tags' },
   checkin: { label: 'Отметка дня (утро/вечер)', group: 'Здоровье', module: 'diary.js', privacy: 'health', analytics: true, fields: 'date, slot (m|e), оценки 1–5, сон, кофе, нагрузка, питание (veg, protein, sweets), note' },
@@ -43,6 +45,7 @@ export const REGISTRY = {
   dayreview: { label: 'Вечерний обзор', group: 'Рефлексия', module: 'reflect.js', privacy: 'text', analytics: false, fields: 'date, win, miss, learn' },
   weekreflect: { label: 'Итоги недели', group: 'Рефлексия', module: 'reflect.js', privacy: 'text', analytics: false, fields: 'week, went, blocked, change' },
   decision: { label: 'Решение', group: 'Рефлексия', module: 'reflect.js', privacy: 'text', analytics: false, fields: 'date, title, why, expect, revisit, closed{date, verdict, outcome}' },
+  parked: { label: 'Отложенная мысль', group: 'Рефлексия', module: 'parked.js', privacy: 'text', analytics: false, fields: 'date, forDate, text, done, doneDate' },
   ritual: { label: 'Вечерний ритуал', group: 'Рефлексия', module: 'reflect.js', privacy: 'numbers', analytics: false, fields: 'date, steps' },
   joy: { label: 'Радость', group: 'Рефлексия', module: 'reflect.js', privacy: 'text', analytics: false, fields: 'date, text' },
   charger: { label: 'Что заряжает', group: 'Рефлексия', module: 'reflect.js', privacy: 'text', analytics: false, fields: 'text' },
@@ -82,7 +85,7 @@ export const RELATIONS = [
   ['lesson', 'lessonnote', 'lesson', 'конспект к пройденному уроку'],
 ];
 // Типы, привязанные к календарному дню полем date (в диаграмме идут от узла «день»).
-export const BY_DAY = ['checkin', 'diary', 'measure', 'workout', 'focus', 'thought', 'intention', 'dayreview', 'joy', 'ritual', 'speak', 'breath', 'testrun', 'expense', 'income', 'medlog', 'habit_log', 'lesson'];
+export const BY_DAY = ['checkin', 'diary', 'measure', 'workout', 'focus', 'thought', 'intention', 'dayreview', 'joy', 'ritual', 'parked', 'speak', 'breath', 'testrun', 'expense', 'income', 'medlog', 'habit_log', 'lesson'];
 
 export function erMarkdown() {
   const L = ['# Связи между данными (ER-диаграмма)', '', '_Файл создан из `registry.js` (`RELATIONS` и `BY_DAY`) и сверяется с ним тестом: правь реестр, а не этот файл._', '',

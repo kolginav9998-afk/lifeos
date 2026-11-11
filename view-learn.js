@@ -3,7 +3,7 @@ import { el, fill, toast } from './ui.js';
 import { todayStr } from './events.js';
 import * as store from './store.js';
 import { TRACKS, trackById, trackProgress, doneLessons, makeLessonDone, lessonEventId, makeSrsEvent, makeUserCard, userCards, sessionQueue, todayLoad, studyDates, MY_TRACK,
-  leeches, comebackInfo, fifteenPlan, lessonNoteOf, makeLessonNote, examQueue, quizFor, cardsOfTrack, cardFace, lessonToRevisit, markRevisited, lessonTitle } from './academy.js';
+  leeches, comebackInfo, fifteenPlan, lessonNoteOf, makeLessonNote, examQueue, quizFor, cardsOfTrack, cardFace, lessonToRevisit, markRevisited, lessonTitle, retentionByInterval } from './academy.js';
 import { newState, grade, studyStreak, INTERVALS } from './srs.js';
 import { canSpeak, foreignSide, speak } from './speech.js';
 import { openSpeaking, hasRunningSpeak, speakWeek, SPEAK_LANGS } from './speaking.js';
@@ -164,6 +164,10 @@ export function createLearnView() {
       el('h2', { textContent: 'Запросы для ИИ-репетитора' }),
       el('p', { class: 'muted', textContent: 'Скопируй запрос, подставь свои данные вместо <…> и вставь в чат с ИИ-помощником. Не отправляй в него личные данные.' }),
       ...prompts);
+    const curve = retentionByInterval(events, t.id), curveN = curve.reduce((n, b) => n + b.n, 0);
+    const curveBox = curveN >= 20 ? el('details', { class: 'card', id: 'curve' }, el('summary', { textContent: 'Как ты помнишь со временем' }),
+      el('p', { class: 'muted', textContent: 'Доля ответов «помню» через разные промежутки после прошлого повторения. Если после месяца помнишь хуже половины, повторяй чаще.' }),
+      ...curve.map(b => el('div', { class: 'curve-row', dataset: { label: b.label } }, el('span', { class: 'curve-label', textContent: b.label }), bar(Math.round(b.rate * 100), 100), el('span', { class: 'muted', textContent: `${Math.round(b.rate * 100)}% (ответов: ${b.n})` })))) : null;
     const plan = el('details', { class: 'card' }, el('summary', { textContent: 'План по неделям' }),
       el('ul', { class: 'plain' }, ...t.plan.map(w => el('li', { textContent: `Неделя ${w.week}: ${w.focus}. Каждый день: ${w.daily}.` }))));
     const lessons = t.lessons.map((l, idx) => {
@@ -189,7 +193,7 @@ export function createLearnView() {
         el('p', { textContent: t.intro }),
         el('p', { class: 'muted', textContent: `Уроки ${p.lessons}/${p.lessonsTotal} · выучено карточек ${p.mastered}/${p.total}` + (p.retention !== null ? ` · помню ${Math.round(p.retention * 100)}%` : '') }),
         bar(p.lessons, p.lessonsTotal), startBtn, examBtn),
-      mentor, plan, el('h2', { textContent: 'Уроки' }), ...lessons, sources);
+      mentor, curveBox, plan, el('h2', { textContent: 'Уроки' }), ...lessons, sources);
   }
 
   async function toggleLesson(t, l, wasDone) {

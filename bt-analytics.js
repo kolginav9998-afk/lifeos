@@ -6,6 +6,8 @@ import { TESTS, TEST_BY_ID, DOMAINS, primaryShown, runsOf, fmtNum, fmtPrimary } 
 import { dailyTable } from './diary.js';
 import { addDays, todayStr } from './events.js';
 import { sickDays } from './sick.js';
+import { dayMood } from './diary.js';
+import { activeHabits, logsOf } from './habits.js';
 
 export const MIN_BASELINE = 5;        // сколько прежних результатов нужно, чтобы считать «норму»
 export const BASELINE_WINDOW = 30;    // норма считается по последним N результатам
@@ -231,6 +233,8 @@ export function insights(events, now = Date.now()) {
       if (g) extra = ` В дни со сном от 7 часов (${g.nHi}) общий результат в среднем ${g.diff >= 0 ? 'выше' : 'ниже'} на ${fmtNum(Math.abs(g.diff), 1)}σ, чем в остальные (${g.nLo}).`;
     }
     extra += slopeSentence(rowsOk, c);
+    const need = daysNeeded(c.rho);
+    if (need && c.n < need) extra += ` Для уверенного вывода при такой силе связи нужно около ${need} дней, сейчас ${c.n}.`;
     out.push({ id: `rel-${c.x}-${c.y}`, kind: 'relation', conf: c.n >= 30 && c.q <= 0.1 ? 'high' : 'low',
       title: `${c.xLabel} ↔ ${c.yLabel}`,
       text: `${c.rho > 0 ? 'Когда выше' : 'Когда ниже'} «${c.xLabel}», обычно ${c.rho > 0 ? 'выше' : 'ниже'} ${c.yLabel} (ρ = ${fmtNum(c.rho, 2)}, дней: ${c.n}, ${c.q < 0.01 ? 'q < 0,01' : `q = ${fmtNum(c.q, 2)}`}).${extra} Это связь, а не доказанная причина: проверь её личным экспериментом на 1–2 недели (Аналитика → Эксперименты).` });
@@ -238,6 +242,7 @@ export function insights(events, now = Date.now()) {
   if (!cors.length && rowsOk.length >= 14) out.push({ id: 'no-relations', kind: 'info', conf: 'mid', title: 'Устойчивых связей пока нет', text: 'С отметками дня (сон, кофе, нагрузка) убедительных связей не найдено. Это нормально: чем дольше ведёшь отметки, тем точнее картина.' });
   if (runs.length > 0 && rowsOk.filter(r => Number.isFinite(r.composite) && Number.isFinite(r.sleepHours)).length < MIN_PAIRS && days >= 3) out.push({ id: 'need-checkins', kind: 'info', conf: 'high', title: 'Добавь утренние отметки сна', text: `Для поиска связей нужно хотя бы ${MIN_PAIRS} дней, где есть и проверка, и отметка сна (раздел «Дневник»). Сейчас таких дней: ${rows.filter(r => Number.isFinite(r.composite) && Number.isFinite(r.sleepHours)).length}.` });
 
+  out.push(...habitMoodInsights(events, todayStr(now)));
   const wdIns = weekdayInsight(rowsOk);
   if (wdIns) out.push(wdIns);
 
@@ -337,4 +342,48 @@ export function driftInsights(runs, today, limit = 2) {
   return out.sort((a, b) => Math.abs(b.d.z) - Math.abs(a.d.z)).slice(0, limit).map(({ d, t }) => ({
     id: `drift-${t.id}`, kind: d.shift > 0 ? 'good' : 'warn', conf: 'mid', title: `«${t.title}»: обычный уровень ${d.shift > 0 ? 'вырос' : 'снизился'}`,
     text: `За последние ${DRIFT_RECENT} дней типичный результат ${fmtPrimary(t.id, { [t.primary.key]: d.recent / (t.primary.scale ?? 1) })} против ${fmtPrimary(t.id, { [t.primary.key]: d.base / (t.primary.scale ?? 1) })} за предыдущие ${DRIFT_BASE} дней (сдвиг ${fmtNum(Math.abs(d.shift), 1)} от обычного разброса, результатов: ${d.nRecent} и ${d.nBase}). ${d.shift > 0 ? 'Похоже, что-то из режима работает: запомни, что менял.' : 'Проверь сон, нагрузку и стресс за эти недели: возможно, сместился режим.'}` }));
+}
+
+// Личный рекорд по тесту (лучший достоверный результат с учётом направления показателя).
+export function bestResult(runs, testId) {
+  const s = seriesOf(runs, testId);
+  if (!s.length) return null;
+  const best = s.reduce((b, p) => (orient(testId, p.value) > orient(testId, b.value) ? p : b));
+  return { value: best.value, date: best.date, n: s.length };
+}
+
+// ---------- мощность вывода: сколько дней нужно, чтобы связь такой силы была надёжной ----------
+// Приближение через преобразование Фишера: n = ((z_α/2 + z_β) / atanh|ρ|)² + 3 при уровне 5% и мощности 80%.
+export function daysNeeded(rho) {
+  const r = Math.min(0.99, Math.abs(rho));
+  if (!(r > 0)) return null;
+  return Math.ceil(((1.96 + 0.8416) / Math.atanh(r)) ** 2 + 3);
+}
+
+// ---------- привычки и настроение: в дни с привычкой настроение другое? ----------
+export function habitMoodLinks(events, today, { days = 60, minPerGroup = 8, permutations = 1000, seed = 5 } = {}) {
+  const habits = activeHabits(events, today), out = [];
+  const sick = sickDays(events, today);
+  for (const { h } of habits) {
+    const logged = new Set(logsOf(events, h.id).map(l => l.payload.date)), a = [], b = [];
+    for (let i = 0; i < days; i++) {
+      const d = addDays(today, -i);
+      if (d < h.payload.startDate || sick.has(d)) continue;
+      const m = dayMood(events, d);
+      if (!Number.isFinite(m)) continue;
+      (logged.has(d) ? a : b).push(m);
+    }
+    if (a.length < minPerGroup || b.length < minPerGroup) continue;
+    const diff = mean(a) - mean(b), all = [...a, ...b], rng = makeRng(seed + out.length);
+    let ge = 0;
+    for (let k = 0; k < permutations; k++) { const sh = rng.shuffle(all); if (Math.abs(mean(sh.slice(0, a.length)) - mean(sh.slice(a.length))) >= Math.abs(diff) - 1e-12) ge++; }
+    out.push({ habit: h, id: h.id, name: h.payload.name, nWith: a.length, nWithout: b.length, meanWith: mean(a), meanWithout: mean(b), diff, p: (ge + 1) / (permutations + 1) });
+  }
+  return out;
+}
+export function habitMoodInsights(events, today, limit = 2) {
+  const links = habitMoodLinks(events, today), alpha = 0.05 / Math.max(1, links.length);      // поправка на число привычек
+  return links.filter(l => l.p < alpha && Math.abs(l.diff) >= 0.4).sort((a, b) => a.p - b.p).slice(0, limit).map(l => ({
+    id: `habit-mood-${l.id}`, kind: 'relation', conf: l.nWith + l.nWithout >= 40 ? 'mid' : 'low', title: `«${l.name}» ↔ настроение`,
+    text: `В дни, когда привычка отмечена, настроение в среднем ${l.diff > 0 ? 'выше' : 'ниже'} на ${fmtNum(Math.abs(l.diff), 1)} из 5 (${fmtNum(l.meanWith, 1)} против ${fmtNum(l.meanWithout, 1)}; дней: ${l.nWith} и ${l.nWithout}). Это связь, а не причина: возможно, в хорошие дни просто легче делать привычки.` }));
 }

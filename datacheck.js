@@ -5,11 +5,12 @@ import { dailySeries } from './health.js';
 import { activeHabits, logsOf } from './habits.js';
 import { runsOf } from './bt-core.js';
 import { unknownTypes } from './registry.js';
+import { futureEvents } from './devicetime.js';
 
 const list = (a, n = 5) => a.slice(0, n).join(', ') + (a.length > n ? ` и ещё ${a.length - n}` : '');
 const fmt = x => String(Math.round(x * 10) / 10).replace('.', ',');
 
-export function dataChecks(events, today) {
+export function dataChecks(events, today, now = Date.now()) {
   const out = [];
   const add = (id, level, text) => out.push({ id, level, text });
   const morning = events.filter(e => e.type === 'checkin' && e.payload.slot === 'm');
@@ -50,6 +51,10 @@ export function dataChecks(events, today) {
   // записи незнакомых типов: чаще всего созданы более новой версией приложения
   const unk = unknownTypes(events);
   if (unk.length) add('unknown-types', 'info', `Есть записи незнакомых типов: ${list(unk.map(u => `${u.type} (${u.count})`))}. Скорее всего, их создала более новая версия приложения. Они сохраняются и ничему не мешают; после обновления приложения станут видны.`);
+
+  // часы устройства: записи с временем создания из будущего
+  const fut = futureEvents(events, now);
+  if (fut.length) add('clock-future', 'warn', `Записей «из будущего»: ${fut.length}. Возможно, часы устройства спешили или сейчас отстают. Проверь дату и время в настройках телефона: от этого зависят порядок записей, напоминания и синхронизация.`);
 
   if (!out.length) add('ok', 'ok', 'Подозрительного не найдено.');
   return out;

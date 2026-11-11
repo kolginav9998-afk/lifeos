@@ -344,3 +344,20 @@ html.amounts-hidden .amount{letter-spacing:.1em}
 .exam-miss{margin:4px 0}
 .fw-clock{font-size:1.6rem;font-weight:700}
 #fw-text{flex:1;min-height:50vh;font-size:1.05rem;line-height:1.5}
+
+.mood-heat{display:flex;gap:3px;margin:8px 0;overflow-x:auto}
+.mh-col{display:flex;flex-direction:column;gap:3px}
+.mh-cell{width:16px;height:16px;border-radius:4px;background:var(--line)}
+.mh-1{background:var(--accent);opacity:.2}.mh-2{background:var(--accent);opacity:.4}.mh-3{background:var(--accent);opacity:.6}.mh-4{background:var(--accent);opacity:.8}.mh-5{background:var(--accent)}
+.mh-cell.future{background:transparent;border:1px dashed var(--line)}
+.heat-title{display:block;margin-top:12px}
+.park-row{padding:6px 0;border-top:1px solid var(--line)}
+.wish-row,.debt-row{display:flex;flex-direction:column;gap:4px;padding:8px 0;border-top:1px solid var(--line)}
+.wish-row.ready{border-left:3px solid var(--accent);padding-left:10px}
+.wish-row.done,.debt-row.done{opacity:.7}
+.debt-row.late{border-left:3px solid var(--warn);padding-left:10px}
+.debt-row .row input{min-width:0;flex:1}
+.wish-saved{color:var(--ok);font-size:.9rem;margin:6px 0}
+.h-plan{font-size:.85rem}
+#money-nudge .row{padding:4px 0;gap:8px}
+#auto-card summary{cursor:pointer;font-weight:600}
