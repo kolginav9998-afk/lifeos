@@ -208,6 +208,7 @@ async function enterApp() {
   $('gate').hidden = true;
   $('lock').hidden = true;
   $('app').hidden = false;
+  paintAvatar(store.state.events);                       // кнопка профиля сразу с буквами логина, не пустая, пока грузятся записи
   try { const n = await db.sealPending(); if (n) toast(`Дошифровано записей: ${n}`); } catch (e) { console.error(e); }
   await store.refresh();
   markData();

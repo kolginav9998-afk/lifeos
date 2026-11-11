@@ -73,7 +73,8 @@ await until(A, () => !document.getElementById('lock').hidden);
 assert.equal(await A.locator('#gate').isHidden(), true, 'вход в аккаунт не просят: устройство уже привязано');
 await A.fill('#lock-input', PW); await A.click('#lock-btn');
 await until(A, () => !document.getElementById('app').hidden);
-assert.equal((await A.textContent('#profile-btn')).trim(), '🦊', 'профиль сохранился');
+await until(A, () => document.getElementById('profile-btn').textContent.trim() === '🦊', null, 15000);          // профиль сохранился и подтянулся
+
 
 // без сети приложение открывается так же (вход проверяется на устройстве)
 await t.ctx.setOffline(true);
