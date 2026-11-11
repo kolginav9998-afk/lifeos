@@ -57,6 +57,17 @@ export function toast(message, { actionLabel, onAction, ms = 5000 } = {}) {
 }
 
 // Убрать сообщение (например, при блокировке: в тексте сообщения могут быть названия дел и суммы).
+// Копирование текста в буфер обмена (с запасным способом для окружений без Clipboard API).
+export function copyText(text, okMessage = 'Скопировано') {
+  const done = () => toast(okMessage);
+  const fallback = () => {
+    const ta = document.createElement('textarea'); ta.value = text; ta.readOnly = true; ta.style.position = 'fixed'; ta.style.opacity = '0';
+    document.body.append(ta); ta.select();
+    try { document.execCommand('copy'); done(); } catch { toast('Не удалось скопировать: выдели текст вручную.'); }
+    ta.remove();
+  };
+  if (navigator.clipboard?.writeText) navigator.clipboard.writeText(text).then(done, fallback); else fallback();
+}
 export function clearToast() { clearTimeout(toastTimer); const box = $('toast'); if (box) { box.hidden = true; box.replaceChildren(); } }
 
 const MONTHS_SHORT = ['янв', 'фев', 'мар', 'апр', 'мая', 'июн', 'июл', 'авг', 'сен', 'окт', 'ноя', 'дек'];

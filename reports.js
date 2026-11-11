@@ -11,6 +11,7 @@ import { focusWeek } from './focus.js';
 import { median, mean, sd, round } from './stats.js';
 import { medsOf, adherence, WHEN } from './meds.js';
 import { sickCount } from './sick.js';
+import { practiceBy } from './practice.js';
 
 const f1 = v => String(Math.round(v * 10) / 10).replace('.', ',');
 const f0 = v => String(Math.round(v));
@@ -72,6 +73,12 @@ export function monthReport(events, ym, { now = Date.now() } = {}) {
     }
     L.push('');
   }
+
+  // время на главное: учёба, фокус, тренировки
+  const studyMin = Object.values(practiceBy(events, from, to)).reduce((n, r) => n + r.total, 0);
+  const focusMin = events.filter(e => e.type === 'focus' && e.payload.date >= from && e.payload.date <= to).reduce((n, e) => n + e.payload.minutes, 0);
+  const workMin = doneWorkouts(events).filter(e => e.payload.date >= from && e.payload.date <= to).reduce((n, e) => n + (e.payload.minutes || 0), 0);
+  if (studyMin || focusMin || workMin) L.push('## Время на главное', `- Учёба: ${studyMin} мин (уроки по плану, говорение по записи, карточки по 15 секунд на ответ)`, `- Фокус: ${focusMin} мин`, `- Тренировки: ${workMin} мин`, '');
 
   // болезнь
   const sickN = sickCount(events, from, to, today);

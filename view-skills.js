@@ -1,6 +1,6 @@
 // Экран «Навыки»: набор того, что ты точно изучил или научился делать. Из уроков навык предлагается сам (урок пройден и карточки выучены),
 // остальное добавляется вручную: «научился делать…».
-import { el, fill, toast, dateRu } from './ui.js';
+import { el, fill, toast, dateRu, copyText } from './ui.js';
 import { todayStr } from './events.js';
 import * as store from './store.js';
 import { TRACKS } from './academy.js';
@@ -9,17 +9,6 @@ import { normalize } from './search.js';
 
 const bar = (value, total) => el('div', { class: 'bar', role: 'img', 'aria-label': `${value} из ${total}` }, el('span', { style: `width:${total ? Math.round((value / total) * 100) : 0}%` }));
 const cap = s => (s ? s.charAt(0).toUpperCase() + s.slice(1) : s);
-
-function copyText(text, okMessage) {
-  const done = () => toast(okMessage);
-  const fallback = () => {
-    const ta = el('textarea', { value: text, readOnly: true }); ta.style.position = 'fixed'; ta.style.opacity = '0';
-    document.body.append(ta); ta.select();
-    try { document.execCommand('copy'); done(); } catch { toast('Не удалось скопировать: выдели текст вручную.'); }
-    ta.remove();
-  };
-  if (navigator.clipboard?.writeText) navigator.clipboard.writeText(text).then(done, fallback); else fallback();
-}
 
 export function createSkillsView() {
   let events = [];

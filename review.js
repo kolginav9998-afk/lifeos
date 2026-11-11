@@ -52,12 +52,34 @@ export function weekReview(events, today) {
   };
 
   return {
-    from, to: today, tasksDone, prevDone, perDay, habits, health, growth, focus, active: activeDays(events, today),
+    from, to: today, tasksDone, prevDone, perDay, habits, health, growth, focus, active: activeDays(events, today), variety: variety(events, today),
     spent: spentBetween(events, from, today),
     income: sumBetween(events, 'income', from, today),
     spentPrev: spentBetween(events, prevFrom, prevTo),
     notes: events.filter(e => e.type === 'note' && localDate(e.ts) >= from).length,
   };
+}
+
+// Разнообразие недели: в скольких из семи областей жизни за последние 7 дней было хоть что-то. Не оценка: просто карта, где пусто.
+export const VARIETY_AREAS = ['Дела', 'Привычки', 'Учёба', 'Движение', 'Дневник', 'Фокус', 'Люди'];
+export const VARIETY_GOAL = 4;
+export function variety(events, today) {
+  const from = addDays(today, -6), inR = d => typeof d === 'string' && d >= from && d <= today, has = new Set();
+  for (const e of events) {
+    const p = e.payload;
+    if (!p) continue;
+    if (e.type === 'task' && p.done && p.doneAt && inR(localDate(p.doneAt))) has.add('Дела');
+    else if (e.type === 'habit_log' && inR(p.date)) has.add('Привычки');
+    else if ((e.type === 'lesson' || e.type === 'speak') && inR(p.date)) has.add('Учёба');
+    else if (e.type === 'srs' && (p.hist || []).some(h => inR(h[0]))) has.add('Учёба');
+    else if (e.type === 'workout' && p.done && inR(p.date)) has.add('Движение');
+    else if (e.type === 'checkin' && inR(p.date)) { has.add('Дневник'); if (p.slot === 'e' && Number.isFinite(p.exercise) && p.exercise > 0) has.add('Движение'); }
+    else if (e.type === 'diary' && inR(p.date)) has.add('Дневник');
+    else if (e.type === 'focus' && inR(p.date)) has.add('Фокус');
+    else if (e.type === 'person' && inR(p.lastContact)) has.add('Люди');
+  }
+  const areas = VARIETY_AREAS.filter(a => has.has(a));
+  return { count: areas.length, total: VARIETY_AREAS.length, areas, missing: VARIETY_AREAS.filter(a => !has.has(a)), reached: areas.length >= VARIETY_GOAL };
 }
 
 // Главная метрика: сколько дней за последний месяц ты сделал хотя бы что-то из своего списка (минимум привычки, задача, фокус, урок, отметка…).

@@ -24,6 +24,7 @@ import { planDay, planText, rankTasks } from './planday.js';
 import { parkedDue, finishPark } from './parked.js';
 import { createMoneyNudge } from './view-money-nudge.js';
 import { createDeviceHints } from './view-device-hints.js';
+import { createDayCards } from './view-day-cards.js';
 import { lessonSkillStatus } from './skills.js';
 import * as vault from './vault.js';
 import * as store from './store.js';
@@ -169,6 +170,7 @@ export function createTodayView({ go }) {
   // деньги: желания, которые отлежали сутки, и просроченные долги
   const moneyNudge = createMoneyNudge({ go });
   const deviceHints = createDeviceHints({ go });
+  const dayCards = createDayCards();
 
   // план дня: предложение по порядку и времени (не сохраняется)
   const planCard = el('details', { id: 'plan-day', class: 'card', hidden: true });
@@ -292,7 +294,7 @@ export function createTodayView({ go }) {
     toast(`Удалено сделанных: ${ids.length}`, { actionLabel: 'Отменить', onAction: () => store.saveMany(old) });
   };
 
-  root.append(hello, dateLine, whatsNew, summary, hintsBox, deviceHints.root, parkedBox, moneyNudge.root, intentionBox, planCard, onboarding, wotd, focusHost, form, minimum, review, journal, ...Object.values(sections).map(s => s.sec), empty, doneBlock);
+  root.append(hello, dateLine, whatsNew, summary, hintsBox, deviceHints.root, parkedBox, moneyNudge.root, intentionBox, planCard, dayCards.root, onboarding, wotd, focusHost, form, minimum, review, journal, ...Object.values(sections).map(s => s.sec), empty, doneBlock);
 
   // ----- элементы списка -----
   async function removeTask(ev) {
@@ -426,6 +428,7 @@ export function createTodayView({ go }) {
     if (r.health.moodAvg !== null) hl.push(`Настроение: в среднем ${f1(r.health.moodAvg)} из 5`);
     if (hl.length) lines.push(el('p', { id: 'review-health', class: 'muted', textContent: hl.join(' · ') }));
     lines.push(el('p', { id: 'review-active', class: 'muted', textContent: `Дней с делом за ${r.active.of} дней: ${r.active.count}${r.active.streak ? ` · подряд: ${r.active.streak}` : ''}. Считается любое дело: минимум привычки, задача, урок, отметка, фокус.` }));
+    lines.push(el('p', { id: 'review-variety', class: 'muted', textContent: `Разнообразие недели: ${r.variety.count} из ${r.variety.total} областей (${r.variety.areas.join(', ') || 'пока ничего'})${r.variety.reached ? ' · разносторонняя неделя ✓' : r.variety.missing.length ? `. Пусто: ${r.variety.missing.join(', ')}` : ''}` }));
     if (r.focus.minutes) lines.push(el('p', { id: 'review-focus', class: 'muted', textContent: `Фокус: ${r.focus.minutes} мин за неделю (сессий: ${r.focus.sessions}, дней: ${r.focus.days})` }));
     if (r.growth.lessons || r.growth.reviews || r.growth.tests) lines.push(el('p', { id: 'review-growth', class: 'muted', textContent: `Развитие: уроков ${r.growth.lessons}, ответов на карточки ${r.growth.reviews}, проверок ${r.growth.tests}` }));
     lines.push(el('button', { type: 'button', id: 'plan-week', class: 'chip', textContent: 'Составить план недели (заметка)', onclick: async () => { await store.save(makeNote(templateText('weekly', todayStr()))); toast('План недели создан в заметках', { actionLabel: 'Открыть', onAction: () => go('notes') }); } }));
@@ -460,7 +463,7 @@ export function createTodayView({ go }) {
     renderWotd(today);
     const g = groupTasks(events, today);
     const heavy = !!getPref('heavyDay');
-    renderWhatsNew(); renderIntention(today); renderHints(today, heavy); renderParked(today); moneyNudge.update(events); deviceHints.update(events); renderPlan(today);
+    renderWhatsNew(); renderIntention(today); renderHints(today, heavy); renderParked(today); moneyNudge.update(events); deviceHints.update(events); renderPlan(today); dayCards.update(events);
     renderMinimum(g, today, heavy);
     for (const key of Object.keys(sections)) {
       sections[key].sec.hidden = heavy || g[key].length === 0;
