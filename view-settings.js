@@ -1,5 +1,6 @@
 import { el, toast, setBusy, agoText, revealable } from './ui.js';
 import * as vault from './vault.js';
+import { startupText } from './perf.js';
 import * as db from './db.js';
 import * as store from './store.js';
 import { serialize, makeProfile, profileOf, todayStr } from './events.js';
@@ -22,7 +23,7 @@ const AUTOLOCK = [[0, 'сразу при сворачивании'], [1, 'чер
 function card(title, ...kids) { return el('section', { class: 'card settings-card' }, el('h3', { textContent: title }), ...kids); }
 function field(id, props) { return el('input', { id, autocomplete: 'off', ...props }); }
 
-export function createSettingsView({ lockNow, applyTheme, onVaultChange, openAccount = () => {} }) {
+export function createSettingsView({ lockNow, applyTheme, applyMode = () => {}, onVaultChange, openAccount = () => {} }) {
   let events = [];
   let pendingImport = null;                       // текст выбранного файла, ждущий пароля
   const root = el('section', { id: 'view-more', class: 'view' });
@@ -190,6 +191,8 @@ export function createSettingsView({ lockNow, applyTheme, onVaultChange, openAcc
   const theme = el('select', { id: 'theme-select' }, ...[['auto', 'как в системе'], ['light', 'светлая'], ['dark', 'тёмная']].map(([v, t]) => el('option', { value: v, textContent: t })));
   theme.value = getPref('theme');
   theme.onchange = () => { setPref('theme', theme.value); applyTheme(); };
+  const simple = el('input', { id: 'simple-mode', type: 'checkbox', checked: !!getPref('simple') });
+  simple.onchange = () => { setPref('simple', simple.checked); applyMode(); };
   const fontSel = el('select', { id: 'font-select', 'aria-label': 'Размер текста' }, ...[['1', 'обычный'], ['1.15', 'крупный'], ['1.3', 'очень крупный']].map(([v, t]) => el('option', { value: v, textContent: t })));
   fontSel.value = String(getPref('fontScale'));
   fontSel.onchange = () => { setPref('fontScale', Number(fontSel.value)); applyTheme(); };
@@ -255,6 +258,7 @@ export function createSettingsView({ lockNow, applyTheme, onVaultChange, openAcc
       `Версия ${VERSION}`,
       meta ? `Запуск №${meta.launches} (первый: ${new Date(meta.first).toLocaleString('ru')})` : 'Запуски: счётчик недоступен',
       `Платформа: ${platformName}; ${isNative ? 'встроенное приложение' : standalone ? 'установленное приложение' : 'вкладка браузера'}`,
+      startupText(),
       `Записей: IndexedDB ${c.idb ?? 'ошибка'}, копия ${c.ls}`,
       `Защита от очистки: ${persisted}`,
       `Пароль: ${{ none: 'не задан', locked: 'задан (заблокировано)', unlocked: 'задан (открыто)' }[vault.status()]}`,
@@ -269,7 +273,7 @@ export function createSettingsView({ lockNow, applyTheme, onVaultChange, openAcc
     const parts = Object.entries(TYPE_NAMES).filter(([t]) => cnt[t]).map(([t, name]) => `${name}: ${cnt[t]}`);
     let usage = '';
     try { const est = await navigator.storage?.estimate?.(); if (est?.usage) usage = ` · занято ≈ ${Math.max(1, Math.round(est.usage / 1024))} КБ`; } catch { /* нет API */ }
-    stats.textContent = (parts.length ? parts.join(' · ') : 'Данных пока нет') + usage + `\nПоследняя копия: ${agoText(getPref('lastBackupAt'))}`;
+    stats.textContent = (parts.length ? parts.join(' · ') : 'Данных пока нет') + (events.length ? ` · всего записей: ${events.length}` : '') + usage + `\nПоследняя копия: ${agoText(getPref('lastBackupAt'))}`;
     const bad = db.state.corrupt.length;
     corrupt.hidden = bad === 0;
     corrupt.textContent = bad ? `Не удалось прочитать записей: ${bad}. Они не удалены и остались на диске. Если помнишь, что менял пароль или файлы вручную, восстанови данные из копии.` : '';
@@ -310,6 +314,7 @@ export function createSettingsView({ lockNow, applyTheme, onVaultChange, openAcc
     card('Внешний вид и поведение',
       el('label', {}, 'Тема: ', theme),
       el('label', {}, 'Размер текста: ', fontSel),
+      el('label', { class: 'check-label' }, simple, ' Простой режим: только Сегодня, Дневник и Настройки, без лишних плашек'),
       el('label', { class: 'check-label' }, parseDates, ' Понимать даты в тексте задачи («завтра», «10 числа»)'),
       el('label', { class: 'check-label' }, hideAmounts, ' Скрывать суммы на экране')),
     card('Напоминания', remindBox),

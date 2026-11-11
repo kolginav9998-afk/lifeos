@@ -7,7 +7,9 @@ import analyst from './c-analyst.js';
 import engineer from './c-engineer.js';
 import health from './c-health.js';
 import ai from './c-ai.js';
-import { summary, srsId, buildQueue, newState, isDue } from './srs.js';
+import { summary, srsId, buildQueue, newState, isDue, MASTERED_BOX } from './srs.js';
+import { daysBetween } from './events.js';
+import { isSick } from './sick.js';
 
 export const TRACKS = [english, hebrew, health, ai, backend, data, analyst, engineer];
 export const trackById = id => TRACKS.find(t => t.id === id) || null;
@@ -143,6 +145,51 @@ export function sessionQueue({ events, today, trackId = null, newPerTrack = 5, m
 export function todayLoad(events, today, trackId = null) {
   const q = sessionQueue({ events, today, trackId, max: 100000 });
   return { due: q.filter(x => x.state).length, fresh: q.filter(x => !x.state).length };
+}
+
+
+// ---------- конспекты уроков ----------
+export const lessonNoteId = lessonId => `ln:${lessonId}`;
+export function makeLessonNote(lessonId, text, date, now = Date.now(), prev = null) {
+  if (!lessonTitle(lessonId)) throw new Error('Урок не найден');
+  const t = String(text ?? '').trim().slice(0, 2000);
+  if (!t) throw new Error('Конспект пуст');
+  return { id: lessonNoteId(lessonId), type: 'lessonnote', ts: prev?.ts ?? now, payload: { lesson: lessonId, text: t, date, ...(prev ? { editedAt: now } : {}) }, source: 'manual', confidence: 1, evidence: [] };
+}
+export const lessonNoteOf = (events, lessonId) => events.find(e => e.type === 'lessonnote' && e.id === lessonNoteId(lessonId)) ?? null;
+
+// ---------- сложные карточки («пиявки»): часто забываются, пока не выучены ----------
+export const LEECH_LAPSES = 3;
+export function leeches(events, limit = 20) {
+  const pool = new Map(cardPool(events).map(c => [c.id, c]));
+  return statesOf(events).filter(s => (s.lapses || 0) >= LEECH_LAPSES && s.box < MASTERED_BOX && pool.has(s.card))
+    .map(s => ({ card: pool.get(s.card), state: s })).sort((a, b) => b.state.lapses - a.state.lapses || a.card.q.localeCompare(b.card.q)).slice(0, limit);
+}
+
+// ---------- возвращение после пропуска ----------
+// Не занимался несколько дней, а повторений накопилось много: предложить начать с малого, без «долга».
+export function comebackInfo(events, today, { minDays = 3, minDue = 8 } = {}) {
+  if (isSick(events, today)) return null;
+  const dates = studyDates(events).sort();
+  if (!dates.length) return null;
+  const last = dates[dates.length - 1], gap = daysBetween(last, today);
+  if (gap < minDays) return null;
+  const load = todayLoad(events, today);
+  return load.due >= minDue ? { days: gap, due: load.due, last } : null;
+}
+
+// ---------- режим «15 минут»: один урок и десяток карточек ----------
+// Курс, которым занимался последним, идёт первым; если занятий не было, берём первый по порядку.
+export function nextLesson(events) {
+  const done = doneLessons(events), last = new Map();
+  for (const e of events) if (e.type === 'lesson' && (!last.has(e.payload.track) || last.get(e.payload.track) < e.payload.date)) last.set(e.payload.track, e.payload.date);
+  const order = [...TRACKS].sort((a, b) => (last.get(b.id) || '').localeCompare(last.get(a.id) || ''));
+  for (const t of order) { const l = t.lessons.find(x => !done.has(x.id)); if (l) return { track: t, lesson: l }; }
+  return null;
+}
+export function fifteenPlan(events, today, cardLimit = 10) {
+  const next = nextLesson(events), load = todayLoad(events, today);
+  return { next, cards: Math.min(cardLimit, load.due + load.fresh), minutes: (next?.lesson.minutes || 0) + Math.ceil(Math.min(cardLimit, load.due + load.fresh) / 2) };
 }
 
 export { newState, isDue };

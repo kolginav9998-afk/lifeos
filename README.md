@@ -15,7 +15,7 @@ node --test tests/events.test.mjs          # юнит-тесты
 node tests/e2e.mjs                         # браузер, офлайн, экспорт/импорт (нужен playwright)
 ```
 
-Инструкция: [docs/GUIDE.md](docs/GUIDE.md) · Идеи и план этапов: [docs/IDEAS.md](docs/IDEAS.md)
+Инструкция: [docs/GUIDE.md](docs/GUIDE.md) · Идеи и план этапов: [docs/IDEAS.md](docs/IDEAS.md) · Типы данных: [docs/EVENTS.md](docs/EVENTS.md) · Выпуск и откат: [docs/RELEASE.md](docs/RELEASE.md)
 
 ## Возможности
 Задачи (сроки, повторы, разбор дат в тексте), привычки, расходы и доходы, заметки, дневник и здоровье,

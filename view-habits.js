@@ -2,6 +2,7 @@ import { el, toast } from './ui.js';
 import { todayStr } from './events.js';
 import { HABIT_TEMPLATES, makeHabit, updateHabit, archiveHabit, makeHabitLog, habitStats, habitCalendar, activeHabits, logsOf, habitReview, reviewDue } from './habits.js';
 import { getPref, setPref } from './prefs.js';
+import { activeSick } from './sick.js';
 import * as store from './store.js';
 
 const pct = x => Math.round(x * 100) + '%';
@@ -15,6 +16,7 @@ export function createHabitsView() {
 
   const intro = el('p', { class: 'muted', textContent: 'Привычка = «после чего» + маленький первый шаг. Если день тяжёлый, достаточно минимума. Главное — не пропускать второй раз подряд.' });
 
+  const sickNote = el('div', { id: 'habit-sick', class: 'card calm', hidden: true, textContent: 'Режим болезни: привычки на паузе. Пропуски не считаются срывом и не рвут серию. Если сил хватает, можно отметить минимум.' });
   const heavy = el('input', { id: 'heavy-day', type: 'checkbox', checked: !!getPref('heavyDay') });
   heavy.onchange = () => { setPref('heavyDay', heavy.checked); render(); };
   const heavyRow = el('label', { class: 'check-label card tight' }, heavy, ' Тяжёлый день: показывать только минимум');
@@ -43,7 +45,7 @@ export function createHabitsView() {
   const empty = el('p', { class: 'muted', hidden: true, textContent: 'Привычек пока нет. Начни с одной маленькой.' });
   const archivedList = el('div', { id: 'habit-archive' });
   const archivedBlock = el('details', { hidden: true }, el('summary', { textContent: 'В архиве' }), archivedList);
-  root.append(intro, addBox, heavyRow, reviewBox, list, empty, archivedBlock);
+  root.append(intro, sickNote, addBox, heavyRow, reviewBox, list, empty, archivedBlock);
 
   async function mark(h, st, level) {
     const today = todayStr();
@@ -137,6 +139,7 @@ export function createHabitsView() {
     const today = todayStr();
     heavy.checked = !!getPref('heavyDay');
     const act = activeHabits(events, today);
+    sickNote.hidden = !activeSick(events, today);
     const any = events.some(e => e.type === 'habit');
     intro.hidden = any;
     heavyRow.hidden = !any;

@@ -2,7 +2,8 @@
 import { el, toast } from './ui.js';
 import { todayStr } from './events.js';
 import * as store from './store.js';
-import { TRACKS, trackById, trackProgress, doneLessons, makeLessonDone, lessonEventId, makeSrsEvent, makeUserCard, userCards, sessionQueue, todayLoad, studyDates, MY_TRACK } from './academy.js';
+import { TRACKS, trackById, trackProgress, doneLessons, makeLessonDone, lessonEventId, makeSrsEvent, makeUserCard, userCards, sessionQueue, todayLoad, studyDates, MY_TRACK,
+  leeches, comebackInfo, fifteenPlan, lessonNoteOf, makeLessonNote } from './academy.js';
 import { newState, grade, studyStreak, INTERVALS } from './srs.js';
 
 const QUALITY_LABEL = { again: 'Забыл', hard: 'Трудно', good: 'Помню' };
@@ -23,6 +24,7 @@ export function createLearnView() {
   let page = { name: 'home' };
   let session = null;
   const openLessons = new Set();
+  const noteDrafts = new Map();                       // несохранённые конспекты переживают перерисовку экрана
   const root = el('section', { id: 'view-learn', class: 'view' });
   const overlay = el('div', { id: 'sess', class: 'overlay', hidden: true, tabIndex: -1, role: 'dialog', 'aria-modal': 'true', 'aria-label': 'Повторение' });
   const mount = (...nodes) => root.replaceChildren(...nodes.filter(Boolean), overlay);     // окно повторения живёт внутри экрана (шторка приватности его тоже скрывает)
@@ -45,6 +47,24 @@ export function createLearnView() {
       el('p', { class: 'muted', id: 'learn-streak', textContent: streak ? `Занятий подряд: ${streak} дн.` : 'Занимайся каждый день по чуть-чуть: серия растёт.' }),
       total ? el('button', { type: 'button', id: 'learn-start', class: 'primary', textContent: 'Начать повторение', onclick: () => startSession(null) })
         : el('p', { class: 'hint', textContent: 'Выбери курс ниже и пройди первый урок — его карточки появятся здесь.' }));
+    const cb = comebackInfo(events, t0);
+    const comeback = cb ? el('div', { class: 'card calm', id: 'comeback' }, el('strong', { textContent: 'С возвращением' }),
+      el('p', { textContent: `Ты не занимался ${cb.days} дн., накопилось повторений: ${cb.due}. Это не страшно. Начни с десяти карточек, остальные подождут.` }),
+      el('button', { type: 'button', id: 'comeback-start', class: 'primary', textContent: 'Начать с 10 карточек', onclick: () => startSession(null, { max: 10 }) })) : null;
+    const plan = fifteenPlan(events, t0);
+    const fifteen = plan.next || plan.cards ? el('div', { class: 'card', id: 'fifteen' }, el('strong', { textContent: 'Режим «15 минут»' }),
+      el('p', { class: 'muted', textContent: `Коротко и без перегруза: один урок и немного карточек. Около ${Math.max(5, plan.minutes + 3)} мин.` }),
+      plan.next ? el('div', { class: 'row' }, el('span', { class: 'grow', id: 'fifteen-lesson-text', textContent: `1. Урок: ${plan.next.lesson.title} (${plan.next.track.title}, ${plan.next.lesson.minutes} мин)` }),
+        el('button', { type: 'button', id: 'fifteen-lesson', class: 'chip', textContent: 'Открыть', onclick: () => openLesson(plan.next.track.id, plan.next.lesson.id) })) : null,
+      plan.cards ? el('div', { class: 'row' }, el('span', { class: 'grow', textContent: `2. Карточки: ${plan.cards}` }),
+        el('button', { type: 'button', id: 'fifteen-cards', class: 'chip', textContent: 'Начать', onclick: () => startSession(null, { max: 10 }) })) : null,
+      plan.next ? el('p', { class: 'muted', textContent: `3. Задание: ${plan.next.lesson.task}` }) : null) : null;
+    const lcAll = leeches(events, 1000), lc = lcAll.slice(0, 5);
+    const leech = lc.length ? el('div', { class: 'card', id: 'leeches' }, el('strong', { textContent: `Сложные карточки (${lcAll.length})` }),
+      el('p', { class: 'muted', textContent: 'Эти карточки ты забываешь чаще других. Помогает своя формулировка, пример или ассоциация: сделай по ним свою карточку.' }),
+      ...lc.map(({ card }) => el('div', { class: 'row leech-row', dataset: { card: card.id } }, el('span', { class: 'grow' }, el('strong', { textContent: card.q })),
+        el('button', { type: 'button', class: 'chip leech-own', textContent: 'Своя карточка', onclick: () => go({ name: 'my', prefill: { q: card.q, a: card.a } }) }))),
+      el('button', { type: 'button', id: 'leech-start', class: 'chip', textContent: 'Повторить только их', onclick: () => startSession(null, { queue: lcAll.map(x => ({ card: x.card, state: x.state })).slice(0, 20) }) })) : null;
     const mine = userCards(events);
     const cards = TRACKS.map(t => {
       const p = trackProgress(t, events, t0);
@@ -59,7 +79,35 @@ export function createLearnView() {
       el('span', { class: 'track-ic', style: `background:${MY_TRACK.color}`, textContent: MY_TRACK.icon, 'aria-hidden': 'true' }),
       el('span', { class: 'track-body' }, el('strong', { textContent: MY_TRACK.title }), el('span', { class: 'muted', textContent: mine.length ? `Карточек: ${mine.length}` : 'Добавляй свои вопросы и ответы' })));
     const note = el('p', { class: 'muted', textContent: 'Курсы — учебный материал, а не медицинская, юридическая или финансовая консультация.' });
-    mount(head, el('h2', { textContent: 'Курсы' }), ...cards, my, note);
+    mount(head, comeback, fifteen, leech, el('h2', { textContent: 'Курсы' }), ...cards, my, note);
+  }
+
+  // ---------- конспект урока и открытие урока ----------
+  const noteAreas = new Map();
+  function noteBox(l) {
+    const note = lessonNoteOf(events, l.id);
+    const ta = el('textarea', { class: 'lesson-note', rows: 3, maxLength: 2000, placeholder: 'Своими словами, 2–3 строки: что главное в уроке', 'aria-label': 'Мой конспект' });
+    ta.value = noteDrafts.has(l.id) ? noteDrafts.get(l.id) : (note?.payload.text ?? '');
+    ta.addEventListener('input', () => noteDrafts.set(l.id, ta.value));
+    noteAreas.set(l.id, ta);
+    return ta;
+  }
+  async function saveNote(l) {
+    const note = lessonNoteOf(events, l.id), text = (noteAreas.get(l.id)?.value ?? '').trim();
+    try {
+      if (!text) {
+        if (note) { const old = await store.remove(note.id); toast('Конспект удалён', old ? { actionLabel: 'Вернуть', onAction: () => store.save(old) } : {}); }
+        noteDrafts.delete(l.id); return;
+      }
+      noteDrafts.delete(l.id);
+      await store.save(makeLessonNote(l.id, text, today(), Date.now(), note));
+      toast('Конспект сохранён');
+    } catch (e) { toast(e.message); }
+  }
+  function openLesson(trackId, lessonId) {
+    page = { name: 'track', id: trackId }; openLessons.add(lessonId);
+    render();
+    root.querySelector(`.lesson[data-lesson="${lessonId}"]`)?.scrollIntoView?.({ block: 'start' });
   }
 
   // ---------- страница курса ----------
@@ -88,6 +136,8 @@ export function createLearnView() {
         el('summary', {}, el('span', { class: 'lesson-n', textContent: isDone ? '✓' : String(idx + 1) }), el('span', { textContent: ` ${l.title} · ${l.minutes} мин` })),
         ...l.body.map(par => el('p', { textContent: par })),
         el('p', { class: 'task' }, el('strong', { textContent: 'Задание: ' }), l.task),
+        el('label', { class: 'field' }, el('span', { class: 'rating-label', textContent: 'Мой конспект' }), noteBox(l)),
+        el('button', { type: 'button', class: 'chip note-save', dataset: { note: l.id }, textContent: 'Сохранить конспект', onclick: () => saveNote(l) }),
         el('p', { class: 'muted', textContent: `Карточек в уроке: ${l.cards.length}` }),
         el('button', { type: 'button', class: 'chip', dataset: { aiCheck: l.id }, textContent: 'Проверить мой ответ с ИИ', onclick: () => copyText(`Я прохожу урок «${l.title}» из курса «${t.title}».\nЗадание: ${l.task}\nМой ответ: <вставь свой ответ>\n\nПроверь ответ как доброжелательный наставник: что верно, что неверно или неполно, один совет и один следующий шаг. Объясняй простыми словами и не выдумывай факты.`) }),
         el('button', { type: 'button', class: isDone ? '' : 'primary', dataset: { done: l.id }, textContent: isDone ? 'Снять отметку «пройден»' : 'Отметить пройденным', onclick: () => toggleLesson(t, l, isDone) }));
@@ -119,6 +169,7 @@ export function createLearnView() {
   function renderMy() {
     const q = el('input', { id: 'my-q', type: 'text', maxLength: 300, placeholder: 'Вопрос или слово', 'aria-label': 'Вопрос' });
     const a = el('input', { id: 'my-a', type: 'text', maxLength: 500, placeholder: 'Ответ', 'aria-label': 'Ответ' });
+    if (page.prefill) { q.value = page.prefill.q; a.value = page.prefill.a; page = { name: 'my' }; }   // заготовка из «сложных карточек» подставляется один раз
     const err = el('p', { class: 'error', id: 'my-err' });
     const add = async () => {
       try { await store.save(makeUserCard(q.value, a.value)); q.value = ''; a.value = ''; err.textContent = ''; q.focus(); toast('Карточка добавлена'); }
@@ -137,9 +188,9 @@ export function createLearnView() {
   }
 
   // ---------- сессия повторения ----------
-  function startSession(trackId) {
+  function startSession(trackId, opts = {}) {
     const t0 = today();
-    const queue = sessionQueue({ events, today: t0, trackId, max: 30 });
+    const queue = opts.queue ?? sessionQueue({ events, today: t0, trackId, max: opts.max ?? 30 });
     if (!queue.length) { toast('Сейчас повторять нечего'); return; }
     session = { queue, i: 0, shown: false, counts: { again: 0, hard: 0, good: 0 }, again: new Map(), today: t0, fresh: queue.filter(x => !x.state).length, startedAt: Date.now() };
     overlay.hidden = false;

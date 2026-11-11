@@ -5,6 +5,7 @@ import { mean, median, mad, robustZ, spearmanTest, round } from './stats.js';
 import { TESTS, TEST_BY_ID, DOMAINS, primaryShown, runsOf, fmtNum, fmtPrimary } from './bt-core.js';
 import { dailyTable } from './diary.js';
 import { addDays, todayStr } from './events.js';
+import { sickDays } from './sick.js';
 
 export const MIN_BASELINE = 5;        // сколько прежних результатов нужно, чтобы считать «норму»
 export const BASELINE_WINDOW = 30;    // норма считается по последним N результатам
@@ -71,6 +72,7 @@ export function dailyRows(events, runs = runsOf(events), analysis = analyzeRuns(
     else if (e.type === 'habit_log') habitBy[e.payload.date] = (habitBy[e.payload.date] || 0) + 1;
     else if (e.type === 'task' && e.payload.done && e.payload.doneAt) { const d = todayStr(e.payload.doneAt); taskBy[d] = (taskBy[d] || 0) + 1; }
   }
+  const sick = sickDays(events, todayStr());                       // дни режима болезни: помечаем, в связях не учитываем
   const byDate = new Map();
   for (const r of analysis.perRun) { if (!byDate.has(r.date)) byDate.set(r.date, []); byDate.get(r.date).push(r); }
   const dates = [...new Set([...diary.keys(), ...byDate.keys()])].sort();
@@ -81,6 +83,7 @@ export function dailyRows(events, runs = runsOf(events), analysis = analyzeRuns(
     const row = { ...d, date, runs: rs.length, composite: comp.length ? median(comp) : null };
     for (const dom of Object.keys(DOMAINS)) { const vs = finite(rs.map(x => x.domains[dom])); row['z_' + dom] = vs.length ? median(vs) : null; }
     for (const k of PREV) row['prev_' + k] = prev[k] ?? null;
+    row.sick = sick.has(date) ? 1 : 0;
     row.focusMin = focusBy[date] ?? 0; row.workoutMin = workBy[date] ?? 0; row.habitsDone = habitBy[date] ?? 0; row.tasksDone = taskBy[date] ?? 0;
     row.prev_focusMin = focusBy[addDays(date, -1)] ?? 0; row.prev_workoutMin = workBy[addDays(date, -1)] ?? 0;
     return row;
@@ -161,7 +164,7 @@ export function insights(events, now = Date.now()) {
     if (low.length) parts.push('Ниже обычного: ' + low.map(x => DOMAINS[x.d].toLowerCase()).join(', '));
     if (high.length) parts.push((parts.length ? 'выше' : 'Выше') + ' обычного: ' + high.map(x => DOMAINS[x.d].toLowerCase()).join(', '));
     out.push({ id: 'latest', kind: last.composite <= -1 ? 'warn' : last.composite >= 1 ? 'good' : 'info', conf: 'mid',
-      title: `Последняя проверка: ${zWord(last.composite)}`, text: `Общий результат ${zText(last.composite)} относительно твоей нормы.${parts.length ? ' ' + parts.join('; ') + '.' : ''} Один день — не вывод: смотри на несколько дней подряд.` });
+      title: `Последняя проверка: ${zWord(last.composite)}`, text: `Общий результат ${zText(last.composite)} относительно твоей нормы.${parts.length ? ' ' + parts.join('; ') + '.' : ''}${sickDays(events, todayStr(now)).has(last.date) ? ' В этот день был включён режим болезни: результат мог снизиться из-за самочувствия.' : ''} Один день — не вывод: смотри на несколько дней подряд.` });
   }
 
   // 2. Резкие отклонения отдельных тестов в последнем прохождении
@@ -194,22 +197,23 @@ export function insights(events, now = Date.now()) {
   if (down.length >= 2 && !up.length) out.push({ id: 'trend', kind: 'warn', conf: 'mid', title: 'Результаты снижаются', text: `По нескольким тестам (${down.join(', ')}) за последние прохождения устойчивое снижение. Проверь сон, нагрузку и стресс за эти дни; если усталость копится — запланируй отдых.` });
 
   // 5. Связи с образом жизни (с поправкой на множественные сравнения)
-  const cors = correlations(rows).filter(c => c.q <= FDR_LIMIT && Math.abs(c.rho) >= 0.3);
+  const rowsOk = rows.filter(r => !r.sick);                         // болезнь искажает связи: такие дни не берём
+  const cors = correlations(rowsOk).filter(c => c.q <= FDR_LIMIT && Math.abs(c.rho) >= 0.3);
   const byFactor = new Map();                       // по одному выводу на фактор: общий результат важнее частных областей
   for (const c of cors) { const cur = byFactor.get(c.x); if (!cur || (c.y === 'composite' && cur.y !== 'composite')) byFactor.set(c.x, c); }
   const picked = [...byFactor.values()].sort((a, b) => a.p - b.p || Math.abs(b.rho) - Math.abs(a.rho));
   for (const c of picked.slice(0, 4)) {
     let extra = '';
     if (c.x === 'sleepHours' && c.y === 'composite') {
-      const g = groupDiff(rows, 'sleepHours', 7);
+      const g = groupDiff(rowsOk, 'sleepHours', 7);
       if (g) extra = ` В дни со сном от 7 часов (${g.nHi}) общий результат в среднем ${g.diff >= 0 ? 'выше' : 'ниже'} на ${fmtNum(Math.abs(g.diff), 1)}σ, чем в остальные (${g.nLo}).`;
     }
     out.push({ id: `rel-${c.x}-${c.y}`, kind: 'relation', conf: c.n >= 30 && c.q <= 0.1 ? 'high' : 'low',
       title: `${c.xLabel} ↔ ${c.yLabel}`,
       text: `${c.rho > 0 ? 'Когда выше' : 'Когда ниже'} «${c.xLabel}», обычно ${c.rho > 0 ? 'выше' : 'ниже'} ${c.yLabel} (ρ = ${fmtNum(c.rho, 2)}, дней: ${c.n}, ${c.q < 0.01 ? 'q < 0,01' : `q = ${fmtNum(c.q, 2)}`}).${extra} Это связь, а не доказанная причина: проверь её личным экспериментом на 1–2 недели (Аналитика → Эксперименты).` });
   }
-  if (!cors.length && rows.length >= 14) out.push({ id: 'no-relations', kind: 'info', conf: 'mid', title: 'Устойчивых связей пока нет', text: 'С отметками дня (сон, кофе, нагрузка) убедительных связей не найдено. Это нормально: чем дольше ведёшь отметки, тем точнее картина.' });
-  if (runs.length > 0 && rows.filter(r => Number.isFinite(r.composite) && Number.isFinite(r.sleepHours)).length < MIN_PAIRS && days >= 3) out.push({ id: 'need-checkins', kind: 'info', conf: 'high', title: 'Добавь утренние отметки сна', text: `Для поиска связей нужно хотя бы ${MIN_PAIRS} дней, где есть и проверка, и отметка сна (раздел «Дневник»). Сейчас таких дней: ${rows.filter(r => Number.isFinite(r.composite) && Number.isFinite(r.sleepHours)).length}.` });
+  if (!cors.length && rowsOk.length >= 14) out.push({ id: 'no-relations', kind: 'info', conf: 'mid', title: 'Устойчивых связей пока нет', text: 'С отметками дня (сон, кофе, нагрузка) убедительных связей не найдено. Это нормально: чем дольше ведёшь отметки, тем точнее картина.' });
+  if (runs.length > 0 && rowsOk.filter(r => Number.isFinite(r.composite) && Number.isFinite(r.sleepHours)).length < MIN_PAIRS && days >= 3) out.push({ id: 'need-checkins', kind: 'info', conf: 'high', title: 'Добавь утренние отметки сна', text: `Для поиска связей нужно хотя бы ${MIN_PAIRS} дней, где есть и проверка, и отметка сна (раздел «Дневник»). Сейчас таких дней: ${rows.filter(r => Number.isFinite(r.composite) && Number.isFinite(r.sleepHours)).length}.` });
 
   // 6. Время суток
   const tod = timeOfDay(an.perRun);

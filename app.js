@@ -11,6 +11,7 @@ import { searchEvents } from './search.js';
 import { searchAcademy } from './academy.js';
 import { VERSION } from './version.js';
 import * as notify from './notify.js';
+import { markShell, markData } from './perf.js';
 
 import { createTodayView } from './view-today.js';
 import { createHabitsView } from './view-habits.js';
@@ -23,6 +24,7 @@ import { createWorkoutsView } from './view-workouts.js';
 import { createPlansView } from './view-plans.js';
 import { createPeopleView } from './view-people.js';
 import { createOkrView } from './view-okr.js';
+import { createReflectView } from './view-reflect.js';
 import { createTestsView } from './view-tests.js';
 import { createInsightsView } from './view-insights.js';
 import { createSettingsView } from './view-settings.js';
@@ -38,6 +40,7 @@ const DEFS = [
   { id: 'health', group: 'diary', title: 'Здоровье', sub: 'Здоровье', make: () => createHealthView() },
   { id: 'workouts', group: 'diary', title: 'Тренировки', sub: 'Тренировки', make: () => createWorkoutsView() },
   { id: 'notes', group: 'diary', title: 'Заметки', sub: 'Заметки', make: () => createNotesView() },
+  { id: 'reflect', group: 'diary', title: 'Рефлексия', sub: 'Рефлексия', make: () => createReflectView() },
   { id: 'learn', group: 'grow', title: 'Учёба', sub: 'Учёба', make: () => createLearnView() },
   { id: 'tests', group: 'grow', title: 'Проверка', sub: 'Тесты', make: () => createTestsView() },
   { id: 'insights', group: 'grow', title: 'Аналитика', sub: 'Аналитика', make: () => createInsightsView() },
@@ -55,6 +58,10 @@ const GROUPS = [
   { id: 'more', label: 'Ещё', icon: 'more' },
 ];
 const FOCUS_TAB = { task: 'today', habit: 'habits', expense: 'money', note: 'notes', diary: 'diary', measure: 'health' };
+
+// Простой режим: меньше вкладок и экранов, только самое нужное. Остальные экраны по-прежнему открываются из чипов и поиска.
+const SIMPLE_VIEWS = new Set(['today', 'habits', 'diary', 'health', 'notes', 'more', 'account']);
+const visibleDefs = () => (getPref('simple') ? DEFS.filter(d => SIMPLE_VIEWS.has(d.id)) : DEFS);
 
 // ---------- тема ----------
 function applyTheme() {
@@ -88,7 +95,8 @@ function go(id) {
   const v = views[def.id];
   if (v.show) v.show(); else v.update(store.state.events);        // настройки могли измениться (например, время последней копии)
   for (const b of $('tabs').children) b.setAttribute('aria-selected', String(b.dataset.tab === def.group));
-  const siblings = DEFS.filter(d => d.group === def.group);
+  const vis = new Set(visibleDefs().map(d => d.id));
+  const siblings = DEFS.filter(d => d.group === def.group && (vis.has(d.id) || d.id === def.id));
   const sub = $('subnav');
   sub.hidden = siblings.length < 2;
   sub.replaceChildren(...siblings.map(d => el('button', { type: 'button', dataset: { view: d.id }, 'aria-pressed': String(d.id === def.id), textContent: d.sub, onclick: () => go(d.id) })));
@@ -168,6 +176,7 @@ async function enterApp() {
   $('app').hidden = false;
   try { const n = await db.sealPending(); if (n) toast(`Дошифровано записей: ${n}`); } catch (e) { console.error(e); }
   await store.refresh();
+  markData();
   updateLockButton();
   appSync.start().catch(e => console.error(e));
   if (!entered) { entered = true; handleUrlParams(); }
@@ -245,6 +254,21 @@ function handleUrlParams() {
 }
 
 // ---------- сборка интерфейса ----------
+let navReady = false;
+function buildTabs() {
+  const groups = GROUPS.filter(g => visibleDefs().some(d => d.group === g.id));
+  $('tabs').replaceChildren(...groups.map(g => el('button', { type: 'button', dataset: { tab: g.id }, role: 'tab', 'aria-selected': 'false',
+    onclick: () => go(visibleDefs().find(d => d.group === g.id).id) }, icon(g.icon), el('span', { textContent: g.label }))));
+  $('tabs').style.gridTemplateColumns = `repeat(${groups.length}, 1fr)`;
+}
+// Включили или выключили простой режим: пересобрать вкладки; если текущий экран скрыт, перейти на «Сегодня».
+function applyMode() {
+  if (!navReady) return;
+  buildTabs();
+  go(visibleDefs().some(d => d.id === current) ? current : 'today');
+  for (const v of Object.values(views)) v.update(store.state.events);
+}
+
 function build() {
   $('search-btn').append(icon('search'));
   $('lock-top').append(icon('lock'));
@@ -256,11 +280,10 @@ function build() {
   $('search-input').oninput = renderSearch;
   $('lock-top').onclick = () => lockNow();
 
-  const ctx = { go, lockNow, applyTheme, onVaultChange: updateLockButton, openAccount: () => go('account'), exportCsv: () => views.more.exportCsv() };
+  const ctx = { go, lockNow, applyTheme, applyMode, onVaultChange: updateLockButton, openAccount: () => go('account'), exportCsv: () => views.more.exportCsv() };
   const main = $('view');
   for (const d of DEFS) { views[d.id] = d.make(ctx); main.append(views[d.id].root); }
-  $('tabs').replaceChildren(...GROUPS.map(g => el('button', { type: 'button', dataset: { tab: g.id }, role: 'tab', 'aria-selected': 'false',
-    onclick: () => go(DEFS.find(d => d.group === g.id).id) }, icon(g.icon), el('span', { textContent: g.label }))));
+  navReady = true; buildTabs();
   $('sync-badge').onclick = () => go('account');
 
   store.onChange(evs => { for (const v of Object.values(views)) v.update(evs); renderSearch(); notify.resyncSoon(); });
@@ -278,6 +301,7 @@ bumpLaunch();
 build();
 setStatus();
 go(getPref('tab'));
+markShell();
 navigator.storage?.persist?.().catch(() => {});
 // В приложении файлы уже внутри APK: офлайн-кэш сайта не нужен (и мешал бы обновлениям)
 if (!isNative && 'serviceWorker' in navigator) navigator.serviceWorker.register('sw.js').catch(() => {});

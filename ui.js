@@ -16,6 +16,9 @@ export function el(tag, props = {}, ...kids) {
   return n;
 }
 
+// Как replaceChildren, но пропускает null/undefined/false. Сам DOM превращает null в текст «null».
+export function fill(node, ...kids) { node.replaceChildren(...kids.flat().filter(k => k !== null && k !== undefined && k !== false)); }
+
 const SVG_NS = 'http://www.w3.org/2000/svg';
 const ICONS = {
   tasks: ['M9 11l3 3L22 4', 'M21 12v7a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h11'],

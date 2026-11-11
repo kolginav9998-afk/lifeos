@@ -76,3 +76,23 @@ test('исходник иконки на месте, все размеры Andro
     for (const f of ['ic_launcher.png', 'ic_launcher_round.png', 'ic_launcher_foreground.png'])
       assert.ok(fs.existsSync(path.join(root, `assets/android-res/mipmap-${d}/${f}`)), `${d}/${f}`);
 });
+
+test('replaceChildren не получает null: DOM рисует его как текст «null» (используй fill из ui.js)', () => {
+  const root = path.resolve(path.dirname(new URL(import.meta.url).pathname), '..');
+  for (const f of fs.readdirSync(root).filter(n => n.endsWith('.js'))) {
+    const s = fs.readFileSync(path.join(root, f), 'utf8');
+    for (const m of s.matchAll(/\.replaceChildren\(/g)) {
+      let depth = 1, j = m.index + m[0].length, str = null;
+      while (j < s.length && depth > 0) {
+        const c = s[j];
+        if (str) { if (c === '\\') j++; else if (c === str) str = null; }
+        else if ('\'"`'.includes(c)) str = c;
+        else if (c === '(') depth++;
+        else if (c === ')') depth--;
+        j++;
+      }
+      const body = s.slice(m.index + m[0].length, j - 1);
+      assert.ok(!/:\s*null\b|:\s*undefined\b|&&\s*el\(/.test(body), `${f}:${s.slice(0, m.index).split('\n').length}: в replaceChildren возможен null, используй fill()`);
+    }
+  }
+});

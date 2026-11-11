@@ -1,6 +1,7 @@
 // Привычки (по мотивам «Атомных привычек»): якорь «после чего», версия на 2 минуты,
 // «не пропусти второй раз», регулярность за 30 дней вместо одной хрупкой серии.
 import { todayStr, addDays, daysBetween, isYmd, newId } from './events.js';
+import { sickDays } from './sick.js';
 
 const clean = (s, n) => String(s ?? '').trim().slice(0, n);
 export const habitLogId = (habitId, date) => `${habitId}:${date}`;   // одна отметка в день на привычку
@@ -37,34 +38,45 @@ export const logsOf = (events, habitId) => events.filter(e => e.type === 'habit_
 
 export function habitStats(habit, events, today) {
   const byDate = new Map(logsOf(events, habit.id).map(l => [l.payload.date, l.payload.level]));
+  const sick = sickDays(events, today);                         // дни болезни: не срыв и не «зачёт»
   const doneToday = byDate.has(today);
 
-  // текущая серия: если сегодня ещё не отмечено, серия не «сгорает» до конца дня
+  // текущая серия: если сегодня ещё не отмечено, серия не «сгорает» до конца дня; дни болезни серию не рвут
   let cursor = doneToday ? today : addDays(today, -1);
   let streak = 0;
-  while (byDate.has(cursor)) { streak++; cursor = addDays(cursor, -1); }
+  for (let guard = 0; guard < 4000; guard++) {
+    if (byDate.has(cursor)) { streak++; cursor = addDays(cursor, -1); }
+    else if (sick.has(cursor)) cursor = addDays(cursor, -1);
+    else break;
+  }
 
   // самая длинная серия
   const dates = [...byDate.keys()].sort();
+  const bridged = (a, b) => { for (let x = addDays(a, 1); x < b; x = addDays(x, 1)) if (!sick.has(x)) return false; return true; };
   let longest = 0, run = 0, prev = null;
-  for (const d of dates) { run = prev && daysBetween(prev, d) === 1 ? run + 1 : 1; longest = Math.max(longest, run); prev = d; }
+  for (const d of dates) { run = prev && bridged(prev, d) ? run + 1 : 1; longest = Math.max(longest, run); prev = d; }
 
-  // регулярность за последние 30 дней (но не раньше старта привычки)
+  // регулярность за последние 30 дней (но не раньше старта привычки); дни болезни без отметки не считаются
   const start = habit.payload.startDate;
-  const span = Math.min(30, Math.max(1, daysBetween(start, today) + 1));
-  let hits = 0;
-  for (let i = 0; i < span; i++) if (byDate.has(addDays(today, -i))) hits++;
+  const win = Math.min(30, Math.max(1, daysBetween(start, today) + 1));
+  let hits = 0, counted = 0, pausedDays = 0;
+  for (let i = 0; i < win; i++) {
+    const d = addDays(today, -i);
+    if (byDate.has(d)) { hits++; counted++; } else if (sick.has(d)) pausedDays++; else counted++;
+  }
+  const span = Math.max(1, counted);
 
   const yesterday = addDays(today, -1);
-  const missedYesterday = daysBetween(start, yesterday) >= 0 && !byDate.has(yesterday);
+  const missedYesterday = daysBetween(start, yesterday) >= 0 && !byDate.has(yesterday) && !sick.has(yesterday);
   const last = dates.length ? dates[dates.length - 1] : null;
-  const gapDays = last ? daysBetween(last, today) : null;
+  let gapDays = last ? daysBetween(last, today) : null;
+  if (last) for (let x = addDays(last, 1); x <= today; x = addDays(x, 1)) if (sick.has(x)) gapDays--;
 
   return {
     doneToday, level: byDate.get(today) ?? null, streak, longest,
-    hits, span, consistency: hits / span, total: byDate.size,
+    hits, span, pausedDays, consistency: hits / span, total: byDate.size,
     missedYesterday, neverMissTwice: missedYesterday && !doneToday,
-    gapDays, needsRecovery: gapDays !== null && gapDays >= 3 && !doneToday,
+    gapDays, needsRecovery: gapDays !== null && gapDays >= 3 && !doneToday && !sick.has(today),
   };
 }
 
@@ -101,10 +113,11 @@ export const REVIEW_TEXT = {
   ok: 'Нормально. Если пропуски повторяются, сделай минимум ещё меньше.',
   ease: 'Похоже, слишком тяжело. Уменьши минимум до двух минут или привяжи к другому «после чего».',
   archive: 'За месяц ни одной отметки. Либо вернись с минимума, либо убери в архив без вины.',
+  few: 'Было мало обычных дней (болезнь или пауза). Оценишь привычку позже, когда режим наладится.',
 };
 export function habitReview(events, today) {
   return activeHabits(events, today).filter(({ st, h }) => daysBetween(h.payload.startDate, today) >= 14).map(({ h, st }) => {
-    const advice = st.hits === 0 ? 'archive' : st.consistency >= 0.8 ? 'keep' : st.consistency >= 0.4 ? 'ok' : 'ease';
+    const advice = st.pausedDays > 0 && st.span < 7 ? 'few' : st.hits === 0 ? 'archive' : st.consistency >= 0.8 ? 'keep' : st.consistency >= 0.4 ? 'ok' : 'ease';
     return { h, st, advice, text: REVIEW_TEXT[advice] };
   });
 }

@@ -5,6 +5,15 @@ import { activeHabits } from './habits.js';
 import { formatMeasure } from './health.js';
 import { doneWorkouts, setsOf } from './workouts.js';
 import { goalProgress, subsOf } from './planning.js';
+import { peopleOf } from './people.js';
+import { okrsOf, okrProgress } from './okr.js';
+import { thoughtsOf } from './thoughts.js';
+import { decisionsOf, joysOf, weekReflections, VERDICTS } from './reflect.js';
+import { checkupsOf } from './prevent.js';
+import { lessonTitle } from './academy.js';
+import { sickRanges } from './sick.js';
+import { medsOf } from './meds.js';
+import { emergencyOf, emergencyLines } from './emergency.js';
 
 const esc = s => String(s).replace(/\r?\n/g, ' ');
 
@@ -65,5 +74,25 @@ export function toMarkdown(events, now = Date.now()) {
   L.push('', '## Эксперименты', '');
   for (const x of exps) L.push(`- ${x.payload.startDate} — ${esc(x.payload.title)}: ${esc(x.payload.change)}${x.payload.cancelled ? ' (остановлен)' : ''}`);
   if (!exps.length) L.push('_нет_');
+  // Разделы, которые появляются только когда в них есть данные.
+  const part = (title, lines) => { if (lines.length) L.push('', `## ${title}`, '', ...lines); };
+  part('Люди', peopleOf(events).map(p => `- ${esc(p.payload.name)}${p.payload.birthday ? ` — день рождения ${p.payload.birthday.split('-').reverse().join('.')}${p.payload.birthYear ? `.${p.payload.birthYear}` : ''}` : ''}${p.payload.cadenceDays ? `; связываться раз в ${p.payload.cadenceDays} дн.` : ''}${p.payload.note ? `; ${esc(p.payload.note)}` : ''}`));
+  part('Цели квартала', okrsOf(events).flatMap(o => [`- **${esc(o.payload.title)}** (${{ active: 'в работе', done: 'достигнута', dropped: 'снята' }[o.payload.status]}, ${Math.round(okrProgress(o) * 100)}%, срок ${o.payload.due})${o.payload.why ? ` — зачем: ${esc(o.payload.why)}` : ''}`,
+    ...o.payload.krs.map(k => `  - ${esc(k.text)}: ${k.current} из ${k.target} ${esc(k.unit)}`.trimEnd())]));
+  part('Мысли и эмоции', thoughtsOf(events).slice().reverse().map(t => `- ${t.payload.date} — ${t.payload.emotion}${Number.isFinite(t.payload.before) ? ` ${t.payload.before}${Number.isFinite(t.payload.after) ? ` → ${t.payload.after}` : ''}` : ''}: ${esc(t.payload.thought)}${t.payload.situation ? ` (ситуация: ${esc(t.payload.situation)})` : ''}${t.payload.alt ? `; иначе: ${esc(t.payload.alt)}` : ''}`));
+  const ref = [];
+  for (const e of events.filter(x => x.type === 'intention').sort((a, b) => a.payload.date.localeCompare(b.payload.date))) ref.push(`- ${e.payload.date} — намерение: ${esc(e.payload.text)}`);
+  for (const e of events.filter(x => x.type === 'dayreview').sort((a, b) => a.payload.date.localeCompare(b.payload.date))) ref.push(`- ${e.payload.date} — обзор дня: ${[['получилось', e.payload.win], ['мешало', e.payload.miss], ['изменю', e.payload.learn]].filter(([, v]) => v).map(([k, v]) => `${k}: ${esc(v)}`).join('; ')}`);
+  for (const e of weekReflections(events).slice().reverse()) ref.push(`- неделя с ${e.payload.week} — ${[['получилось', e.payload.went], ['мешало', e.payload.blocked], ['изменю', e.payload.change]].filter(([, v]) => v).map(([k, v]) => `${k}: ${esc(v)}`).join('; ')}`);
+  const dec = decisionsOf(events);
+  for (const e of [...dec.open, ...dec.closed]) ref.push(`- ${e.payload.date} — решение: ${esc(e.payload.title)}${e.payload.expect ? `; ожидал: ${esc(e.payload.expect)}` : ''}; вернуться ${e.payload.revisit}${e.payload.closed ? `; итог (${e.payload.closed.date}): ${VERDICTS[e.payload.closed.verdict]}${e.payload.closed.outcome ? `, ${esc(e.payload.closed.outcome)}` : ''}` : ''}`);
+  for (const e of joysOf(events).slice().reverse()) ref.push(`- ${e.payload.date} — радость: ${esc(e.payload.text)}`);
+  part('Рефлексия', ref);
+  part('Конспекты уроков', events.filter(e => e.type === 'lessonnote').sort((a, b) => a.payload.date.localeCompare(b.payload.date)).map(e => `- ${lessonTitle(e.payload.lesson)?.title ?? e.payload.lesson} (${e.payload.date}): ${esc(e.payload.text)}`));
+  part('Профилактика', checkupsOf(events).map(c => `- ${esc(c.payload.name)}: раз в ${c.payload.months} мес.; последний раз ${c.payload.last ?? 'не отмечен'}`));
+  part('Лекарства и добавки', medsOf(events).map(m => `- ${esc(m.payload.name)}${m.payload.dose ? ` — ${esc(m.payload.dose)}` : ''}${m.payload.active ? '' : ' (пауза)'}`));
+  part('Режим болезни', sickRanges(events).sort((a, b) => a.from.localeCompare(b.from)).map(r => `- с ${r.from}${r.to ? ` по ${r.to}` : ' (идёт)'}`));
+  const em = emergencyOf(events);
+  if (em) part('Данные на экстренный случай', emergencyLines(em.payload).map(([k, v]) => `- ${k}: ${esc(v)}`));
   return L.join('\n') + '\n';
 }

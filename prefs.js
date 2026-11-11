@@ -1,7 +1,7 @@
 // Настройки интерфейса. Это не личные данные (тема, автоблокировка), поэтому хранятся открыто.
 const KEY = 'lifeos.prefs.v1';
-export const DEFAULTS = { theme: 'auto', autoLockMin: 5, parseDates: true, hideAmounts: false, heavyDay: false, onboardingDone: false, tab: 'today',
-  fontScale: 1, habitReview: '', remindersOn: false, taskHour: 9, habitHour: 20, eveningHour: 21, bedtimeMin: -1, weeklyHour: -1, lastBackupAt: 0 };
+export const DEFAULTS = { theme: 'auto', autoLockMin: 5, parseDates: true, hideAmounts: false, simple: false, heavyDay: false, onboardingDone: false, tab: 'today',
+  fontScale: 1, habitReview: '', lowMoodUntil: '', lightDayAsked: '', overloadAsked: '', remindersOn: false, taskHour: 9, habitHour: 20, eveningHour: 21, bedtimeMin: -1, weeklyHour: -1, lastBackupAt: 0 };
 
 let cache = null;
 function load() {

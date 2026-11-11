@@ -312,3 +312,25 @@ html.amounts-hidden .amount{letter-spacing:.1em}
 .okr.behind{border-left:4px solid var(--warn)}.okr.done,.okr.ahead{border-left:4px solid var(--ok)}.okr.overdue{border-left:4px solid var(--danger)}
 .pp-due-row{padding:6px 0;border-top:1px solid var(--line)}
 .pp summary{justify-content:space-between;gap:8px;color:var(--text)}
+.card.calm{border-left:4px solid var(--accent)}
+.hint-card p{margin:0 0 8px;font-size:.92rem;line-height:1.5}
+.card.calm .chip{background:var(--soft)}
+.field{display:flex;flex-direction:column;gap:4px;margin-top:8px}
+.dec,.dec-done,.wk-past-row{padding:10px 0;border-top:1px solid var(--line)}
+.dec.due{border-left:3px solid var(--warn);padding-left:10px}
+.dec p,.dec-done p{margin:4px 0}
+.joy-row,.chg-row{padding:6px 0;border-top:1px solid var(--line)}
+.joy-pick{margin:8px 0;padding:10px 12px;border-radius:10px;background:var(--soft)}
+.row .primary{white-space:nowrap}
+.plain-details{margin-top:6px}
+.stack{display:flex;flex-direction:column;gap:12px}
+.bp-days{display:grid;grid-template-columns:repeat(7,1fr);gap:4px;margin:8px 0}
+.bp-day{display:flex;flex-direction:column;align-items:center;gap:2px;padding:6px 2px;border-radius:8px;background:var(--soft);font-size:.72rem;color:var(--muted)}
+.bp-day b{font-size:.75rem;color:var(--text)}
+.bp-day.some{outline:1px solid var(--line)}.bp-day.full{background:var(--ok);color:#fff}.bp-day.full b{color:#fff}
+.chk-row{padding:10px 0;border-top:1px solid var(--line)}
+.chk-row.never,.chk-row.overdue{border-left:3px solid var(--warn);padding-left:10px}
+.chk-date{width:auto;min-height:36px;padding:4px 8px}
+.em-row{margin:4px 0}
+.em-big{font-size:1.4rem;font-weight:600;overflow-wrap:anywhere;margin-top:2px}
+.em-line{padding:10px 14px}

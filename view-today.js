@@ -14,6 +14,10 @@ import { openFocus, hasRunningFocus, focusMinutes } from './focus.js';
 import { makeNote, templateText } from './notes.js';
 import { upcomingBirthdays, dueContacts } from './people.js';
 import { okrsOf, okrPace } from './okr.js';
+import { makeIntention, intentionOf, decisionsDue, lowMoodNotice, LOW_MOOD_TEXT } from './reflect.js';
+import { lightDayHint, overloadHint } from './hints.js';
+import { activeSick, startSick, endSick } from './sick.js';
+import { checkupsDue } from './prevent.js';
 import * as vault from './vault.js';
 import * as store from './store.js';
 
@@ -52,7 +56,7 @@ export function createTodayView({ go }) {
       ['lock', 'Включи защиту паролем (Ещё)', vault.hasVault(), () => go('more')],
     ];
     const left = steps.filter(s => !s[2]).length;
-    onboarding.hidden = getPref('onboardingDone') || left === 0;
+    onboarding.hidden = getPref('onboardingDone') || left === 0 || !!getPref('simple');
     obList.replaceChildren(...steps.map(([id, text, done, act]) => el('li', { class: done ? 'done' : '', dataset: { step: id } },
       el('span', { class: 'ob-mark', textContent: done ? '✓' : '○', 'aria-hidden': 'true' }),
       done ? el('span', { textContent: text }) : el('button', { type: 'button', class: 'link', textContent: text, onclick: act }))));
@@ -66,7 +70,7 @@ export function createTodayView({ go }) {
   const wotd = el('div', { id: 'wotd', class: 'card tight', hidden: true });
   function renderWotd(today) {
     const rows = ['english', 'hebrew'].map(id => wordOfDay(today, id)).filter(Boolean);
-    wotd.hidden = !rows.length || getPref('wotdHidden') === today;
+    wotd.hidden = !rows.length || getPref('wotdHidden') === today || !!getPref('simple');
     wotd.replaceChildren(el('div', { class: 'row' }, el('strong', { class: 'grow', textContent: 'Слово дня' }),
       el('button', { type: 'button', class: 'link', 'aria-label': 'Скрыть слово дня', textContent: 'скрыть', onclick: () => { setPref('wotdHidden', today); wotd.hidden = true; } })),
       ...rows.map(w => {
@@ -74,6 +78,52 @@ export function createTodayView({ go }) {
         const btn = el('button', { type: 'button', class: 'link wotd-show', dataset: { track: w.track }, textContent: w.front, onclick: () => { back.hidden = !back.hidden; } });
         return el('p', { class: 'wotd-row', dataset: { track: w.track } }, btn, back);
       }));
+  }
+
+  // намерение дня: одна строка «что сегодня зависит от меня»
+  let editingIntent = false;
+  const intInput = el('input', { id: 'intent-input', type: 'text', maxLength: 160, placeholder: 'Что сегодня зависит от меня? Одна строка', autocomplete: 'off' });
+  const intForm = el('form', { id: 'intent-form', class: 'row' }, intInput, el('button', { type: 'submit', id: 'intent-save', class: 'primary', textContent: 'Записать' }));
+  intForm.onsubmit = async e => {
+    e.preventDefault();
+    try {
+      const today = todayStr();
+      const ev = makeIntention(today, intInput.value, Date.now(), intentionOf(events, today));
+      editingIntent = false; intInput.value = '';                  // до сохранения: оно перерисует экран
+      await store.save(ev);
+      toast('Намерение дня записано');
+    } catch (err) { toast(err.message); }
+  };
+  const intentionBox = el('div', { id: 'intention', class: 'card tight' });
+  function renderIntention(today) {
+    const cur = intentionOf(events, today);
+    if (cur && !editingIntent) {
+      intentionBox.replaceChildren(el('div', { class: 'row' }, el('span', { class: 'muted', textContent: 'Намерение дня' }), el('strong', { id: 'intent-text', class: 'grow', textContent: cur.payload.text }),
+        el('button', { type: 'button', id: 'intent-edit', class: 'link', textContent: 'изменить', onclick: () => { editingIntent = true; intInput.value = cur.payload.text; renderIntention(todayStr()); intInput.focus(); } })));
+    } else intentionBox.replaceChildren(intForm);
+  }
+
+  // мягкие подсказки: мало сил, слишком много дел, долго низкое настроение
+  const hintsBox = el('div', { id: 'hints' });
+  function hintCard(id, text, ...buttons) { return el('div', { id, class: 'card calm hint-card' }, el('p', { textContent: text }), el('div', { class: 'row wrap' }, ...buttons)); }
+  function renderHints(today, heavy) {
+    const out = [];
+    const sickEv = activeSick(events, today);
+    if (sickEv) out.push(hintCard('sick-banner', 'Режим болезни: привычки и серии на паузе, пропуски не считаются срывом, проверки и напоминания о привычках отложены. Отдыхай.',
+      el('button', { type: 'button', id: 'sick-banner-end', class: 'chip', textContent: 'Я поправился', onclick: async () => { await store.save(endSick(sickEv)); toast('Рад, что стало лучше. Серии продолжатся.'); } })));
+    const light = !heavy && !sickEv && getPref('lightDayAsked') !== today && lightDayHint(events, today);
+    if (light) out.push(hintCard('hint-light', light.text,
+      el('button', { type: 'button', id: 'hint-light-on', class: 'chip', textContent: 'Включить «Тяжёлый день»', onclick: () => { setPref('heavyDay', true); setPref('lightDayAsked', today); render(); } }),
+      el('button', { type: 'button', id: 'hint-light-sick', class: 'chip', textContent: 'Я заболел', onclick: async () => { try { setPref('lightDayAsked', today); await store.save(startSick(events)); } catch (e) { toast(e.message); } } }),
+      el('button', { type: 'button', class: 'chip', textContent: 'Не сейчас', onclick: () => { setPref('lightDayAsked', today); render(); } })));
+    const over = !heavy && !sickEv && getPref('overloadAsked') !== today && overloadHint(events, today);
+    if (over) out.push(hintCard('hint-overload', over.text,
+      el('button', { type: 'button', id: 'hint-overload-on', class: 'chip', textContent: 'Оставить три главных', onclick: () => { setPref('heavyDay', true); setPref('overloadAsked', today); render(); } }),
+      el('button', { type: 'button', class: 'chip', textContent: 'Справлюсь', onclick: () => { setPref('overloadAsked', today); render(); } })));
+    if (lowMoodNotice(events, today) && (getPref('lowMoodUntil') || '') < today) out.push(hintCard('hint-lowmood', LOW_MOOD_TEXT,
+      el('button', { type: 'button', id: 'hint-lowmood-go', class: 'chip', textContent: 'Что меня заряжает', onclick: () => go('reflect') }),
+      el('button', { type: 'button', id: 'hint-lowmood-hide', class: 'chip', textContent: 'Понятно, напомнить через неделю', onclick: () => { setPref('lowMoodUntil', addDays(today, 7)); render(); } })));
+    hintsBox.replaceChildren(...out);
   }
 
   // ----- форма добавления -----
@@ -185,7 +235,7 @@ export function createTodayView({ go }) {
     toast(`Удалено сделанных: ${ids.length}`, { actionLabel: 'Отменить', onAction: () => store.saveMany(old) });
   };
 
-  root.append(hello, dateLine, summary, onboarding, wotd, focusHost, form, minimum, review, journal, ...Object.values(sections).map(s => s.sec), empty, doneBlock);
+  root.append(hello, dateLine, summary, hintsBox, intentionBox, onboarding, wotd, focusHost, form, minimum, review, journal, ...Object.values(sections).map(s => s.sec), empty, doneBlock);
 
   // ----- элементы списка -----
   async function removeTask(ev) {
@@ -260,30 +310,36 @@ export function createTodayView({ go }) {
   }
 
   function renderSummary(g, today) {
-    const chips = [];
+    const chips = [], opt = [];                       // opt — необязательные чипы: в простом режиме их нет
     chips.push(el('span', { class: 'chip static', textContent: `Задач: ${g.openCount}` }));
     if (g.overdue.length) chips.push(el('span', { class: 'chip static danger', textContent: `Просрочено: ${g.overdue.length}` }));
     const hs = activeHabits(events, today);
     const real = events.filter(e => e.type !== 'profile' && e.type !== 'budget').length;
     const last = getPref('lastBackupAt');
     if (real >= 5 && (!last || Date.now() - last > 14 * 86400000)) chips.push(el('button', { type: 'button', id: 'backup-chip', class: 'chip', textContent: 'Сделай резервную копию', onclick: () => go('more') }));
-    if (hs.length) chips.push(el('button', { type: 'button', class: 'chip', textContent: `Привычки: ${hs.filter(x => x.st.doneToday).length}/${hs.length}`, onclick: () => go('habits') }));
+    const sickNow = !!activeSick(events, today);
+    if (hs.length) chips.push(el('button', { type: 'button', class: 'chip', textContent: sickNow ? 'Привычки: пауза' : `Привычки: ${hs.filter(x => x.st.doneToday).length}/${hs.length}`, onclick: () => go('habits') }));
     const spent = spentBetween(events, today, today);
-    if (spent) chips.push(el('button', { type: 'button', class: 'chip', textContent: `Потрачено сегодня: ${moneyText(spent)}`, onclick: () => go('money') }));
+    if (spent) opt.push(el('button', { type: 'button', class: 'chip', textContent: `Потрачено сегодня: ${moneyText(spent)}`, onclick: () => go('money') }));
     const load = todayLoad(events, today);
-    if (load.due + load.fresh) chips.push(el('button', { type: 'button', id: 'learn-chip', class: 'chip', textContent: `Повторение: ${load.due + load.fresh}`, onclick: () => go('learn') }));
+    if (load.due + load.fresh) opt.push(el('button', { type: 'button', id: 'learn-chip', class: 'chip', textContent: `Повторение: ${load.due + load.fresh}`, onclick: () => go('learn') }));
     if (!events.some(e => e.type === 'checkin' && e.payload.date === today && e.payload.slot === 'm')) chips.push(el('button', { type: 'button', id: 'checkin-chip', class: 'chip', textContent: 'Отметка утра', onclick: () => go('diary') }));
-    if (!events.some(e => e.type === 'testrun' && e.payload.date === today)) chips.push(el('button', { type: 'button', id: 'test-chip', class: 'chip', textContent: 'Проверка дня', onclick: () => go('tests') }));
+    if (!sickNow && !events.some(e => e.type === 'testrun' && e.payload.date === today)) opt.push(el('button', { type: 'button', id: 'test-chip', class: 'chip', textContent: 'Проверка дня', onclick: () => go('tests') }));
     chips.push(el('button', { type: 'button', id: 'heavy-chip', class: 'chip', textContent: getPref('heavyDay') ? 'Тяжёлый день: включён' : 'Тяжёлый день', 'aria-pressed': String(!!getPref('heavyDay')), onclick: () => { setPref('heavyDay', !getPref('heavyDay')); render(); } }));
     const goalsOn = okrsOf(events, 'active');
-    if (goalsOn.length) chips.push(el('button', { type: 'button', id: 'okr-chip', class: 'chip', textContent: `Цели: ${goalsOn.length}${goalsOn.some(g => okrPace(g, today).state === 'behind') ? ' ⚠' : ''}`, onclick: () => go('okr') }));
+    if (goalsOn.length) opt.push(el('button', { type: 'button', id: 'okr-chip', class: 'chip', textContent: `Цели: ${goalsOn.length}${goalsOn.some(g => okrPace(g, today).state === 'behind') ? ' ⚠' : ''}`, onclick: () => go('okr') }));
     const bds = upcomingBirthdays(events, today, 7), dueP = dueContacts(events, today);
-    if (bds.length) chips.push(el('button', { type: 'button', id: 'bday-chip', class: 'chip', textContent: `🎂 ${bds[0].person.payload.name}: ${bds[0].inDays === 0 ? 'сегодня' : bds[0].inDays === 1 ? 'завтра' : `через ${bds[0].inDays} дн.`}${bds.length > 1 ? ` (+${bds.length - 1})` : ''}`, onclick: () => go('people') }));
-    if (dueP.length) chips.push(el('button', { type: 'button', id: 'contact-chip', class: 'chip', textContent: `Написать: ${dueP.length}`, onclick: () => go('people') }));
+    if (bds.length) opt.push(el('button', { type: 'button', id: 'bday-chip', class: 'chip', textContent: `🎂 ${bds[0].person.payload.name}: ${bds[0].inDays === 0 ? 'сегодня' : bds[0].inDays === 1 ? 'завтра' : `через ${bds[0].inDays} дн.`}${bds.length > 1 ? ` (+${bds.length - 1})` : ''}`, onclick: () => go('people') }));
+    if (dueP.length) opt.push(el('button', { type: 'button', id: 'contact-chip', class: 'chip', textContent: `Написать: ${dueP.length}`, onclick: () => go('people') }));
+    const chkDue = checkupsDue(events, today);
+    if (chkDue.length) opt.push(el('button', { type: 'button', id: 'checkup-chip', class: 'chip', textContent: `Профилактика: ${chkDue.length}`, onclick: () => go('health') }));
+    const decDue = decisionsDue(events, today);
+    if (decDue.length) opt.push(el('button', { type: 'button', id: 'decision-chip', class: 'chip', textContent: `Решения: ${decDue.length} пора оценить`, onclick: () => go('reflect') }));
     const fm = focusMinutes(events, today);
-    chips.push(el('button', { type: 'button', id: 'focus-chip', class: 'chip', textContent: fm ? `Фокус: ${fm} мин` : 'Фокус', onclick: () => startFocus() }));
-    if (doneWorkouts(events).length) chips.push(el('button', { type: 'button', id: 'strength-chip', class: 'chip', textContent: `Силовые: ${strengthDays(events, today)}/${WEEKLY_STRENGTH_GOAL}`, onclick: () => go('workouts') }));
-    for (const e of activeExperiments(events, today)) chips.push(el('button', { type: 'button', class: 'chip exp-chip', dataset: { exp: e.id }, textContent: `Эксперимент: фаза ${phaseOf(e.payload, today)}`, onclick: () => go('insights') }));
+    opt.push(el('button', { type: 'button', id: 'focus-chip', class: 'chip', textContent: fm ? `Фокус: ${fm} мин` : 'Фокус', onclick: () => startFocus() }));
+    if (doneWorkouts(events).length) opt.push(el('button', { type: 'button', id: 'strength-chip', class: 'chip', textContent: `Силовые: ${strengthDays(events, today)}/${WEEKLY_STRENGTH_GOAL}`, onclick: () => go('workouts') }));
+    for (const e of activeExperiments(events, today)) opt.push(el('button', { type: 'button', class: 'chip exp-chip', dataset: { exp: e.id }, textContent: `Эксперимент: фаза ${phaseOf(e.payload, today)}`, onclick: () => go('insights') }));
+    if (!getPref('simple')) chips.push(...opt);
     summary.replaceChildren(...chips);
   }
 
@@ -346,12 +402,14 @@ export function createTodayView({ go }) {
     renderWotd(today);
     const g = groupTasks(events, today);
     const heavy = !!getPref('heavyDay');
+    renderIntention(today); renderHints(today, heavy);
     renderMinimum(g, today, heavy);
     for (const key of Object.keys(sections)) {
       sections[key].sec.hidden = heavy || g[key].length === 0;
       sections[key].ul.replaceChildren(...g[key].map(e => item(e, today)));
     }
-    doneBlock.hidden = heavy; review.hidden = heavy; journal.hidden = heavy;
+    const simple = !!getPref('simple');
+    doneBlock.hidden = heavy; review.hidden = heavy || simple; journal.hidden = heavy || simple;
     doneList.replaceChildren(...g.done.slice(0, 50).map(e => item(e, today)));
     doneCount.textContent = g.done.length;
     clearDone.hidden = g.done.length === 0;

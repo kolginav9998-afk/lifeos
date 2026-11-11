@@ -191,6 +191,7 @@ export function parseImport(text) {
   if (!data || data.app !== 'lifeos' || !Array.isArray(data.events)) {
     throw new Error('Это не резервная копия Life OS');
   }
+  if (Number.isFinite(data.schema) && data.schema > SCHEMA_VERSION) throw new Error('Копия сделана более новой версией Life OS. Обнови приложение и восстанови копию снова.');
   if (data.events.length > MAX_IMPORT_EVENTS) throw new Error('Слишком много записей в файле');
   const valid = [];
   let skipped = 0;

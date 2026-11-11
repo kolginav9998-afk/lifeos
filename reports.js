@@ -10,6 +10,7 @@ import { doneWorkouts, strengthDays } from './workouts.js';
 import { focusWeek } from './focus.js';
 import { median, mean, sd, round } from './stats.js';
 import { medsOf, adherence, WHEN } from './meds.js';
+import { sickCount } from './sick.js';
 
 const f1 = v => String(Math.round(v * 10) / 10).replace('.', ',');
 const f0 = v => String(Math.round(v));
@@ -71,6 +72,10 @@ export function monthReport(events, ym, { now = Date.now() } = {}) {
     }
     L.push('');
   }
+
+  // болезнь
+  const sickN = sickCount(events, from, to, today);
+  if (sickN) L.push('## Болезнь', `- Дней в режиме болезни: ${sickN} (привычки и серии в эти дни стояли на паузе)`, '');
 
   // деньги
   const exp = summarizeMonth(events, ym, 'expense'), inc = summarizeMonth(events, ym, 'income'), prevExp = summarizeMonth(events, prevYm, 'expense');
@@ -169,6 +174,8 @@ export function doctorSummary(events, today, { days = 30, now = Date.now() } = {
     if (pulses.length) L.push(`- Пульс: замеров ${pulses.length}, в среднем ${f0(mean(pulses.map(e => e.payload.value)))} уд/мин (от ${Math.min(...pulses.map(e => e.payload.value))} до ${Math.max(...pulses.map(e => e.payload.value))})`);
     L.push('');
   }
+  const sickN = sickCount(events, from, today, today);
+  if (sickN) L.push('## Самочувствие', `- Дней в режиме болезни за период: ${sickN}`, '');
   const sl = sleepPanel(events, today, days, 7);
   if (sl.nights) L.push('## Сон', `- В среднем ${f1(sl.avg)} ч (ночей с отметкой: ${sl.nights}); меньше 7 ч: ${sl.under}`, ...(sl.regularity ? [`- Режим: ${REGULARITY_TEXT[sl.regularity]}`] : []), '');
   const dayList = rangeDays(from, today);

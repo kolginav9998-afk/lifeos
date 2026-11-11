@@ -1,5 +1,6 @@
 // Поиск по всем данным. Без индексов и без ИИ: нормализация + «все слова должны встретиться».
 import { MAX_TEXT } from './events.js';
+import { lessonTitle } from './academy.js';
 
 export function normalize(s) {
   return String(s ?? '').normalize('NFKC').toLowerCase().replace(/ё/g, 'е');
@@ -21,11 +22,20 @@ function searchable(e) {
     case 'experiment': return { kind: 'Эксперимент', title: p.title, text: [p.title, p.change].join(' ') };
     case 'focus': return p.label ? { kind: 'Фокус', title: `${p.label} · ${p.minutes} мин`, text: p.label } : null;
     case 'ucard': return { kind: 'Карточка', title: p.q, text: [p.q, p.a].join(' ') };
+    case 'person': return { kind: 'Человек', title: p.name, text: [p.name, p.note].join(' ') };
+    case 'okr': return { kind: 'Цель квартала', title: p.title, text: [p.title, p.why, ...p.krs.map(k => k.text)].join(' ') };
+    case 'thought': return { kind: 'Мысль', title: p.thought, text: [p.situation, p.thought, p.emotion, p.alt].join(' ') };
+    case 'intention': return { kind: 'Намерение', title: p.text, text: p.text };
+    case 'dayreview': return { kind: 'Обзор дня', title: p.win || p.miss || p.learn || p.date, text: [p.win, p.miss, p.learn, p.date].join(' ') };
+    case 'weekreflect': return { kind: 'Итоги недели', title: p.went || p.blocked || p.change || p.week, text: [p.went, p.blocked, p.change].join(' ') };
+    case 'decision': return { kind: 'Решение', title: p.title, text: [p.title, p.why, p.expect, p.closed?.outcome].join(' ') };
+    case 'lessonnote': return { kind: 'Конспект', title: `${lessonTitle(p.lesson)?.title ?? 'Урок'}: ${p.text}`, text: [lessonTitle(p.lesson)?.title, p.text].join(' ') };
+    case 'joy': return { kind: 'Радость', title: p.text, text: p.text };
     case 'checkin': return p.note ? { kind: p.slot === 'm' ? 'Утро' : 'Вечер', title: p.note, text: [p.note, p.date].join(' ') } : null;
     default: return null;
   }
 }
-export const TAB_OF = { task: 'today', note: 'notes', habit: 'habits', expense: 'money', income: 'money', diary: 'diary', measure: 'health', checkin: 'diary', ucard: 'learn', workout: 'workouts', goal: 'plans', sub: 'plans', experiment: 'insights', focus: 'today' };
+export const TAB_OF = { task: 'today', note: 'notes', habit: 'habits', expense: 'money', income: 'money', diary: 'diary', measure: 'health', checkin: 'diary', ucard: 'learn', workout: 'workouts', goal: 'plans', sub: 'plans', experiment: 'insights', focus: 'today', person: 'people', okr: 'okr', thought: 'health', intention: 'today', dayreview: 'reflect', weekreflect: 'reflect', decision: 'reflect', joy: 'reflect', lessonnote: 'learn' };
 
 export function searchEvents(events, query, limit = 50) {
   const tokens = normalize(query).split(/\s+/).filter(Boolean);

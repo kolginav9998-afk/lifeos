@@ -50,7 +50,7 @@ export function buildTables(events) {
   for (const e of events) if (e.type === 'measure' && e.payload.kind === 'weight') (wt[e.payload.date] ||= []).push(e.payload.value);
   const dayCols = ['date', 'runs', 'composite', ...Object.keys(DOMAINS).map(d => 'z_' + d),
     'sleepHours', 'sleepQuality', 'moodMorning', 'energyMorning', 'stressMorning', 'moodEvening', 'energyEvening', 'stressEvening', 'focus', 'productivity', 'social',
-    'caffeine', 'alcohol', 'water', 'exercise', 'screen', 'outdoors', 'foodScore', 'habitsDone', 'tasksDone', 'focusMin', 'weightKg'];
+    'caffeine', 'alcohol', 'water', 'exercise', 'screen', 'outdoors', 'foodScore', 'habitsDone', 'tasksDone', 'focusMin', 'weightKg', 'sick'];
   const dayRows = days.map(r => ({ ...r, focusMin: focusMinutes(events, r.date), habitsDone: habitsByDate[r.date] ?? 0, tasksDone: tasksByDate[r.date] ?? 0, weightKg: wt[r.date] ? wt[r.date].reduce((a, b) => a + b, 0) / wt[r.date].length : null }));
   T.daily = { cols: dayCols, rows: dayRows };
 
@@ -98,6 +98,7 @@ export const README = `Выгрузка для анализа — Life OS
 
 daily.csv        — одна строка на день: результаты проверок (composite — общий результат, z_* — по областям; в σ относительно твоей же нормы),
                    отметки утром и вечером (сон, настроение, энергия, стресс, кофе, нагрузка и т. д.), число привычек и задач, вес.
+                   Колонка sick = 1 в дни режима болезни: такие дни лучше исключать, когда ищешь связи с образом жизни.
 daily_excel.csv  — то же самое для русского Excel (разделитель «;», запятая в числах).
 test_runs.csv    — одна строка на прохождение проверки: дата, время, режим, самооценка перед проверкой (state_*), главные показатели каждого теста, z и достоверность.
 test_metrics.csv — все метрики всех тестов в «длинном» виде (run_id, test, metric, value, valid).

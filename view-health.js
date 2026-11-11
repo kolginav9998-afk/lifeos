@@ -1,4 +1,5 @@
-import { el, toast, dateRu, sparkline } from './ui.js';
+import { el, fill, toast, dateRu, sparkline } from './ui.js';
+import { createHealthExtras } from './view-health-extra.js';
 import { todayStr } from './events.js';
 import { makeProfile } from './events.js';
 import { MEASURES, makeMeasure, updateMeasure, measureKeys, measuresOf, dailySeries, linearTrend, changeOver, bmi, whtr, bmiNote, whtrNote,
@@ -116,7 +117,8 @@ export function createHealthView() {
   const breathHost = el('div', { id: 'breath-host', class: 'overlay', hidden: true, tabIndex: -1, role: 'dialog', 'aria-modal': 'true', 'aria-label': 'Дыхание' });
   const breathCard = el('div', { class: 'card tight row' }, el('span', { class: 'grow', textContent: 'Дыхание 4–6: успокоиться за пару минут' }),
     el('button', { type: 'button', id: 'breath-start', class: 'chip', textContent: 'Начать', onclick: () => { openBreathing(breathHost); breathHost.focus({ preventScroll: true }); } }));
-  root.append(summary, sleepCard, medsCard, thCard, form, list, empty, hpBox, el('div', { class: 'row' }, csv), breathCard, breathHost);
+  const extras = createHealthExtras();
+  root.append(extras.top, summary, sleepCard, extras.bottom, medsCard, thCard, form, list, empty, hpBox, el('div', { class: 'row' }, csv), breathCard, breathHost);
 
   function renderSummary(today) {
     const hpf = healthProfile(events);
@@ -145,7 +147,7 @@ export function createHealthView() {
     const lines = [`В среднем ${num(p.avg)} ч · лучшая ${num(p.best)} · худшая ${num(p.worst)} (ночей с отметкой: ${p.nights})`,
       `Меньше цели (${num(p.target)} ч): ${p.under} из ${p.nights} ночей${p.debt !== null ? ` · недосып за неделю: ${num(p.debt)} ч` : ''}`];
     if (p.regularity) lines.push(`Режим: ${REGULARITY_TEXT[p.regularity]}${p.bedSd !== null ? `; отбой в среднем ±${Math.round(p.bedSd)} мин` : ''}`);
-    sleepCard.replaceChildren(el('strong', { textContent: 'Сон за 14 дней' }), sparkline(p.days.map(d => d.hours), { width: 280, height: 44 }),
+    fill(sleepCard, el('strong', { textContent: 'Сон за 14 дней' }), sparkline(p.days.map(d => d.hours), { width: 280, height: 44 }),
       ...lines.map(t => el('p', { class: 'muted', textContent: t })),
       p.debt > 2 ? el('p', { class: 'hint', textContent: 'Недосып лучше возвращать постепенно: по 30–60 минут сна в течение нескольких дней, а не одним длинным сном.' }) : null);
   }
@@ -168,7 +170,7 @@ export function createHealthView() {
 
   function renderThoughts() {
     const list = thoughtsOf(events).slice(0, 5), st = reliefStats(events);
-    thCard.replaceChildren(el('strong', { textContent: 'Мысли и эмоции' }), el('p', { class: 'muted', textContent: THOUGHT_NOTE }),
+    fill(thCard, el('strong', { textContent: 'Мысли и эмоции' }), el('p', { class: 'muted', textContent: THOUGHT_NOTE }),
       st ? el('p', { class: 'muted', id: 'th-stats', textContent: `Стало легче ${st.helped} из ${st.n} раз (в среднем на ${String(Math.round(st.avg * 10) / 10).replace('.', ',')} балла из 10).` }) : null,
       thDetails,
       ...list.map(t => el('div', { class: 'th-row', dataset: { id: t.id } }, el('strong', { textContent: `${t.payload.date} · ${t.payload.emotion}` }), el('span', { class: 'muted', textContent: relief(t) !== null ? ` · ${t.payload.before} → ${t.payload.after}` : '' }),
@@ -205,6 +207,7 @@ export function createHealthView() {
 
   function render() {
     const today = todayStr();
+    extras.update(events);
     renderSummary(today);
     renderSleep(today);
     renderMeds(today);

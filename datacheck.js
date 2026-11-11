@@ -4,6 +4,7 @@ import { checkinOf, sleepFromTimes } from './diary.js';
 import { dailySeries } from './health.js';
 import { activeHabits, logsOf } from './habits.js';
 import { runsOf } from './bt-core.js';
+import { unknownTypes } from './registry.js';
 
 const list = (a, n = 5) => a.slice(0, n).join(', ') + (a.length > n ? ` и ещё ${a.length - n}` : '');
 const fmt = x => String(Math.round(x * 10) / 10).replace('.', ',');
@@ -45,6 +46,10 @@ export function dataChecks(events, today) {
   const from = addDays(today, -29);
   const noMorning = [...runDates].filter(d => d >= from && !checkinOf(events, d, 'm')).length;
   if (noMorning >= 3) add('gaps', 'info', `Проверок без утренней отметки за 30 дней: ${noMorning}. Без отметок сна аналитика не найдёт связей.`);
+
+  // записи незнакомых типов: чаще всего созданы более новой версией приложения
+  const unk = unknownTypes(events);
+  if (unk.length) add('unknown-types', 'info', `Есть записи незнакомых типов: ${list(unk.map(u => `${u.type} (${u.count})`))}. Скорее всего, их создала более новая версия приложения. Они сохраняются и ничему не мешают; после обновления приложения станут видны.`);
 
   if (!out.length) add('ok', 'ok', 'Подозрительного не найдено.');
   return out;

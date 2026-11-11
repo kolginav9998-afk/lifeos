@@ -2,6 +2,7 @@
 // Текст уведомлений общий, без названий задач: уведомления видны на экране блокировки и лежат вне шифрования приложения.
 import { todayStr, addDays } from './events.js';
 import { activeHabits } from './habits.js';
+import { isSick } from './sick.js';
 
 export const HORIZON_DAYS = 14;
 export const TASK_ID_BASE = 1000;       // 1000..1013 — задачи
@@ -18,6 +19,7 @@ export function planReminders(events, now, { taskHour = 9, habitHour = 20, eveni
   const today = todayStr(now);
   const open = events.filter(e => e.type === 'task' && !e.payload.done && e.payload.due);
   const habits = activeHabits(events, today);
+  const sickNow = isSick(events, today);                  // в режиме болезни молчат привычки и вечерняя отметка
   const out = [];
   for (let i = 0; i < HORIZON_DAYS; i++) {
     const day = addDays(today, i);
@@ -32,7 +34,7 @@ export function planReminders(events, now, { taskHour = 9, habitHour = 20, eveni
         out.push({ id: TASK_ID_BASE + i, at, title: 'Life OS', body: parts.join(', ') });
       }
     }
-    if (habitHour >= 0 && habits.length) {
+    if (habitHour >= 0 && habits.length && !sickNow) {
       const at = atLocal(day, habitHour);
       const pending = i === 0 ? habits.filter(h => !h.st.doneToday).length : habits.length;
       if (pending && at > now) out.push({ id: HABIT_ID_BASE + i, at, title: 'Life OS', body: 'Привычки на сегодня. Минимум тоже считается.' });
@@ -46,7 +48,7 @@ export function planReminders(events, now, { taskHour = 9, habitHour = 20, eveni
       const at = atLocal(day, weeklyHour);
       if (new Date(y, m - 1, d, 12).getDay() === 0 && at > now) out.push({ id: WEEKLY_ID_BASE + i, at, title: 'Life OS', body: 'Воскресенье: итоги недели и план на следующую.' });
     }
-    if (eveningHour >= 0) {
+    if (eveningHour >= 0 && !sickNow) {
       const at = atLocal(day, eveningHour);
       const marked = i === 0 && events.some(e => e.type === 'checkin' && e.payload.date === day && e.payload.slot === 'e');
       if (!marked && at > now) out.push({ id: EVENING_ID_BASE + i, at, title: 'Life OS', body: 'Вечер: отметка дня и пара карточек на повторение.' });
