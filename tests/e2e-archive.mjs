@@ -40,7 +40,7 @@ assert.match(await text(page, '#archive-box'), /Все твои записи, н
 const plainFile = await download(page, '#export-btn');
 assert.match(path.basename(plainFile), /^lifeos-archive-\d{4}-\d{2}-\d{2}\.json$/);
 const archive = JSON.parse(fs.readFileSync(plainFile, 'utf8'));
-assert.equal(archive.app, 'lifeos'); assert.match(archive.version, /^R3\.\d+$/);
+assert.equal(archive.app, 'lifeos'); assert.match(archive.version, /^R3\.\d+(\.\d+)?$/);
 assert.deepEqual(archive.prefs, { theme: 'dark', fontScale: 1.15, parseDates: true, hideAmounts: false, simple: false, autoLockMin: 5, taskHour: 9, habitHour: 20, eveningHour: 21, bedtimeMin: -1, weeklyHour: -1, quietFrom: -1, quietTo: 7, daysOff: [], backupEveryDays: 14 }, 'настройки в архиве, но без привязанных к устройству');
 assert.ok(archive.events.some(e => e.type === 'skill') && archive.events.some(e => e.type === 'habit_log') && archive.events.filter(e => e.type === 'task').length === 2);
 await until(page, () => /Последний архив: сегодня/.test(document.getElementById('archive-info').textContent) && /Последняя копия: сегодня/.test(document.getElementById('stats').textContent));
