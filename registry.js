@@ -30,11 +30,11 @@ export const REGISTRY = {
   checkup: { label: 'Плановая проверка', group: 'Здоровье', module: 'prevent.js', privacy: 'health', analytics: false, fields: 'name, months, last, createdDate' },
   emergency: { label: 'Данные на экстренный случай', group: 'Здоровье', module: 'emergency.js', privacy: 'health', analytics: false, fields: 'группа крови, аллергии, состояния, лекарства, контакт, телефон, заметка' },
   focus: { label: 'Сессия фокуса', group: 'Дела', module: 'focus.js', privacy: 'numbers', analytics: true, fields: 'date, minutes, planned, completed, label' },
-  lesson: { label: 'Пройденный урок', group: 'Учёба', module: 'academy.js', privacy: 'learning', analytics: true, fields: 'lesson, track, date, minutes' },
+  lesson: { label: 'Пройденный урок', group: 'Учёба', module: 'academy.js', privacy: 'learning', analytics: true, fields: 'lesson, track, date, minutes, revisited' },
   lessonnote: { label: 'Конспект урока', group: 'Учёба', module: 'academy.js', privacy: 'text', analytics: false, fields: 'lesson, text, date' },
   srs: { label: 'Состояние карточки', group: 'Учёба', module: 'srs.js', privacy: 'learning', analytics: true, fields: 'card, box, due, first, last, reps, lapses, hist' },
   speak: { label: 'Говорение вслух', group: 'Учёба', module: 'speaking.js', privacy: 'learning', analytics: false, fields: 'date, lang, seconds, minutes, topic' },
-  ucard: { label: 'Своя карточка', group: 'Учёба', module: 'academy.js', privacy: 'text', analytics: false, fields: 'q, a' },
+  ucard: { label: 'Своя карточка', group: 'Учёба', module: 'academy.js', privacy: 'text', analytics: false, fields: 'q, a, hint' },
   testrun: { label: 'Прохождение проверки', group: 'Проверки', module: 'bt-core.js', privacy: 'numbers', analytics: true, fields: 'date, mode, tests{metrics, trials}, state, startedAt, durationMs' },
   experiment: { label: 'Личный эксперимент', group: 'Проверки', module: 'experiments.js', privacy: 'text', analytics: false, fields: 'title, change, metric, days, blockDays, startDate, order, cancelled' },
   person: { label: 'Человек', group: 'Люди и цели', module: 'people.js', privacy: 'people', analytics: false, fields: 'name, birthday, birthYear, cadenceDays, lastContact, note' },
@@ -71,5 +71,27 @@ export function registryMarkdown() {
     for (const [type, r] of items) L.push(`| \`${type}\` | ${r.label} | ${r.fields} | ${PRIVACY_LABEL[r.privacy]} | ${r.analytics ? 'да' : 'нет'} | \`${r.module}\` |`);
     L.push('');
   }
+  return L.join('\n');
+}
+
+// Связи между типами записей: [родитель, потомок, поле-ссылка, что означает]. Из них строится ER-диаграмма (docs/ER.md).
+export const RELATIONS = [
+  ['habit', 'habit_log', 'habitId', 'отметки привычки по дням'],
+  ['med', 'medlog', 'medId', 'приёмы лекарства'],
+  ['goal', 'goalmove', 'goalId', 'взносы в копилку'],
+  ['lesson', 'lessonnote', 'lesson', 'конспект к пройденному уроку'],
+];
+// Типы, привязанные к календарному дню полем date (в диаграмме идут от узла «день»).
+export const BY_DAY = ['checkin', 'diary', 'measure', 'workout', 'focus', 'thought', 'intention', 'dayreview', 'joy', 'ritual', 'speak', 'breath', 'testrun', 'expense', 'income', 'medlog', 'habit_log', 'lesson'];
+
+export function erMarkdown() {
+  const L = ['# Связи между данными (ER-диаграмма)', '', '_Файл создан из `registry.js` (`RELATIONS` и `BY_DAY`) и сверяется с ним тестом: правь реестр, а не этот файл._', '',
+    'Записи не хранят вложенных копий друг друга: связь идёт по идентификатору или по дате. Диаграмма в формате Mermaid (отображается на GitHub).', '', '```mermaid', 'erDiagram'];
+  for (const [parent, child, field] of RELATIONS) L.push(`  ${parent} ||--o{ ${child} : "${field}"`);
+  for (const t of BY_DAY) L.push(`  day ||--o{ ${t} : "date"`);
+  L.push('```', '', '## Связи по идентификатору', '', '| Родитель | Потомок | Поле | Смысл |', '|---|---|---|---|');
+  for (const [parent, child, field, what] of RELATIONS) L.push(`| \`${parent}\` | \`${child}\` | \`${field}\` | ${what} |`);
+  L.push('', '## Записи по дням', '', 'Эти типы привязаны к дню полем `date`: ' + BY_DAY.map(t => `\`${t}\``).join(', ') + '. Узел «day» условный: отдельной записи «день» нет, день — это просто дата.', '',
+    '## Внутри записи (не отдельные типы)', '', '- `okr` содержит список результатов `krs[]` (текст, цель, текущее значение, единица).', '- `workout` содержит упражнения и подходы `exercises[].sets[]`.', '- `testrun` содержит результаты тестов и отдельные пробы `tests{}.trials[]`.', '- `decision` содержит итог `closed{}` после оценки решения.', '');
   return L.join('\n');
 }

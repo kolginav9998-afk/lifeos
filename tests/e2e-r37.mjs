@@ -144,7 +144,7 @@ assert.match(await text('#rit-progress'), /Сделано: 0 из 6/, 'без о
 // ---------- заготовки: привычки и заметка с покупками ----------
 await tab(page, 'habits');
 await page.locator('#habit-add').evaluate(d => { d.open = true; });
-assert.equal(await page.locator('#habit-templates .tpl').count(), 8);
+assert.equal(await page.locator('#habit-templates .tpl').count(), 9);
 await page.click('#habit-templates .tpl:has-text("Свет утром")');
 assert.equal(await page.inputValue('#habit-name'), 'Свет утром'); assert.match(await page.inputValue('#habit-full'), /10 минут на дневном свету/);
 await tab(page, 'notes');

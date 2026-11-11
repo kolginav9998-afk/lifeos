@@ -86,7 +86,7 @@ test('курсы: id карточек уникальны во всей акад�
   assert.equal(new Set(lessons.map(l => l.id)).size, lessons.length, 'id уроков уникальны');
   assert.ok(lessons.length >= 90, `уроков: ${lessons.length}`);
   assert.ok(all.length >= 700, `карточек: ${all.length}`);
-  assert.equal(trackById('english').lessons.length, 12);
+  assert.equal(trackById('english').lessons.length, 16);
   assert.ok(trackById('english').deck.length >= 150);
   assert.equal(trackById('nope'), null);
 });
@@ -118,7 +118,7 @@ test('академия: прогресс по урокам и доступные
   assert.equal(events[0].id, `lesson:${l1.id}`);
   assert.ok(doneLessons(events).has(l1.id));
   const p = trackProgress(t, events, D);
-  assert.equal(p.lessons, 1); assert.equal(p.lessonsTotal, 12);
+  assert.equal(p.lessons, 1); assert.equal(p.lessonsTotal, 16);
 });
 test('академия: события карточек, свои карточки и даты занятий', () => {
   const t = trackById('hebrew');

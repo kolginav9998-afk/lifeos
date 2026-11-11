@@ -1,4 +1,4 @@
-import { el, toast, dateRu, moneyText, weekdayOf } from './ui.js';
+import { el, fill, toast, dateRu, moneyText, weekdayOf } from './ui.js';
 import { makeTask, updateTask, completeTask, reopenTask, groupTasks, todayStr, addDays, dueLabel, repeatLabel, profileOf } from './events.js';
 import { parseQuick } from './quick.js';
 import { getPref, setPref } from './prefs.js';
@@ -18,6 +18,7 @@ import { makeIntention, intentionOf, decisionsDue, lowMoodNotice, LOW_MOOD_TEXT 
 import { lightDayHint, overloadHint, caffeineHint } from './hints.js';
 import { activeSick, startSick, endSick } from './sick.js';
 import { checkupsDue } from './prevent.js';
+import { planDay, planText, rankTasks } from './planday.js';
 import * as vault from './vault.js';
 import * as store from './store.js';
 
@@ -130,6 +131,18 @@ export function createTodayView({ go }) {
     hintsBox.replaceChildren(...out);
   }
 
+  // план дня: предложение по порядку и времени (не сохраняется)
+  const planCard = el('details', { id: 'plan-day', class: 'card', hidden: true });
+  function renderPlan(today) {
+    const d = new Date(), plan = planDay(events, today, { nowMinutes: d.getHours() * 60 + d.getMinutes() });
+    planCard.hidden = !plan.items.length || !!getPref('simple');
+    if (planCard.hidden) { planCard.replaceChildren(); return; }               // текст задач не должен оставаться в скрытой разметке (при блокировке тоже)
+    fill(planCard, el('summary', { textContent: 'План дня (предложение)' }),
+      el('ul', { class: 'plain plan-list' }, ...plan.items.map(i => el('li', { class: 'plan-row', dataset: { kind: i.kind } }, el('strong', { textContent: `${i.from}–${i.to}` }), ` ${i.text}`))),
+      plan.dropped.length ? el('p', { class: 'muted', textContent: `Не уместилось до вечера: ${plan.dropped.join('; ')}` }) : null,
+      el('button', { type: 'button', id: 'plan-copy', class: 'chip', textContent: 'Скопировать', onclick: () => { navigator.clipboard?.writeText(planText(plan, today)).then(() => toast('План скопирован'), () => toast('Не удалось скопировать')); } }));
+  }
+
   // ----- форма добавления -----
   const input = el('input', { id: 'add-input', type: 'text', placeholder: 'Задача, расход или замер…', enterKeyHint: 'done', maxLength: 500, required: true, autocomplete: 'off' });
   const addBtn = el('button', { type: 'submit', 'aria-label': 'Добавить', textContent: '+' });
@@ -239,7 +252,7 @@ export function createTodayView({ go }) {
     toast(`Удалено сделанных: ${ids.length}`, { actionLabel: 'Отменить', onAction: () => store.saveMany(old) });
   };
 
-  root.append(hello, dateLine, summary, hintsBox, intentionBox, onboarding, wotd, focusHost, form, minimum, review, journal, ...Object.values(sections).map(s => s.sec), empty, doneBlock);
+  root.append(hello, dateLine, summary, hintsBox, intentionBox, planCard, onboarding, wotd, focusHost, form, minimum, review, journal, ...Object.values(sections).map(s => s.sec), empty, doneBlock);
 
   // ----- элементы списка -----
   async function removeTask(ev) {
@@ -380,9 +393,7 @@ export function createTodayView({ go }) {
   function renderMinimum(g, today, heavy) {
     minimum.hidden = !heavy;
     if (!heavy) return;
-    const open = events.filter(e => e.type === 'task' && !e.payload.done);
-    const rank = e => (e.payload.priority === 'high' ? 0 : 4) + (!e.payload.due ? 3 : e.payload.due < today ? 0 : e.payload.due === today ? 1 : 2);
-    const pick = [...open].sort((a, b) => rank(a) - rank(b) || (a.payload.due || '9').localeCompare(b.payload.due || '9') || a.ts - b.ts).slice(0, 3);
+    const pick = rankTasks(events, today).slice(0, 3);
     minList.replaceChildren(...(pick.length ? pick.map(e => item(e, today)) : [el('li', { class: 'muted', textContent: 'Задач нет. Отдохни.' })]));
   }
   const moveOverdue = el('button', { type: 'button', id: 'move-overdue', class: 'chip', textContent: 'Перенести всё на сегодня', onclick: async () => {
@@ -406,7 +417,7 @@ export function createTodayView({ go }) {
     renderWotd(today);
     const g = groupTasks(events, today);
     const heavy = !!getPref('heavyDay');
-    renderIntention(today); renderHints(today, heavy);
+    renderIntention(today); renderHints(today, heavy); renderPlan(today);
     renderMinimum(g, today, heavy);
     for (const key of Object.keys(sections)) {
       sections[key].sec.hidden = heavy || g[key].length === 0;

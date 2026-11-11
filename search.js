@@ -21,7 +21,7 @@ function searchable(e) {
     case 'sub': return { kind: 'Подписка', title: p.name, text: p.name };
     case 'experiment': return { kind: 'Эксперимент', title: p.title, text: [p.title, p.change].join(' ') };
     case 'focus': return p.label ? { kind: 'Фокус', title: `${p.label} · ${p.minutes} мин`, text: p.label } : null;
-    case 'ucard': return { kind: 'Карточка', title: p.q, text: [p.q, p.a].join(' ') };
+    case 'ucard': return { kind: 'Карточка', title: p.q, text: [p.q, p.a, p.hint].join(' ') };
     case 'person': return { kind: 'Человек', title: p.name, text: [p.name, p.note].join(' ') };
     case 'okr': return { kind: 'Цель квартала', title: p.title, text: [p.title, p.why, ...p.krs.map(k => k.text)].join(' ') };
     case 'thought': return { kind: 'Мысль', title: p.thought, text: [p.situation, p.thought, p.emotion, p.alt].join(' ') };

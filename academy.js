@@ -1,5 +1,6 @@
 // Академия: учебные программы (треки), карточки для повторения и прогресс. Содержимое лежит в файлах c-*.js.
-import english from './c-english.js';
+import englishBase from './c-english.js';
+import englishWords from './c-english-words.js';
 import hebrew from './c-hebrew.js';
 import backend from './c-backend.js';
 import data from './c-data.js';
@@ -12,6 +13,7 @@ import { daysBetween } from './events.js';
 import { isSick } from './sick.js';
 import { makeRng } from './stats.js';
 
+const english = { ...englishBase, deck: [...(englishBase.deck || []), ...englishWords] };   // колода слов лежит в отдельном файле (бюджет размера файла)
 export const TRACKS = [english, hebrew, health, ai, backend, data, analyst, engineer];
 export const trackById = id => TRACKS.find(t => t.id === id) || null;
 export const MY_TRACK = { id: 'my', title: 'Свои карточки', icon: '★', color: '#a16207' };
@@ -37,7 +39,7 @@ export const allBuiltinCards = () => TRACKS.flatMap(cardsOfTrack);
 
 // Карточки пользователя — события типа ucard.
 export const userCards = events => events.filter(e => e.type === 'ucard')
-  .map(e => ({ id: `u:${e.id}`, track: 'my', kind: 'user', q: e.payload.q, a: e.payload.a, evId: e.id }))
+  .map(e => ({ id: `u:${e.id}`, track: 'my', kind: 'user', q: e.payload.q, a: e.payload.a, hint: e.payload.hint || '', evId: e.id }))
   .sort((a, b) => a.id.localeCompare(b.id));
 
 export const cardPool = events => [...allBuiltinCards(), ...userCards(events)];
@@ -59,10 +61,10 @@ export function makeLessonDone(track, lesson, date, now = Date.now()) {
 export function makeSrsEvent(state, now = Date.now()) {
   return { id: srsId(state.card), type: 'srs', ts: now, payload: state, source: 'manual', confidence: 1, evidence: [] };
 }
-export function makeUserCard(q, a, now = Date.now(), id = null) {
-  const cq = String(q ?? '').trim().slice(0, 300), ca = String(a ?? '').trim().slice(0, 500);
+export function makeUserCard(q, a, now = Date.now(), id = null, hint = '') {
+  const cq = String(q ?? '').trim().slice(0, 300), ca = String(a ?? '').trim().slice(0, 500), ch = String(hint ?? '').trim().slice(0, 200);
   if (!cq || !ca) throw new Error('Заполни вопрос и ответ');
-  return { id: id || `ucard:${now.toString(36)}${Math.random().toString(36).slice(2, 8)}`, type: 'ucard', ts: now, payload: { q: cq, a: ca }, source: 'manual', confidence: 1, evidence: [] };
+  return { id: id || `ucard:${now.toString(36)}${Math.random().toString(36).slice(2, 8)}`, type: 'ucard', ts: now, payload: { q: cq, a: ca, ...(ch ? { hint: ch } : {}) }, source: 'manual', confidence: 1, evidence: [] };
 }
 
 export function trackProgress(track, events, today) {
@@ -218,6 +220,39 @@ export function quizFor(track, lesson, { seed = Date.now(), n = 3, options = 4 }
     return { q: c.q, options: all, answer: all.indexOf(c.a) };
   });
 }
+
+
+// ---------- вид карточки в повторении ----------
+// Колода слов английского и иврита: хорошо выученные слова иногда спрашиваем в обратную сторону (перевод → слово),
+// а транскрипцию иврита скрываем (её можно показать кнопкой). Оценка и расписание от этого не меняются.
+const HEBREW_BACK = /^([а-яё' -]+) — (.+)$/i;
+export function cardFace(card, state, today) {
+  let front = card.q, back = card.a, reversed = false, translit = null;
+  if (card.kind === 'deck' && (card.track === 'english' || card.track === 'hebrew')) {
+    const box = state?.box ?? 0;
+    const heb = card.track === 'hebrew' ? HEBREW_BACK.exec(card.a) : null;
+    const meaning = heb ? heb[2] : card.a;
+    const foreign = card.track === 'hebrew' ? /[\u0590-\u05FF]/.test(card.q) : /^[A-Za-z][A-Za-z' -]*$/.test(card.q);
+    const textual = !/ — /.test(meaning) && /[А-Яа-яЁё]/.test(meaning) && meaning.length <= 60;      // длинные пояснения (корни, фразы) не переворачиваем
+    if (foreign && textual && box >= 2 && parseInt(fnv(card.id + today), 36) % 2 === 0) {
+      reversed = true; front = meaning; back = heb ? `${card.q} (${heb[1]})` : card.q;
+    } else if (heb && box >= 3) { translit = heb[1]; back = meaning; }
+  }
+  return { front, back, reversed, translit };
+}
+
+// ---------- возвращение к пройденным урокам ----------
+// Через 30 дней после прохождения (или прошлого повторения) предлагаем вернуться к уроку. Берём самый давний.
+export const REVISIT_DAYS = 30;
+export function lessonToRevisit(events, today) {
+  const due = events.filter(e => e.type === 'lesson' && lessonTitle(e.payload.lesson))
+    .map(e => ({ ev: e, since: e.payload.revisited || e.payload.date })).filter(x => daysBetween(x.since, today) >= REVISIT_DAYS)
+    .sort((a, b) => a.since.localeCompare(b.since) || a.ev.payload.lesson.localeCompare(b.ev.payload.lesson));
+  if (!due.length) return null;
+  const { ev, since } = due[0];
+  return { ev, lesson: ev.payload.lesson, track: ev.payload.track, days: daysBetween(since, today), count: due.length };
+}
+export const markRevisited = (ev, date) => ({ ...ev, payload: { ...ev.payload, revisited: date } });
 
 export { newState, isDue };
 

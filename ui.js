@@ -56,6 +56,9 @@ export function toast(message, { actionLabel, onAction, ms = 5000 } = {}) {
   toastTimer = setTimeout(() => { box.hidden = true; }, ms);
 }
 
+// Убрать сообщение (например, при блокировке: в тексте сообщения могут быть названия дел и суммы).
+export function clearToast() { clearTimeout(toastTimer); const box = $('toast'); if (box) { box.hidden = true; box.replaceChildren(); } }
+
 const MONTHS_SHORT = ['янв', 'фев', 'мар', 'апр', 'мая', 'июн', 'июл', 'авг', 'сен', 'окт', 'ноя', 'дек'];
 export function dateRu(ymd) { const [, m, d] = ymd.split('-').map(Number); return `${d} ${MONTHS_SHORT[m - 1]}`; }
 

@@ -1,7 +1,7 @@
 // Аналитика результатов проверок: личная норма, отклонения, домены, связи с образом жизни, подсказки.
 // Принципы: сравнение только с самим собой; устойчивая статистика (медиана/MAD); поправка на множественные сравнения;
 // формулировки осторожные — это наблюдения, а не диагнозы и не доказанные причины.
-import { mean, median, mad, robustZ, spearmanTest, slopeCI, round } from './stats.js';
+import { mean, median, mad, robustZ, spearmanTest, slopeCI, makeRng, round } from './stats.js';
 import { TESTS, TEST_BY_ID, DOMAINS, primaryShown, runsOf, fmtNum, fmtPrimary } from './bt-core.js';
 import { dailyTable } from './diary.js';
 import { addDays, todayStr } from './events.js';
@@ -215,6 +215,9 @@ export function insights(events, now = Date.now()) {
   if (up.length >= 2 && !down.length) out.push({ id: 'trend', kind: 'good', conf: 'mid', title: 'Результаты растут', text: `По нескольким тестам (${up.join(', ')}) за последние прохождения устойчивый рост. Часть роста — привыкание к самим тестам; ещё лучший знак, если растёт и «усвоение знаний».` });
   if (down.length >= 2 && !up.length) out.push({ id: 'trend', kind: 'warn', conf: 'mid', title: 'Результаты снижаются', text: `По нескольким тестам (${down.join(', ')}) за последние прохождения устойчивое снижение. Проверь сон, нагрузку и стресс за эти дни; если усталость копится — запланируй отдых.` });
 
+  // 4а. Дрейф нормы и дни недели
+  out.push(...driftInsights(runs, todayStr(now)));
+
   // 5. Связи с образом жизни (с поправкой на множественные сравнения)
   const rowsOk = rows.filter(r => !r.sick);                         // болезнь искажает связи: такие дни не берём
   const cors = correlations(rowsOk).filter(c => c.q <= FDR_LIMIT && Math.abs(c.rho) >= 0.3);
@@ -234,6 +237,9 @@ export function insights(events, now = Date.now()) {
   }
   if (!cors.length && rowsOk.length >= 14) out.push({ id: 'no-relations', kind: 'info', conf: 'mid', title: 'Устойчивых связей пока нет', text: 'С отметками дня (сон, кофе, нагрузка) убедительных связей не найдено. Это нормально: чем дольше ведёшь отметки, тем точнее картина.' });
   if (runs.length > 0 && rowsOk.filter(r => Number.isFinite(r.composite) && Number.isFinite(r.sleepHours)).length < MIN_PAIRS && days >= 3) out.push({ id: 'need-checkins', kind: 'info', conf: 'high', title: 'Добавь утренние отметки сна', text: `Для поиска связей нужно хотя бы ${MIN_PAIRS} дней, где есть и проверка, и отметка сна (раздел «Дневник»). Сейчас таких дней: ${rows.filter(r => Number.isFinite(r.composite) && Number.isFinite(r.sleepHours)).length}.` });
+
+  const wdIns = weekdayInsight(rowsOk);
+  if (wdIns) out.push(wdIns);
 
   // 6. Время суток
   const tod = timeOfDay(an.perRun);
@@ -271,4 +277,64 @@ export function selfCompare(events) {
   if (days.length < 2) return null;
   const last = days.at(-1), prev = days.at(-2), best = days.reduce((b, d) => (d.value > b.value ? d : b));
   return { last, prev, best, diff: last.value - prev.value, days: days.length, isBest: days.length >= 3 && last.date === best.date };
+}
+
+// ---------- дни недели ----------
+const WD_IN = ['в воскресенье', 'в понедельник', 'во вторник', 'в среду', 'в четверг', 'в пятницу', 'в субботу'];
+const wdOf = ymd => { const [y, m, d] = ymd.split('-').map(Number); return new Date(y, m - 1, d).getDay(); };
+// Различается ли общий результат по дням недели. Критерий: размах медиан по дням против перемешанных меток (перестановки, зерно фиксировано).
+export function weekdayEffect(rows, { minPerDay = 3, minDays = 4, permutations = 1000, seed = 21 } = {}) {
+  const groups = new Map();
+  for (const r of rows) {
+    if (!Number.isFinite(r.composite)) continue;
+    const wd = wdOf(r.date);
+    if (!groups.has(wd)) groups.set(wd, []);
+    groups.get(wd).push(r.composite);
+  }
+  const ok = [...groups].filter(([, v]) => v.length >= minPerDay);
+  if (ok.length < minDays) return null;
+  const sizes = ok.map(([, v]) => v.length), all = ok.flatMap(([, v]) => v);
+  const spread = gs => { const m = gs.map(g => median(g)); return Math.max(...m) - Math.min(...m); };
+  const obs = spread(ok.map(([, v]) => v));
+  const rng = makeRng(seed);
+  let ge = 0;
+  for (let i = 0; i < permutations; i++) {
+    const sh = rng.shuffle(all); let k = 0;
+    if (spread(sizes.map(n => { const g = sh.slice(k, k + n); k += n; return g; })) >= obs - 1e-12) ge++;
+  }
+  const days = ok.map(([weekday, v]) => ({ weekday, n: v.length, median: median(v) })).sort((a, b) => b.median - a.median);
+  return { p: (ge + 1) / (permutations + 1), spread: obs, best: days[0], worst: days[days.length - 1], days, n: all.length };
+}
+export function weekdayInsight(rows) {
+  const w = weekdayEffect(rows);
+  if (!w || w.n < 20 || w.p >= 0.05 || w.spread < 0.5) return null;
+  const sg = v => `${v > 0 ? '+' : v < 0 ? '−' : ''}${fmtNum(Math.abs(v), 1)}σ`;
+  return { id: 'weekday', kind: 'info', conf: w.p < 0.01 ? 'mid' : 'low', title: 'Результат зависит от дня недели',
+    text: `Лучше всего ${WD_IN[w.best.weekday]} (${sg(w.best.median)}, дней: ${w.best.n}), хуже всего ${WD_IN[w.worst.weekday]} (${sg(w.worst.median)}, дней: ${w.worst.n}). Это наблюдение по твоим данным (${w.p < 0.01 ? 'p < 0,01' : `p = ${fmtNum(w.p, 2)}`}): посмотри, чем эти дни отличаются по сну, нагрузке и режиму.` };
+}
+
+// ---------- дрейф нормы ----------
+// Сместилось ли «обычное»: медиана последних 14 дней против предыдущих 30. Размер сдвига измеряем в разбросе (MAD) прежних результатов.
+export const DRIFT_RECENT = 14, DRIFT_BASE = 30;
+export function normDrift(runs, testId, today) {
+  const s = seriesOf(runs, testId);
+  const from = addDays(today, -(DRIFT_RECENT - 1)), baseFrom = addDays(from, -DRIFT_BASE);
+  const recent = s.filter(p => p.date >= from && p.date <= today), base = s.filter(p => p.date >= baseFrom && p.date < from);
+  if (recent.length < 4 || base.length < 8) return null;
+  const rb = recent.map(p => orient(testId, p.value)), bb = base.map(p => orient(testId, p.value));
+  const bm = median(bb), scale = Math.max(1.4826 * mad(bb), Math.abs(bm) * 0.05, 1e-9);
+  const shift = (median(rb) - bm) / scale;                               // в единицах разброса; > 0 — лучше прежнего
+  const z = shift * Math.sqrt(recent.length);                           // медиана нескольких результатов шумит меньше одного
+  return { testId, shift, z, nRecent: recent.length, nBase: base.length, recent: median(recent.map(p => p.value)), base: median(base.map(p => p.value)) };
+}
+export function driftInsights(runs, today, limit = 2) {
+  const out = [];
+  for (const t of TESTS) {
+    const d = normDrift(runs, t.id, today);
+    if (!d || Math.abs(d.shift) < 0.7 || Math.abs(d.z) < 2.5) continue;
+    out.push({ d, t });
+  }
+  return out.sort((a, b) => Math.abs(b.d.z) - Math.abs(a.d.z)).slice(0, limit).map(({ d, t }) => ({
+    id: `drift-${t.id}`, kind: d.shift > 0 ? 'good' : 'warn', conf: 'mid', title: `«${t.title}»: обычный уровень ${d.shift > 0 ? 'вырос' : 'снизился'}`,
+    text: `За последние ${DRIFT_RECENT} дней типичный результат ${fmtPrimary(t.id, { [t.primary.key]: d.recent / (t.primary.scale ?? 1) })} против ${fmtPrimary(t.id, { [t.primary.key]: d.base / (t.primary.scale ?? 1) })} за предыдущие ${DRIFT_BASE} дней (сдвиг ${fmtNum(Math.abs(d.shift), 1)} от обычного разброса, результатов: ${d.nRecent} и ${d.nBase}). ${d.shift > 0 ? 'Похоже, что-то из режима работает: запомни, что менял.' : 'Проверь сон, нагрузку и стресс за эти недели: возможно, сместился режим.'}` }));
 }

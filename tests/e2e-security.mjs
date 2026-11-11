@@ -84,11 +84,45 @@ assert.equal(await page.locator('#lock-top').isVisible(), true, 'кнопка «
 // =====================================================================
 // 2. Блокировка, неверный пароль, перебор
 // =====================================================================
-await page.click('#lock-top');
+// Личные данные всех видов и открытые окна: после блокировки в странице не должно остаться ни следа
+await page.evaluate(async () => {
+  const store = await import('./store.js'); const ev = await import('./events.js'); const dr = await import('./diary.js'); const rf = await import('./reflect.js');
+  const th = await import('./thoughts.js'); const pe = await import('./people.js'); const ok = await import('./okr.js'); const me = await import('./meds.js'); const pv = await import('./prevent.js');
+  const em = await import('./emergency.js'); const ac = await import('./academy.js'); const hl = await import('./health.js'); const hb = await import('./habits.js'); const mo = await import('./money.js');
+  const pl = await import('./planning.js'); const fo = await import('./focus.js'); const sp = await import('./speaking.js'); const sk = await import('./sick.js');
+  const today = ev.todayStr(), now = Date.now(), Z = 'зюзя';
+  const lesson = ac.TRACKS[0].lessons[0];
+  await store.saveMany([
+    dr.makeDiary(today, { text: Z + ' дневник', highlight: Z + ' главное', gratitude: [Z + ' спасибо'] }, now), dr.makeCheckin('e', today, { mood: 3, note: Z + ' заметка вечера' }, Z + ' заметка вечера', now),
+    rf.makeIntention(today, Z + ' намерение', now), rf.makeDayReview(today, { win: Z + ' обзор' }, now), rf.makeWeekReflection(today, { went: Z + ' неделя' }, now),
+    rf.makeDecision({ title: Z + ' решение', why: Z + ' почему', expect: Z + ' ожидание' }, now), rf.makeJoy({ text: Z + ' радость' }, now), rf.makeCharger(Z + ' заряжает', now),
+    th.makeThought({ situation: Z + ' ситуация', thought: Z + ' мысль', emotion: 'грусть', alt: Z + ' иначе' }, now), pe.makePerson({ name: 'Зюзя Человек', note: Z + ' про человека' }, now),
+    ok.makeOkr({ title: Z + ' цель квартала', why: Z + ' зачем', krs: [{ text: Z + ' результат', target: '5', unit: 'шт' }] }, now), me.makeMed({ name: Z + '-витамин', dose: Z + ' доза', when: 'morning' }, now),
+    pv.makeCheckup({ name: Z + '-врач', months: 12 }, now), em.makeEmergency({ allergies: Z + ' аллергия', contactName: 'Зюзя', contactPhone: '+7 900 111-22-33' }, now),
+    ac.makeLessonNote(lesson.id, Z + ' конспект урока', today, now), ac.makeUserCard(Z + ' вопрос', Z + ' ответ', now, 'ucard:z', Z + ' ассоциация'),
+    hl.makeMeasure({ kind: 'custom', name: Z + '-показатель', value: '5', unit: 'шт' }, now), hb.makeHabit({ name: Z + '-привычка', anchor: Z + ' якорь', identity: Z + ' идентичность' }, now),
+    mo.makeExpense({ amount: 12345, category: 'Еда', note: Z + ' расход', date: today }, now), pl.makeSub({ name: Z + '-подписка', amountMinor: 10000 }, now), pl.makeGoal({ title: Z + '-копилка', targetMinor: 100000 }, now),
+    fo.makeFocus({ date: today, minutes: 30, label: Z + ' фокус' }, now), sp.makeSpeak({ lang: 'english', seconds: 300, topic: Z + ' тема' }, now),
+  ]);
+});
+for (const id of ['today', 'habits', 'people', 'diary', 'health', 'workouts', 'notes', 'reflect', 'learn', 'tests', 'insights', 'okr', 'money', 'plans', 'more']) await tab(page, id);
+await until(page, () => /зюзя/.test(document.getElementById('app').textContent), null, 5000).catch(() => {});
+const shown = await page.evaluate(() => document.getElementById('app').textContent.toLowerCase().split('зюзя').length - 1);
+assert.ok(shown >= 8, `перед блокировкой данные видны в разметке (${shown})`);
+// открытые окна с личным текстом: свободное письмо, экстренные данные, говорение (кнопки нажимаем из кода: окна закрывают экран)
+const clickJs = sel => page.evaluate(q => document.querySelector(q).click(), sel);
+await tab(page, 'diary'); await page.click('#fw-open'); await page.click('#fw-go'); await page.fill('#fw-text', 'зюзя пишу свободно');
+await clickJs('#subnav button[data-view="health"]'); await until(page, () => !document.getElementById('view-health').hidden);
+await clickJs('#em-show'); await until(page, () => !document.getElementById('em-overlay').hidden);
+await clickJs('#tabs button[data-tab="grow"]'); await until(page, () => !document.getElementById('view-learn').hidden);
+await clickJs('#speak-english'); await until(page, () => !document.getElementById('speak-host').hidden);
+await page.evaluate(() => document.getElementById('lock-top').click());                 // кнопка закрыта окном, как и при автоблокировке по таймеру
 await until(page, () => !document.getElementById('lock').hidden);
 assert.equal(await page.locator('#app').isVisible(), false);
 let body = await page.evaluate(() => document.body.textContent);
 assert.ok(!body.includes('секретная') && !body.includes('сейфа') && !body.includes('затея'), 'в странице нет данных, пока заблокировано');
+const left = await page.evaluate(() => ({ text: document.body.textContent.toLowerCase().includes('зюзя'), values: [...document.querySelectorAll('input,textarea')].some(i => i.value.toLowerCase().includes('зюзя')), html: document.body.innerHTML.toLowerCase().includes('зюзя') }));
+assert.deepEqual(left, { text: false, values: false, html: false }, 'после блокировки в странице не осталось личных данных (текст, поля ввода, разметка)');
 
 await page.fill('#lock-input', 'проверка-показа');
 await page.click('#lock-reveal');

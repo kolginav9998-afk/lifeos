@@ -18,7 +18,7 @@ assert.equal(await page.locator('#tabs button').count(), 5);
 
 // ---------- курс: наставник, уроки ----------
 await page.click('.track-card[data-track="english"]');
-assert.equal(await page.locator('.lesson').count(), 12);
+assert.equal(await page.locator('.lesson').count(), 16);
 await page.click('#mentor summary');
 await page.click('#mentor button[data-prompt="0"]');
 await toast(/Скопировано/);
@@ -29,7 +29,7 @@ await page.click('button[data-done="en-01"]');
 await toast(/Урок пройден/);
 assert.equal(await page.getAttribute('.lesson[data-lesson="en-01"]', 'open'), '', 'урок остался раскрытым после отметки');
 assert.match(await text('.lesson[data-lesson="en-01"] .lesson-n'), /✓/);
-assert.match(await text('#view-learn'), /Уроки 1\/12/);
+assert.match(await text('#view-learn'), /Уроки 1\/16/);
 
 // ---------- сессия повторения ----------
 const startText = await text('#track-start');
@@ -51,7 +51,7 @@ await page.click('#sess-done');
 assert.equal(await page.isVisible('#sess'), false);
 
 // на сегодня всё: новых больше нет (лимит), повторять рано
-assert.match(await text('#view-learn'), /Уроки 1\/12/);
+assert.match(await text('#view-learn'), /Уроки 1\/16/);
 await page.click('#learn-back');
 assert.equal(await text('#learn-count'), '0');
 assert.match(await text('#learn-streak'), /Занятий подряд: 1 дн\./);

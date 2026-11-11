@@ -64,11 +64,11 @@ _Файл создан из `registry.js` и сверяется с ним тес
 
 | Тип | Что это | Поля | Приватность | В выгрузке | Модуль |
 |---|---|---|---|---|---|
-| `lesson` | Пройденный урок | lesson, track, date, minutes | учёба | да | `academy.js` |
+| `lesson` | Пройденный урок | lesson, track, date, minutes, revisited | учёба | да | `academy.js` |
 | `lessonnote` | Конспект урока | lesson, text, date | личный текст | нет | `academy.js` |
 | `srs` | Состояние карточки | card, box, due, first, last, reps, lapses, hist | учёба | да | `srs.js` |
 | `speak` | Говорение вслух | date, lang, seconds, minutes, topic | учёба | нет | `speaking.js` |
-| `ucard` | Своя карточка | q, a | личный текст | нет | `academy.js` |
+| `ucard` | Своя карточка | q, a, hint | личный текст | нет | `academy.js` |
 
 ## Проверки
 

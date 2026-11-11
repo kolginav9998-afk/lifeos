@@ -45,7 +45,7 @@ test('слои: логика не импортирует экраны, инте�
   const UI_LAYER = new Set(['ui.js', 'store.js', 'db.js', 'platform.js', 'vault.js', 'app.js', 'app-sync.js', 'notify.js', 'errlog.js']);
   const PURE = ['events.js', 'stats.js', 'srs.js', 'habits.js', 'money.js', 'health.js', 'diary.js', 'reflect.js', 'sick.js', 'prevent.js', 'emergency.js', 'bp.js', 'hints.js', 'registry.js', 'writing.js', 'speech.js',
     'reports.js', 'export.js', 'planning.js', 'people.js', 'okr.js', 'academy.js', 'bt-core.js', 'bt-logic.js', 'bt-analytics.js', 'bt-export.js', 'capture.js', 'quick.js', 'ics.js', 'datacheck.js', 'search.js',
-    'journal.js', 'review.js', 'reminders.js', 'meds.js', 'notes.js', 'thoughts.js', 'experiments.js', 'zip.js', 'cryptoutil.js'];
+    'journal.js', 'planday.js', 'review.js', 'reminders.js', 'meds.js', 'notes.js', 'thoughts.js', 'experiments.js', 'zip.js', 'cryptoutil.js'];
   const bad = [];
   for (const f of PURE) {
     assert.ok(graph.has(f), `${f}: файла нет`);

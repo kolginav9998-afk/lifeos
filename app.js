@@ -1,5 +1,5 @@
 import { install as installErrLog } from './errlog.js';
-import { $, el, icon, toast } from './ui.js';
+import { $, el, icon, toast, clearToast } from './ui.js';
 
 installErrLog();
 import * as vault from './vault.js';
@@ -156,7 +156,8 @@ function showLock() {
   $('lock-input').value = ''; $('lock-input').type = 'password'; $('lock-reveal').textContent = 'показать';
   $('lock-msg').textContent = '';
   $('forgot').open = false; $('reset-confirm').value = ''; $('reset-btn').disabled = true;
-  views.more?.reset();
+  clearToast();
+  if (navReady) { buildViews(); go(current); }
   closeSearch();
   updateLockout();
   $('lock-input').focus();
@@ -254,6 +255,16 @@ function handleUrlParams() {
 }
 
 // ---------- сборка интерфейса ----------
+// Экраны создаются заново и при блокировке: в скрытых экранах и открытых окнах не должно оставаться личных данных.
+function buildViews() {
+  const main = $('view'), ctx = { go, lockNow, applyTheme, applyMode, onVaultChange: updateLockButton, openAccount: () => go('account'), exportCsv: () => views.more.exportCsv() };
+  for (const d of DEFS) {
+    const v = d.make(ctx);
+    if (views[d.id]) views[d.id].root.replaceWith(v.root); else main.append(v.root);
+    views[d.id] = v;
+  }
+  for (const v of Object.values(views)) v.update([]);
+}
 let navReady = false;
 function buildTabs() {
   const groups = GROUPS.filter(g => visibleDefs().some(d => d.group === g.id));
@@ -280,15 +291,12 @@ function build() {
   $('search-input').oninput = renderSearch;
   $('lock-top').onclick = () => lockNow();
 
-  const ctx = { go, lockNow, applyTheme, applyMode, onVaultChange: updateLockButton, openAccount: () => go('account'), exportCsv: () => views.more.exportCsv() };
-  const main = $('view');
-  for (const d of DEFS) { views[d.id] = d.make(ctx); main.append(views[d.id].root); }
+  buildViews();
   navReady = true; buildTabs();
   $('sync-badge').onclick = () => go('account');
 
   store.onChange(evs => { for (const v of Object.values(views)) v.update(evs); renderSearch(); notify.resyncSoon(); });
   store.setLockedHandler(showLock);
-  for (const v of Object.values(views)) v.update([]);
 }
 
 function setStatus() { $('status').textContent = `${VERSION} · ${navigator.onLine ? 'онлайн' : 'офлайн'}`; }

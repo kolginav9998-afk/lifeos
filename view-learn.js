@@ -3,7 +3,7 @@ import { el, fill, toast } from './ui.js';
 import { todayStr } from './events.js';
 import * as store from './store.js';
 import { TRACKS, trackById, trackProgress, doneLessons, makeLessonDone, lessonEventId, makeSrsEvent, makeUserCard, userCards, sessionQueue, todayLoad, studyDates, MY_TRACK,
-  leeches, comebackInfo, fifteenPlan, lessonNoteOf, makeLessonNote, examQueue, quizFor, cardsOfTrack } from './academy.js';
+  leeches, comebackInfo, fifteenPlan, lessonNoteOf, makeLessonNote, examQueue, quizFor, cardsOfTrack, cardFace, lessonToRevisit, markRevisited, lessonTitle } from './academy.js';
 import { newState, grade, studyStreak, INTERVALS } from './srs.js';
 import { canSpeak, foreignSide, speak } from './speech.js';
 import { openSpeaking, hasRunningSpeak, speakWeek, SPEAK_LANGS } from './speaking.js';
@@ -71,6 +71,11 @@ export function createLearnView() {
       ...lc.map(({ card }) => el('div', { class: 'row leech-row', dataset: { card: card.id } }, el('span', { class: 'grow' }, el('strong', { textContent: card.q })),
         el('button', { type: 'button', class: 'chip leech-own', textContent: 'Своя карточка', onclick: () => go({ name: 'my', prefill: { q: card.q, a: card.a } }) }))),
       el('button', { type: 'button', id: 'leech-start', class: 'chip', textContent: 'Повторить только их', onclick: () => startSession(null, { queue: lcAll.map(x => ({ card: x.card, state: x.state })).slice(0, 20) }) })) : null;
+    const rv = lessonToRevisit(events, t0), rvInfo = rv ? lessonTitle(rv.lesson) : null;
+    const revisit = rv && rvInfo ? el('div', { class: 'card', id: 'revisit' }, el('strong', { textContent: 'Пора вернуться к уроку' }),
+      el('p', { textContent: `«${rvInfo.title}» (${rvInfo.track}) пройден ${rv.days} дн. назад. Перечитай его и ещё раз скажи задание вслух: возвращение через месяц закрепляет надолго.${rv.count > 1 ? ` Всего уроков для возврата: ${rv.count}.` : ''}` }),
+      el('div', { class: 'row wrap' }, el('button', { type: 'button', id: 'revisit-open', class: 'chip', textContent: 'Открыть урок', onclick: () => openLesson(rv.track, rv.lesson) }),
+        el('button', { type: 'button', id: 'revisit-done', class: 'chip', textContent: 'Повторил', onclick: async () => { await store.save(markRevisited(rv.ev, t0)); toast('Следующее возвращение к этому уроку через месяц'); } }))) : null;
     const sw = speakWeek(events, t0);
     const speaking = el('div', { class: 'card', id: 'speak-card' }, el('strong', { textContent: 'Говорение вслух' }),
       el('p', { class: 'muted', id: 'speak-week', textContent: `За неделю: ${sw.minutes} из ${sw.goal} мин${sw.minutes ? ` (${Object.entries(sw.byLang).map(([k, v]) => `${SPEAK_LANGS[k].toLowerCase()} ${v}`).join(', ')})` : ''}. Говорить вслух полезнее, чем читать молча.` }),
@@ -90,7 +95,7 @@ export function createLearnView() {
       el('span', { class: 'track-ic', style: `background:${MY_TRACK.color}`, textContent: MY_TRACK.icon, 'aria-hidden': 'true' }),
       el('span', { class: 'track-body' }, el('strong', { textContent: MY_TRACK.title }), el('span', { class: 'muted', textContent: mine.length ? `Карточек: ${mine.length}` : 'Добавляй свои вопросы и ответы' })));
     const note = el('p', { class: 'muted', textContent: 'Курсы — учебный материал, а не медицинская, юридическая или финансовая консультация.' });
-    mount(head, comeback, fifteen, speaking, leech, el('h2', { textContent: 'Курсы' }), ...cards, my, note);
+    mount(head, comeback, fifteen, revisit, speaking, leech, el('h2', { textContent: 'Курсы' }), ...cards, my, note);
   }
 
   // ---------- конспект урока и открытие урока ----------
@@ -201,10 +206,11 @@ export function createLearnView() {
   function renderMy() {
     const q = el('input', { id: 'my-q', type: 'text', maxLength: 300, placeholder: 'Вопрос или слово', 'aria-label': 'Вопрос' });
     const a = el('input', { id: 'my-a', type: 'text', maxLength: 500, placeholder: 'Ответ', 'aria-label': 'Ответ' });
+    const hint = el('input', { id: 'my-hint', type: 'text', maxLength: 200, placeholder: 'Моя ассоциация или пример (по желанию)', 'aria-label': 'Ассоциация' });
     if (page.prefill) { q.value = page.prefill.q; a.value = page.prefill.a; page = { name: 'my' }; }   // заготовка из «сложных карточек» подставляется один раз
     const err = el('p', { class: 'error', id: 'my-err' });
     const add = async () => {
-      try { await store.save(makeUserCard(q.value, a.value)); q.value = ''; a.value = ''; err.textContent = ''; q.focus(); toast('Карточка добавлена'); }
+      try { await store.save(makeUserCard(q.value, a.value, Date.now(), null, hint.value)); q.value = ''; a.value = ''; hint.value = ''; err.textContent = ''; q.focus(); toast('Карточка добавлена'); }
       catch (e) { err.textContent = e.message; }
     };
     const list = userCards(events);
@@ -212,9 +218,9 @@ export function createLearnView() {
       el('button', { type: 'button', id: 'learn-back', class: 'link', textContent: '‹ Все курсы', onclick: () => go({ name: 'home' }) }),
       el('div', { class: 'card' }, el('h3', { textContent: 'Свои карточки' }),
         el('p', { class: 'muted', textContent: 'Всё, что хочешь запомнить: слова, формулы, определения, даты. Они попадут в общее повторение.' }),
-        el('form', { class: 'form-stack', onsubmit: e => { e.preventDefault(); add(); } }, q, a, el('button', { type: 'submit', id: 'my-add', class: 'primary', textContent: 'Добавить' }), err)),
+        el('form', { class: 'form-stack', onsubmit: e => { e.preventDefault(); add(); } }, q, a, hint, el('button', { type: 'submit', id: 'my-add', class: 'primary', textContent: 'Добавить' }), err)),
       list.length ? el('ul', { class: 'list', id: 'my-list' }, ...list.map(c => el('li', { class: 'entry' },
-        el('div', { class: 'grow' }, el('strong', { textContent: c.q }), el('div', { class: 'muted', textContent: c.a })),
+        el('div', { class: 'grow' }, el('strong', { textContent: c.q }), el('div', { class: 'muted', textContent: c.a }), c.hint ? el('div', { class: 'muted', textContent: `Ассоциация: ${c.hint}` }) : null),
         el('button', { type: 'button', class: 'chip danger', 'aria-label': 'Удалить карточку', textContent: 'Удалить', onclick: async () => { await store.removeMany([c.evId, `srs:${c.id}`]); toast('Карточка удалена'); } })))) : el('p', { class: 'muted', textContent: 'Пока нет своих карточек.' }),
       list.length ? el('button', { type: 'button', class: 'primary', textContent: 'Повторять свои карточки', onclick: () => startSession('my') }) : null);
   }
@@ -238,13 +244,13 @@ export function createLearnView() {
     s.counts[q]++;
     if (s.exam) {                                       // экзамен: ничего не пишем в расписание повторений
       if (q === 'again') s.missed.push(item.card);
-      s.i++; s.shown = false; renderSession(); return;
+      s.i++; s.shown = false; s.translit = false; renderSession(); return;
     }
     const next = grade(item.state ?? newState(item.card.id, s.today), q, s.today);
     item.state = next;
     const tries = s.again.get(item.card.id) || 0;
     if (q === 'again' && tries < 2) { s.again.set(item.card.id, tries + 1); s.queue.splice(Math.min(s.queue.length, s.i + 4), 0, { card: item.card, state: next }); }
-    s.i++; s.shown = false;
+    s.i++; s.shown = false; s.translit = false;
     renderSession();
     await store.save(makeSrsEvent(next));
   }
@@ -254,13 +260,17 @@ export function createLearnView() {
     const item = s.queue[s.i], c = item.card;
     const tr = c.track === 'my' ? MY_TRACK : trackById(c.track);
     const interval = q => { const nb = q === 'again' ? 0 : q === 'hard' ? Math.max(1, item.state?.box ?? 0) : Math.min(INTERVALS.length - 1, (item.state?.box ?? 0) + 1); return q === 'again' ? 'сегодня' : q === 'hard' ? `через ${Math.max(1, Math.floor(INTERVALS[nb] / 2))} дн.` : `через ${INTERVALS[nb]} дн.`; };
+    const face0 = cardFace(c, item.state, s.today);
     const fs = canSpeak() && (c.track === 'english' || c.track === 'hebrew') ? foreignSide(c, c.track) : null;
-    const speakBtn = fs && (fs.side === 'q' || s.shown) ? el('button', { type: 'button', id: 'sess-speak', class: 'chip', 'aria-label': 'Произнести', textContent: '🔊',
+    const speakBtn = fs && (s.shown || (fs.side === 'q' && !face0.reversed)) ? el('button', { type: 'button', id: 'sess-speak', class: 'chip', 'aria-label': 'Произнести', textContent: '🔊',
       onclick: () => { if (!speak(fs.text, c.track, () => toast('На телефоне нет голоса для этого языка. Установи голосовой движок в настройках телефона.'))) toast('Озвучка недоступна на этом устройстве'); } }) : null;
     const face = el('div', { class: 'flash', id: 'sess-card' },
-      el('span', { class: 'muted', textContent: s.exam ? `Экзамен · ${tr?.title ?? ''}` : `${tr?.title ?? ''}${item.state ? '' : ' · новая'}` }),
-      el('p', { class: 'flash-q', id: 'sess-q', textContent: c.q }), speakBtn,
-      s.shown ? el('p', { class: 'flash-a', id: 'sess-a', textContent: c.a }) : null);
+      el('span', { class: 'muted', textContent: (s.exam ? `Экзамен · ${tr?.title ?? ''}` : `${tr?.title ?? ''}${item.state ? '' : ' · новая'}`) + (face0.reversed ? ' · обратное направление' : '') }),
+      el('p', { class: 'flash-q', id: 'sess-q', textContent: face0.front }), speakBtn,
+      s.shown ? el('p', { class: 'flash-a', id: 'sess-a', textContent: face0.back }) : null,
+      s.shown && face0.translit ? (s.translit ? el('p', { class: 'muted', id: 'sess-translit', textContent: `Транскрипция: ${face0.translit}` })
+        : el('button', { type: 'button', id: 'sess-translit-btn', class: 'chip', textContent: 'Показать транскрипцию', onclick: () => { s.translit = true; renderSession(); } })) : null,
+      s.shown && c.hint ? el('p', { class: 'muted', id: 'sess-hint', textContent: `Моя ассоциация: ${c.hint}` }) : null);
     const controls = s.shown
       ? el('div', { class: 'grade-row' }, ...['again', 'hard', 'good'].map(q => el('button', { type: 'button', class: `grade ${q}`, dataset: { q }, onclick: () => answer(q) }, el('strong', { textContent: QUALITY_LABEL[q] }), s.exam ? null : el('span', { class: 'muted', textContent: interval(q) }))))
       : el('button', { type: 'button', id: 'sess-show', class: 'primary big-btn', textContent: 'Показать ответ', onclick: () => { s.shown = true; renderSession(); } });

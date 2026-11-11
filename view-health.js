@@ -4,7 +4,7 @@ import { sleepReasons } from './diary.js';
 import { todayStr } from './events.js';
 import { makeProfile } from './events.js';
 import { MEASURES, makeMeasure, updateMeasure, measureKeys, measuresOf, dailySeries, linearTrend, changeOver, bmi, whtr, bmiNote, whtrNote,
-  sleepStats, bpAverage, healthProfile, checkHealthProfile, formatMeasure, measureLabel, ageFromBirthYear, measuresToCsv } from './health.js';
+  sleepStats, bpAverage, goalCheck, healthProfile, checkHealthProfile, formatMeasure, measureLabel, ageFromBirthYear, measuresToCsv } from './health.js';
 import { saveTextFile } from './platform.js';
 import * as store from './store.js';
 import { openBreathing } from './breathing.js';
@@ -130,6 +130,7 @@ export function createHealthView() {
     if (b !== null) lines.push(`ИМТ ${num(b)} · ${bmiNote(b)} (ориентир, не диагноз)`);
     if (r !== null) lines.push(`Талия к росту ${num(r)} · ${whtrNote(r)}`);
     if (w !== null && hpf.goalWeight) lines.push(`До цели ${num(Math.abs(w - hpf.goalWeight))} кг ${w > hpf.goalWeight ? 'вниз' : 'вверх'}`);
+    if (hpf.goalWeight) for (const t of goalCheck(w, hpf.heightCm, hpf.goalWeight).warnings) lines.push(`Внимание: ${t}`);
     const sl = sleepStats(events, today, 7, hpf.sleepTarget);
     if (sl) lines.push(`Сон за 7 дней: в среднем ${num(sl.avg)} ч (цель ${num(sl.target)}), разброс ±${num(sl.sd)} ч, недосып ${num(sl.debt)} ч`);
     const bp = bpAverage(events, today, 7);

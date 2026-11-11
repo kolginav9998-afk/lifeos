@@ -120,6 +120,15 @@ export function whtr(waistCm, heightCm) {
 export const bmiNote = v => (v === null ? '' : v < 18.5 ? 'ниже ориентира 18,5–24,9' : v <= 24.9 ? 'в пределах ориентира 18,5–24,9' : 'выше ориентира 18,5–24,9');
 export const whtrNote = v => (v === null ? '' : v < 0.5 ? 'ниже порога 0,5' : 'не ниже порога 0,5');
 
+// Мягкая проверка цели по весу: слишком низкий ИМТ цели или слишком далёкая цель. Это ориентиры, а не диагноз.
+const num1 = x => String(Math.round(x * 10) / 10).replace('.', ',');
+export function goalCheck(currentKg, heightCm, goalKg) {
+  const warnings = [], goalBmi = bmi(goalKg, heightCm);
+  if (goalBmi !== null && goalBmi < 18.5) warnings.push(`Цель ${num1(goalKg)} кг при росте ${num1(heightCm)} см даёт ИМТ ${num1(goalBmi)}: это ниже ориентира 18,5. Такую цель стоит обсудить с врачом.`);
+  if (currentKg > 0 && goalKg > 0 && Math.abs(currentKg - goalKg) / currentKg > 0.3) warnings.push('Цель далеко от текущего веса (больше 30%). Разбей путь на этапы: обычно ставят цель в 5–10% от веса на 3–6 месяцев.');
+  return { goalBmi, warnings };
+}
+
 // Сон за последние дни по утренним отметкам.
 export function sleepStats(events, today, days = 7, target = 8) {
   const from = addDays(today, -(days - 1));

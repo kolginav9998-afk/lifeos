@@ -3,7 +3,7 @@ import test from 'node:test';
 import assert from 'node:assert/strict';
 import fs from 'node:fs';
 import path from 'node:path';
-import { REGISTRY, PRIVACY_LABEL, knownType, unknownTypes, registryMarkdown } from '../registry.js';
+import { REGISTRY, PRIVACY_LABEL, RELATIONS, BY_DAY, knownType, unknownTypes, registryMarkdown, erMarkdown } from '../registry.js';
 import { parseImport, serialize, SCHEMA_VERSION } from '../events.js';
 import { dataChecks } from '../datacheck.js';
 
@@ -61,4 +61,13 @@ test('копия, сделанная более новой версией, не 
   assert.equal(parseImport(JSON.stringify({ app: 'lifeos', events: [ev] })).events.length, 1, 'старая копия без номера схемы');
   assert.equal(parseImport(JSON.stringify({ app: 'lifeos', schema: 0, events: [ev] })).events.length, 1);
   assert.throws(() => parseImport(JSON.stringify({ app: 'lifeos', schema: SCHEMA_VERSION + 1, events: [ev] })), /более новой версией/);
+});
+
+test('ER-диаграмма: связи ссылаются на существующие типы, docs/ER.md совпадает с реестром', () => {
+  for (const [parent, child, field, what] of RELATIONS) { assert.ok(knownType(parent) && knownType(child), `${parent} → ${child}`); assert.ok(field && what); assert.ok(REGISTRY[child].fields.includes(field), `у ${child} нет поля ${field}`); }
+  for (const type of BY_DAY) { assert.ok(knownType(type), type); assert.match(REGISTRY[type].fields, /\bdate\b|takenAt|lesson/, `${type}: нет даты`); }
+  assert.equal(new Set(BY_DAY).size, BY_DAY.length);
+  const doc = fs.readFileSync(path.join(root, 'docs/ER.md'), 'utf8');
+  assert.equal(doc.trim(), erMarkdown().trim(), 'перегенерируй: node -e "import(\'./registry.js\').then(m=>require(\'fs\').writeFileSync(\'docs/ER.md\', m.erMarkdown()+\'\\n\'))"');
+  assert.match(doc, /```mermaid\nerDiagram\n/); assert.match(doc, /habit \|\|--o\{ habit_log : "habitId"/);
 });
