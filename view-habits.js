@@ -1,6 +1,6 @@
 import { el, toast } from './ui.js';
 import { todayStr } from './events.js';
-import { HABIT_TEMPLATES, makeHabit, updateHabit, archiveHabit, makeHabitLog, habitStats, habitCalendar, activeHabits, logsOf, habitReview, reviewDue, WEEK_ORDER, DAY_NAMES, daysText } from './habits.js';
+import { HABIT_TEMPLATES, makeHabit, updateHabit, archiveHabit, makeHabitLog, habitStats, habitCalendar, activeHabits, logsOf, habitReview, reviewDue, WEEK_ORDER, DAY_NAMES, daysText, supportPhrase } from './habits.js';
 import { getPref, setPref } from './prefs.js';
 import { activeSick } from './sick.js';
 import * as store from './store.js';
@@ -123,6 +123,7 @@ export function createHabitsView() {
       c.append(el('div', { class: 'h-actions' }, heavyDay ? null : fullBtn, minBtn));
       if (st.neverMissTwice) c.append(el('p', { class: 'warn', textContent: (p.days?.length ? 'Прошлое занятие по плану пропущено' : 'Вчера пропуск') + ' — это нормально. Не пропусти второй раз: достаточно минимума.' }));
       else if (st.needsRecovery) c.append(el('p', { class: 'warn', textContent: `Перерыв ${st.gapDays} дн. Начинать с нуля не нужно — вернись с минимума.` }));
+      if (st.neverMissTwice || st.needsRecovery) c.append(el('p', { class: 'muted h-support', textContent: supportPhrase(h.id, today) }));
     }
     c.append(el('div', { class: 'h-stats muted', textContent: `Серия: ${st.streak} · Лучшая: ${st.longest} · Регулярность за 30 дн.: ${pct(st.consistency)} (${st.hits} из ${st.span})` }));
     const cal = el('div', { class: 'h-cal', 'aria-label': 'Последние 4 недели' }, ...habitCalendar(h, events, today, 28).map(d =>

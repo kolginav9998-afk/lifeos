@@ -35,6 +35,27 @@ export function updateHabit(ev, { name, anchor, minimum, full, identity, plan, d
   return { ...ev, payload: { ...ev.payload, name: n, anchor: clean(anchor, 200), minimum: clean(minimum, 200), full: clean(full, 200), identity: identity === undefined ? (ev.payload.identity ?? '') : clean(identity, 120), plan: plan === undefined ? (ev.payload.plan ?? '') : clean(plan, 200), days: days === undefined ? (ev.payload.days ?? []) : cleanDays(days), editedAt: now } };
 }
 
+// Фразы-поддержки при срыве: без осуждения и без обращения «ты сорвался». Одна и та же фраза весь день, на следующий день другая.
+export const SUPPORT_PHRASES = [
+  'Один пропуск — это ещё не конец привычки. Важно, что будет дальше.',
+  'Срывы случаются у всех. Вернись с самого маленького шага.',
+  'Не нужно навёрстывать. Достаточно сделать минимум сегодня.',
+  'Привычка не обнуляется из-за одного дня. Всё, что уже сделано, остаётся.',
+  'Начни с двух минут. Начало важнее результата.',
+  'Спокойно: возвращаться можно сколько угодно раз.',
+  'Выбери самую лёгкую версию и сделай её прямо сейчас.',
+  'Ты не обязан быть идеальным. Достаточно быть регулярным.',
+  'Если было тяжело, облегчи привычку: меньше, проще, короче.',
+  'Что помешало? Запиши в плане «если помешает» и попробуй снова.',
+  'Маленькое действие сегодня лучше большого плана на потом.',
+  'Каждое возвращение укрепляет привычку не меньше, чем непрерывная серия.',
+];
+export function supportPhrase(habitId, today) {
+  const h = fnvLike(`${habitId}|${today}`);
+  return SUPPORT_PHRASES[h % SUPPORT_PHRASES.length];
+}
+function fnvLike(str) { let h = 0x811c9dc5; for (let i = 0; i < str.length; i++) { h ^= str.charCodeAt(i); h = Math.imul(h, 0x01000193) >>> 0; } return h; }
+
 export const archiveHabit = (ev, archived = true) => ({ ...ev, payload: { ...ev.payload, archived } });
 
 export function makeHabitLog(habit, date, level, now = Date.now()) {

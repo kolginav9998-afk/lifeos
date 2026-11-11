@@ -171,12 +171,23 @@ export const MAX_IMPORT_EVENTS = 200000;
 const TYPE_RE = /^[a-z][a-z0-9_]{0,39}$/;
 const isPlain = o => !!o && typeof o === 'object' && !Array.isArray(o);
 
+// Слишком глубоко вложенные данные не нужны (у настоящих записей вложенность не больше четырёх уровней) и опасны: ломают разбор. Проверка без рекурсии.
+export const MAX_PAYLOAD_DEPTH = 24;
+export function depthOk(value, maxDepth = MAX_PAYLOAD_DEPTH) {
+  const stack = [[value, 1]];
+  while (stack.length) {
+    const [x, d] = stack.pop();
+    if (x && typeof x === 'object') { if (d > maxDepth) return false; for (const k in x) stack.push([x[k], d + 1]); }
+  }
+  return true;
+}
+
 export function cleanEvent(e) {
   if (!isPlain(e)) return null;
   if (typeof e.id !== 'string' || e.id.length < 1 || e.id.length > 100) return null;
   if (typeof e.type !== 'string' || !TYPE_RE.test(e.type)) return null;
   if (typeof e.ts !== 'number' || !Number.isFinite(e.ts)) return null;
-  if (!isPlain(e.payload)) return null;
+  if (!isPlain(e.payload) || !depthOk(e.payload)) return null;
   return {
     id: e.id, type: e.type, ts: e.ts, payload: e.payload,
     source: typeof e.source === 'string' ? e.source.slice(0, 20) : 'import',

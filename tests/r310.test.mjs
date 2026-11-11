@@ -10,6 +10,10 @@ import { makeFocus } from '../focus.js';
 import { makeRun, makeRunEvent } from '../bt-core.js';
 import { makeRng } from '../stats.js';
 import { normBand, variability, variabilityTrend, CV_TESTS, comparePeriods, compareWeeks, compare90, topFactors, eventMarks } from '../bt-extra.js';
+import fs from 'node:fs';
+import path from 'node:path';
+import { NOTE_TEMPLATES, templateText } from '../notes.js';
+import { SUPPORT_PHRASES, supportPhrase } from '../habits.js';
 import { makeHabit, updateHabit, makeHabitLog, habitStats, habitCalendar, cleanDays, isScheduled, daysText, activeHabits } from '../habits.js';
 import { planReminders, HABIT_ID_BASE } from '../reminders.js';
 import { planDay } from '../planday.js';
@@ -267,4 +271,24 @@ test('расписание привычки учитывают напомина�
   assert.deepEqual(habitMoodLinks(sched, '2026-11-14'), [], 'все плановые дни отмечены: сравнивать не с чем');
   const dl = habitMoodLinks(every, '2026-11-14');
   assert.equal(dl.length, 1); assert.ok(dl[0].diff > 2.9);
+});
+
+test('фразы-поддержки при срывах: добрые, без осуждения, одна на день', () => {
+  assert.equal(SUPPORT_PHRASES.length, 12); assert.equal(new Set(SUPPORT_PHRASES).size, 12);
+  for (const p of SUPPORT_PHRASES) { assert.ok(p.length >= 30 && p.length <= 110 && p.endsWith('.'), p); assert.ok(!/сорвал|провал|слабак|лен[ия]вый|виноват/i.test(p), `без осуждения: ${p}`); }
+  assert.equal(supportPhrase('h1', '2026-11-14'), supportPhrase('h1', '2026-11-14'), 'в течение дня фраза не меняется');
+  assert.ok(SUPPORT_PHRASES.includes(supportPhrase('h1', '2026-11-14')));
+  const week = new Set(Array.from({ length: 14 }, (_, i) => supportPhrase('h1', addDays('2026-11-01', i))));
+  assert.ok(week.size >= 6, `за две недели разные фразы (${week.size})`);
+  assert.notEqual(new Set(['a', 'b', 'c', 'd', 'e', 'f'].map(h => supportPhrase(h, '2026-11-14'))).size, 1, 'у разных привычек не всегда одна и та же');
+});
+
+test('«письмо себе на неделю» и уважение к «уменьшить движение»', () => {
+  const tpl = NOTE_TEMPLATES.find(x => x.id === 'weeklyletter');
+  assert.equal(tpl.title, 'Письмо себе на неделю');
+  const text = templateText('weeklyletter', '2026-11-14');
+  for (const q of ['Письмо себе: неделя с', 'Что было главным на этой неделе:', 'Чем я горжусь:', 'Что было трудным', 'Что хочу сделать иначе', 'Одно доброе слово себе:']) assert.ok(text.includes(q), q);
+  const css = fs.readFileSync(path.resolve(import.meta.dirname, '..', 'style.css'), 'utf8');
+  assert.match(css, /@media \(prefers-reduced-motion: reduce\)\{\*,\*::before,\*::after\{animation-duration:\.01ms !important;[^}]*transition-duration:\.01ms !important;scroll-behavior:auto !important\}\}/, 'при «уменьшить движение» отключаются анимации и плавная прокрутка');
+  assert.match(css, /prefers-reduced-motion: no-preference\)\{\.toast/, 'появление сообщения анимируется только если движение разрешено');
 });

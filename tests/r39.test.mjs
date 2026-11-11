@@ -377,12 +377,12 @@ test('диаграммы состояний: файл на месте, у каж
   const root = path.resolve(import.meta.dirname, '..');
   const md = fs.readFileSync(path.join(root, 'docs', 'STATES.md'), 'utf8');
   const blocks = [...md.matchAll(/```mermaid\n([\s\S]*?)```/g)].map(m => m[1]);
-  assert.ok(blocks.length >= 8, `диаграмм: ${blocks.length}`);
+  assert.ok(blocks.length >= 10, `диаграмм: ${blocks.length}`);
   for (const b of blocks) { assert.match(b, /^stateDiagram-v2\n/); assert.match(b, /\[\*\] -->/, 'есть начальное состояние'); assert.ok((b.match(/-->/g) || []).length >= 4, 'не меньше четырёх переходов'); }
   const heads = [...md.matchAll(/^## (.+?) \(`([\w.-]+\.js)`(?:, `([\w.-]+\.js)`)?\)$/gm)];
   assert.ok(heads.length >= 8, 'у каждого раздела указан файл с логикой');
   for (const h of heads) for (const f of h.slice(2).filter(Boolean)) assert.ok(fs.existsSync(path.join(root, f)), `${h[1]}: нет файла ${f}`);
-  for (const w of ['Задача', 'Привычка', 'Режим болезни', 'Карточка', 'Решение', 'Желание', 'Долг', 'Отложенная мысль']) assert.ok(heads.some(h => h[1].startsWith(w)), `нет раздела «${w}»`);
+  for (const w of ['Задача', 'Привычка', 'Режим болезни', 'Карточка', 'Решение', 'Желание', 'Долг', 'Отложенная мысль', 'Навык', 'Загрузка архива']) assert.ok(heads.some(h => h[1].startsWith(w)), `нет раздела «${w}»`);
   // вычисляемые вещи в диаграммах не расходятся с кодом
   assert.ok(md.includes(`${INTERVALS.join(', ')} дней`), 'интервалы коробок в документе совпадают с кодом');
   assert.ok(md.includes('30 дней') && SICK_DAYS === 30, 'предел режима болезни совпадает');

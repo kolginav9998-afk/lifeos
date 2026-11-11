@@ -164,6 +164,16 @@ await clearToast(); await page.click('#habit-form button[type=submit]'); await t
 assert.equal((await evs('habit')).length, 1, 'привычка без дней не создаётся');
 
 
+// фраза-поддержка после перерыва
+await page.evaluate(async () => {
+  const store = await import('./store.js'), ev = await import('./events.js'), hb = await import('./habits.js');
+  const h = hb.makeHabit({ name: 'Растяжка' }, Date.now() - 40 * 86400000);
+  await store.saveMany([h, hb.makeHabitLog(h, ev.addDays(ev.todayStr(), -5), 'full', 1)]);
+});
+await until(page, () => [...document.querySelectorAll('.habit')].some(c => c.textContent.includes('Растяжка') && c.querySelector('.h-support')));
+assert.equal(await page.evaluate(async () => { const c = [...document.querySelectorAll('.habit')].find(x => x.textContent.includes('Растяжка')); return (await import('./habits.js')).SUPPORT_PHRASES.includes(c.querySelector('.h-support').textContent); }), true, 'фраза из списка поддержки');
+assert.match(await page.evaluate(() => [...document.querySelectorAll('.habit')].find(x => x.textContent.includes('Растяжка')).textContent), /Вчера пропуск — это нормально/);
+
 // ---------- навыки ----------
 await tab(page, 'skills');
 assert.deepEqual(await page.locator('#subnav button').allTextContents(), ['Учёба', 'Навыки', 'Тесты', 'Аналитика', 'Цели']);
