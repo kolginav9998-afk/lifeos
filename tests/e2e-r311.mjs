@@ -60,6 +60,51 @@ await until(page, () => document.getElementById('review-variety'));
 assert.match(await text('#review-variety'), /^Разнообразие недели: \d из 7 областей \(.*Дела.*\)/);
 assert.match(await text('#review-variety'), /Пусто: /);
 
+
+// ---------- второе окно приложения ----------
+await tab(page, 'today');
+assert.equal(await page.locator('#hint-tabs').count(), 0, 'пока окно одно, подсказки нет');
+const p2 = await t.ctx.newPage();
+await p2.goto(t.url); await until(p2, () => !document.getElementById('app').hidden);
+await until(page, () => document.getElementById('hint-tabs'), null, 10000);
+assert.match(await text('#hint-tabs'), /Приложение открыто ещё в окнах: 1\. Записи из других окон подтягиваются сами/);
+// запись во втором окне появляется в первом без перезагрузки
+await p2.evaluate(async () => { const st = await import('./store.js'), ev = await import('./events.js'); await st.save(ev.makeTask('Задача из второго окна', Date.now() + 77)); });
+await until(page, () => [...document.querySelectorAll('.item .text')].some(n => n.textContent === 'Задача из второго окна'), null, 10000);
+assert.ok((await evs('task')).some(e => e.payload.text === 'Задача из второго окна'));
+await page.click('#hint-tabs .chip'); await until(page, () => !document.getElementById('hint-tabs'));
+await p2.evaluate(() => dispatchEvent(new Event('pagehide'))); await p2.close();
+await page.waitForTimeout(300);
+
+// ---------- проверка целостности при запуске ----------
+await page.evaluate(async () => { const db = await import('./db.js'), st = await import('./store.js'), ev = await import('./events.js'); db.state.corrupt = ['a', 'b']; await st.save(ev.makeTask('Толчок для перерисовки', Date.now() + 88)); });
+await until(page, () => document.getElementById('hint-integrity'));
+assert.match(await text('#hint-integrity'), /Не удалось прочитать записей: 2\. Они не удалены и остаются на месте/);
+await page.click('#hint-integrity .chip:has-text("Понятно")'); await until(page, () => !document.getElementById('hint-integrity'));
+assert.equal(await page.evaluate(async () => (await import('./prefs.js')).getPref('integrityAsked') === (await import('./events.js')).todayStr()), true, 'до завтра не повторяем');
+await page.evaluate(async () => { const db = await import('./db.js'), st = await import('./store.js'), pr = await import('./prefs.js'), ev = await import('./events.js'); pr.setPref('integrityAsked', ''); db.state.corrupt = []; db.state.idbOk = false; db.state.idbError = 'тест'; dispatchEvent(new CustomEvent('lifeos:tabs', { detail: 0 })); });     // перерисовка без обращения к базе (обращение вернуло бы idbOk)
+await until(page, () => document.getElementById('hint-integrity'));
+assert.match(await text('#hint-integrity'), /Основное хранилище не открылось \(тест\)\. Данные пока лежат в запасной копии/);
+await page.click('#hint-integrity-backup'); await until(page, () => !document.getElementById('view-more').hidden);
+await page.evaluate(async () => { const db = await import('./db.js'); db.state.idbOk = true; db.state.idbError = ''; });
+
+// ---------- напоминание об архиве ----------
+await tab(page, 'today');
+await page.evaluate(async () => { const pr = await import('./prefs.js'), st = await import('./store.js'), ev = await import('./events.js'); pr.setPref('lastBackupAt', 0); await st.save(ev.makeTask('Для чипа', Date.now() + 111)); });
+await until(page, () => document.getElementById('backup-chip'));
+await tab(page, 'more');
+assert.equal(await page.inputValue('#archive-remind'), '14', 'по умолчанию раз в две недели');
+await page.selectOption('#archive-remind', '0');
+assert.equal(await page.evaluate(async () => (await import('./prefs.js')).getPref('backupEveryDays')), 0);
+await tab(page, 'today');
+await page.evaluate(async () => { const st = await import('./store.js'), ev = await import('./events.js'); await st.save(ev.makeTask('Ещё для чипа', Date.now() + 122)); });
+await until(page, () => !document.getElementById('backup-chip'));
+await tab(page, 'more'); await page.selectOption('#archive-remind', '7');
+await page.evaluate(async () => { (await import('./prefs.js')).setPref('lastBackupAt', Date.now() - 8 * 86400000); const st = await import('./store.js'), ev = await import('./events.js'); await st.save(ev.makeTask('И ещё', Date.now() + 133)); });
+await tab(page, 'today'); await until(page, () => document.getElementById('backup-chip'));
+await page.evaluate(async () => { (await import('./prefs.js')).setPref('lastBackupAt', Date.now() - 6 * 86400000); const st = await import('./store.js'), ev = await import('./events.js'); await st.save(ev.makeTask('И ещё раз', Date.now() + 144)); });
+await until(page, () => !document.getElementById('backup-chip'));
+
 assert.deepEqual(errors, [], 'нет ошибок в консоли:\n' + errors.join('\n'));
 await t.close();
 console.log('E2E R3.11 OK');

@@ -31,6 +31,7 @@ import { createInsightsView } from './view-insights.js';
 import { createSettingsView } from './view-settings.js';
 import { createAccountView } from './view-account.js';
 import * as appSync from './app-sync.js';
+import { createTabGuard, tabState } from './tabguard.js';
 
 // Экраны и группы вкладок. Нижняя панель — группы; внутри группы с несколькими экранами есть вторая строка переключателей.
 const DEFS = [
@@ -182,7 +183,20 @@ async function enterApp() {
   markData();
   updateLockButton();
   appSync.start().catch(e => console.error(e));
+  startTabGuard();
   if (!entered) { entered = true; handleUrlParams(); }
+}
+
+// Второе окно с этим же приложением: считаем окна и подтягиваем чужие записи, чтобы данные не расходились.
+let tabGuard = null;
+function startTabGuard() {
+  if (tabGuard) return;
+  tabGuard = createTabGuard({
+    onOthers: n => { tabState.others = n; window.dispatchEvent(new CustomEvent('lifeos:tabs', { detail: n })); },
+    onRemoteWrite: () => { if (vault.status() !== 'locked') store.refresh().catch(e => console.error(e)); },
+  });
+  db.onWrite(() => tabGuard.announceWrite());
+  addEventListener('pagehide', () => tabGuard?.stop());                     // сообщаем соседям, что окно закрылось
 }
 
 $('lock-form').addEventListener('submit', async e => {

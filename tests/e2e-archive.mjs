@@ -41,7 +41,7 @@ const plainFile = await download(page, '#export-btn');
 assert.match(path.basename(plainFile), /^lifeos-archive-\d{4}-\d{2}-\d{2}\.json$/);
 const archive = JSON.parse(fs.readFileSync(plainFile, 'utf8'));
 assert.equal(archive.app, 'lifeos'); assert.match(archive.version, /^R3\.\d+$/);
-assert.deepEqual(archive.prefs, { theme: 'dark', fontScale: 1.15, parseDates: true, hideAmounts: false, simple: false, autoLockMin: 5, taskHour: 9, habitHour: 20, eveningHour: 21, bedtimeMin: -1, weeklyHour: -1, quietFrom: -1, quietTo: 7, daysOff: [] }, 'настройки в архиве, но без привязанных к устройству');
+assert.deepEqual(archive.prefs, { theme: 'dark', fontScale: 1.15, parseDates: true, hideAmounts: false, simple: false, autoLockMin: 5, taskHour: 9, habitHour: 20, eveningHour: 21, bedtimeMin: -1, weeklyHour: -1, quietFrom: -1, quietTo: 7, daysOff: [], backupEveryDays: 14 }, 'настройки в архиве, но без привязанных к устройству');
 assert.ok(archive.events.some(e => e.type === 'skill') && archive.events.some(e => e.type === 'habit_log') && archive.events.filter(e => e.type === 'task').length === 2);
 await until(page, () => /Последний архив: сегодня/.test(document.getElementById('archive-info').textContent) && /Последняя копия: сегодня/.test(document.getElementById('stats').textContent));
 const total = archive.events.length;
@@ -57,6 +57,25 @@ const total = archive.events.length;
   assert.equal(await p.evaluate(() => getComputedStyle(document.documentElement).getPropertyValue('--fs').trim()), '1.15');
   assert.equal((await evs(p, 'task')).length, 2); assert.equal((await evs(p, 'skill')).length, 1); assert.equal((await evs(p, 'habit'))[0].payload.days.join(), '1,3,5');
   assert.equal(await p.evaluate(async () => (await import('./prefs.js')).getPref('remindersOn')), false, 'разрешение на уведомления на новом устройстве не переносится');
+  await ctx.close();
+}
+
+// ---------- выборочная загрузка: без денег ----------
+{
+  const { ctx, p } = await freshDevice();
+  await tab(p, 'more');
+  await p.check('#imp-select');
+  await p.setInputFiles('#import-input', plainFile);
+  await until(p, () => document.getElementById('imp-groups'));
+  const groups = await p.locator('.imp-group').allTextContents();
+  assert.ok(groups.some(g => /Деньги: новых 1/.test(g)) && groups.some(g => /Дела: новых/.test(g)) && groups.some(g => /Учёба: новых 1/.test(g)), groups.join(' | '));
+  const before = await text(p, '#imp-merge');
+  await p.uncheck('.imp-group-box[data-group="Деньги"]');
+  assert.notEqual(await text(p, '#imp-merge'), before, 'число в кнопке обновилось после снятия группы');
+  await p.uncheck('#imp-prefs');                                                    // без перезапуска приложения
+  await p.click('#imp-merge'); await toast(p, /Восстановлено записей: \d+/);
+  await until(p, async () => (await (await import('./store.js')).state.events.filter(e => e.type === 'task')).length === 2);
+  assert.equal((await evs(p, 'expense')).length, 0, 'деньги не загружены'); assert.equal((await evs(p, 'skill')).length, 1); assert.equal((await evs(p, 'note')).length, 1);
   await ctx.close();
 }
 

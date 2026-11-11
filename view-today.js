@@ -375,7 +375,8 @@ export function createTodayView({ go }) {
     const hs = activeHabits(events, today);
     const real = events.filter(e => e.type !== 'profile' && e.type !== 'budget').length;
     const last = getPref('lastBackupAt');
-    if (real >= 5 && (!last || Date.now() - last > 14 * 86400000)) chips.push(el('button', { type: 'button', id: 'backup-chip', class: 'chip', textContent: 'Сделай резервную копию', onclick: () => go('more') }));
+    const every = getPref('backupEveryDays');
+    if (every > 0 && real >= 5 && (!last || Date.now() - last > every * 86400000)) chips.push(el('button', { type: 'button', id: 'backup-chip', class: 'chip', textContent: 'Сделай резервную копию', onclick: () => go('more') }));
     const sickNow = !!activeSick(events, today);
     if (hs.length) chips.push(el('button', { type: 'button', class: 'chip', textContent: sickNow ? 'Привычки: пауза' : (() => { const plan = hs.filter(x => x.st.scheduledToday || x.st.doneToday); return plan.length ? `Привычки: ${plan.filter(x => x.st.doneToday).length}/${plan.length}` : 'Привычки: сегодня не по плану'; })(), onclick: () => go('habits') }));
     const spent = spentBetween(events, today, today);

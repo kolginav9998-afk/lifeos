@@ -12,3 +12,11 @@ export function storageStatus({ usage = 0, quota = 0 } = {}) {
     : level === 'warn' ? `Свободной памяти становится мало (около ${f(freeMb)} МБ). Стоит сделать резервную копию и освободить место на телефоне.` : '';
   return { level, usedMb, freeMb, ratio, line, text };
 }
+
+// Целостность хранилища при запуске: основное хранилище не открылось или есть записи, которые не удалось прочитать.
+// Записи при этом не удаляются: подсказка только просит сохранить архив.
+export function integrityHint({ idbOk = true, idbError = '', corrupt = [] } = {}) {
+  if (idbOk === false) return { level: 'bad', kind: 'idb', text: `Основное хранилище не открылось${idbError ? ` (${String(idbError).slice(0, 80)})` : ''}. Данные пока лежат в запасной копии браузера. Сохрани архив сейчас: «Ещё» → «Архив данных».` };
+  if (corrupt.length) return { level: 'warn', kind: 'corrupt', count: corrupt.length, text: `Не удалось прочитать записей: ${corrupt.length}. Они не удалены и остаются на месте. Сохрани архив и загляни в «Ещё» → «Данные».` };
+  return null;
+}

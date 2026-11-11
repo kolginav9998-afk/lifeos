@@ -1,6 +1,8 @@
 // Архив данных: один файл со всеми записями и настройками. Чистая логика: что войдёт в архив, что внутри файла и что изменится при загрузке.
 // Загрузка по умолчанию только добавляет (ничего не затирает); данные, отличающиеся от уже имеющихся, заменяются только по явному выбору.
 
+import { REGISTRY } from './registry.js';
+
 // ---------- настройки в архиве ----------
 // Только внешний вид и расписание напоминаний. Не переносим то, что привязано к устройству: разрешение на уведомления, состояние защиты, служебные отметки.
 const HOUR = (lo, hi) => v => Number.isInteger(v) && v >= lo && v <= hi;
@@ -15,6 +17,7 @@ export const PREF_RULES = {
   bedtimeMin: HOUR(-1, 1439),
   quietFrom: HOUR(-1, 23), quietTo: HOUR(0, 23),
   daysOff: v => Array.isArray(v) && v.length <= 7 && new Set(v).size === v.length && v.every(HOUR(0, 6)),
+  backupEveryDays: v => [0, 7, 14, 30].includes(v),
 };
 // Берём из настроек только разрешённое и корректное.
 export function cleanPrefs(raw) {
@@ -44,6 +47,23 @@ export function importPlan(existing, incoming) {
   }
   return { total: incoming.length, fresh, same, differ, byType, types: Object.keys(byType).length, range: Number.isFinite(from) ? { from, to } : null };
 }
+// ---------- выборочная загрузка: по группам данных ----------
+export const OTHER_GROUP = 'Прочее';
+export const groupOf = type => REGISTRY[type]?.group ?? OTHER_GROUP;
+// Группы с числом новых и отличающихся записей (по названию группы).
+export function planGroups(plan) {
+  const by = new Map();
+  const row = g => by.get(g) ?? by.set(g, { group: g, fresh: 0, differ: 0 }).get(g);
+  for (const e of plan.fresh) row(groupOf(e.type)).fresh++;
+  for (const d of plan.differ) row(groupOf(d.incoming.type)).differ++;
+  return [...by.values()].sort((a, b) => (a.group === OTHER_GROUP) - (b.group === OTHER_GROUP) || a.group.localeCompare(b.group));
+}
+// План только по выбранным группам (остальные записи из файла не трогаем).
+export function filterPlan(plan, groups) {
+  const keep = type => groups.has(groupOf(type));
+  return { ...plan, fresh: plan.fresh.filter(e => keep(e.type)), differ: plan.differ.filter(d => keep(d.incoming.type)) };
+}
+
 // Какие записи сохранить: merge — только новые; replace — новые и отличающиеся (берём версию из архива).
 export const planEvents = (plan, mode) => (mode === 'replace' ? [...plan.fresh, ...plan.differ.map(d => d.incoming)] : plan.fresh);
 
