@@ -39,6 +39,9 @@ function searchable(e) {
     default: return null;
   }
 }
+// Коротко: что это за запись (для списка «чем отличается» при загрузке архива).
+export function describeEvent(e) { const s = searchable(e); return s ? { kind: s.kind, title: String(s.title ?? '').slice(0, 60) } : { kind: e.type, title: '' }; }
+
 export const TAB_OF = { task: 'today', note: 'notes', habit: 'habits', expense: 'money', income: 'money', diary: 'diary', measure: 'health', checkin: 'diary', ucard: 'learn', skill: 'skills', workout: 'workouts', goal: 'plans', sub: 'plans', experiment: 'insights', focus: 'today', person: 'people', okr: 'okr', thought: 'health', intention: 'today', dayreview: 'reflect', weekreflect: 'reflect', decision: 'reflect', joy: 'reflect', parked: 'reflect', wish: 'plans', debt: 'plans', lessonnote: 'learn' };
 
 export function searchEvents(events, query, limit = 50) {

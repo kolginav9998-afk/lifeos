@@ -18,12 +18,12 @@ export function backupKind(text) {
   return 'unknown';
 }
 
-export async function encryptBackup(events, password, { iterations = C.PBKDF2_ITER, now = Date.now() } = {}) {
+export async function encryptBackup(events, password, { iterations = C.PBKDF2_ITER, now = Date.now(), version, prefs } = {}) {
   const weak = checkPassword(password);
   if (weak) throw new Error(weak);
   const salt = C.randomBytes(16);
   const key = await C.deriveKey(password, salt, iterations);
-  const { iv, ct } = await C.encryptBytes(key, C.textToBytes(serialize(events, now)), AAD);
+  const { iv, ct } = await C.encryptBytes(key, C.textToBytes(serialize(events, now, { version, prefs })), AAD);
   return JSON.stringify({ app: 'lifeos-enc', v: 1, kdf: 'PBKDF2-SHA256', iter: iterations, salt: C.b64(salt), iv, ct });
 }
 

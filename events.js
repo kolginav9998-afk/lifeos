@@ -147,8 +147,9 @@ export function groupTasks(events, today) {
 }
 
 // ---------- экспорт / импорт ----------
-export function serialize(events, now = Date.now()) {
-  return JSON.stringify({ app: 'lifeos', schema: SCHEMA_VERSION, exportedAt: now, events }, null, 2);
+// version — версия приложения, prefs — настройки (только разрешённые, см. archive.js): они едут в архиве вместе с записями.
+export function serialize(events, now = Date.now(), { version, prefs } = {}) {
+  return JSON.stringify({ app: 'lifeos', schema: SCHEMA_VERSION, exportedAt: now, version, prefs, events }, null, 2);
 }
 
 // ---------- профиль ----------
@@ -202,7 +203,9 @@ export function parseImport(text, { schemaVersion = SCHEMA_VERSION, migrations =
     const c = cleanEvent(e);
     if (c) valid.push(c); else skipped++;
   }
-  if (from >= schemaVersion) return { events: valid, skipped, migrated: [] };
+  const meta = { exportedAt: Number.isFinite(data.exportedAt) ? data.exportedAt : null, version: typeof data.version === 'string' ? data.version.slice(0, 20) : null, schema: from };
+  const prefs = isPlain(data.prefs) ? data.prefs : null;
+  if (from >= schemaVersion) return { events: valid, skipped, migrated: [], meta, prefs };
   let moved;
   try { moved = migrateEvents(valid, from, schemaVersion, migrations); } catch (e) { throw new Error(`Не удалось привести копию к текущему формату: ${e.message}`); }
   const events = [];
@@ -210,5 +213,5 @@ export function parseImport(text, { schemaVersion = SCHEMA_VERSION, migrations =
     const c = cleanEvent(e);                                              // миграция не должна нарушить правила записей
     if (c) events.push(c); else skipped++;
   }
-  return { events, skipped, migrated: moved.applied };
+  return { events, skipped, migrated: moved.applied, meta, prefs };
 }

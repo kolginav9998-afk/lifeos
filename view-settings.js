@@ -4,8 +4,8 @@ import { startupText } from './perf.js';
 import { yearBook, diaryYears } from './writing.js';
 import * as db from './db.js';
 import * as store from './store.js';
-import { serialize, makeProfile, profileOf, todayStr } from './events.js';
-import { encryptBackup, decryptBackup, readBackup, backupKind, NeedPasswordError, BadBackupPasswordError, MAX_BACKUP_BYTES } from './backup.js';
+import { makeProfile, profileOf, todayStr } from './events.js';
+import { createArchive } from './view-archive.js';
 import { expensesToCsv } from './money.js';
 import { toMarkdown } from './export.js';
 import { saveTextFile, isNative, platformName } from './platform.js';
@@ -28,7 +28,6 @@ function field(id, props) { return el('input', { id, autocomplete: 'off', ...pro
 
 export function createSettingsView({ lockNow, applyTheme, applyMode = () => {}, onVaultChange, openAccount = () => {} }) {
   let events = [];
-  let pendingImport = null;                       // текст выбранного файла, ждущий пароля
   const root = el('section', { id: 'view-more', class: 'view' });
 
   // ---------- профиль ----------
@@ -126,28 +125,7 @@ export function createSettingsView({ lockNow, applyTheme, applyMode = () => {}, 
 
   // ---------- резервные копии ----------
   const stamp = () => todayStr();
-  const bkPass = field('bk-pass', { type: 'password', autocomplete: 'new-password', placeholder: 'Пароль для копии (не короче 8 символов)' });
-  const bkBtn = el('button', { id: 'bk-enc', type: 'button', class: 'primary', textContent: 'Сохранить зашифрованную копию' });
-  bkBtn.onclick = async () => {
-    setBusy(bkBtn, true, 'Шифрую…');
-    try {
-      const text = await encryptBackup(store.state.events, bkPass.value);
-      const check = await decryptBackup(text, bkPass.value);               // сразу проверяем, что копию можно прочитать
-      if (check.events.length !== store.state.events.length || check.skipped) throw new Error('Проверка копии не пройдена, файл не сохранён');
-      await saveTextFile(`lifeos-${stamp()}.enc.json`, text);
-      setPref('lastBackupAt', Date.now());
-      toast(`Копия проверена и сохранена (записей: ${check.events.length})`);
-      bkPass.value = '';
-      renderStats();
-    } catch (err) { toast(err.message); }
-    finally { setBusy(bkBtn, false); }
-  };
-  const plainBtn = el('button', { id: 'export-btn', type: 'button', textContent: 'Копия открытым текстом (JSON)' });
-  plainBtn.onclick = async () => {
-    if (vault.hasVault() && !confirm('Файл будет БЕЗ шифрования: любой, кто его получит, прочтёт все данные. Продолжить?')) return;
-    try { await saveTextFile(`lifeos-${stamp()}.json`, serialize(store.state.events)); setPref('lastBackupAt', Date.now()); renderStats(); toast(`Сохранено записей: ${store.state.events.length}`); }
-    catch (err) { toast('Не удалось сохранить: ' + (err?.message || err)); }
-  };
+  const archive = createArchive({ onSaved: () => renderStats() });
   const checkOut = el('div', { id: 'data-check-out', class: 'form-stack' });
   const checkBtn = el('button', { id: 'data-check', type: 'button', textContent: 'Проверить данные на ошибки и пропуски', onclick: () => {
     const res = dataChecks(store.state.events, todayStr());
@@ -173,33 +151,6 @@ export function createSettingsView({ lockNow, applyTheme, applyMode = () => {}, 
     try { await saveTextFile(`money-${stamp()}.csv`, expensesToCsv(store.state.events), 'text/csv'); }
     catch (err) { toast('Не удалось сохранить: ' + (err?.message || err)); }
   }
-
-  const impInput = el('input', { id: 'import-input', type: 'file', accept: '.json,application/json', hidden: true });
-  const impPass = field('imp-pass', { type: 'password', autocomplete: 'current-password', placeholder: 'Пароль от этой копии' });
-  const impGo = el('button', { id: 'imp-go', type: 'button', class: 'primary', textContent: 'Расшифровать и восстановить' });
-  const impRow = el('div', { id: 'imp-row', class: 'row', hidden: true }, revealable(impPass), impGo);
-  async function runImport(text, password) {
-    try {
-      const r = await readBackup(text, password);
-      await store.saveMany(r.events);
-      pendingImport = null; impRow.hidden = true; impPass.value = '';
-      toast(`Восстановлено записей: ${r.events.length}` + (r.skipped ? `, пропущено повреждённых: ${r.skipped}` : '') + (r.migrated?.length ? `. Формат копии обновлён (версия ${r.migrated[0].from} → ${r.migrated.at(-1).to})` : ''));
-    } catch (err) {
-      if (err instanceof NeedPasswordError || err instanceof BadBackupPasswordError) { impRow.hidden = false; toast(err.message); }
-      else { pendingImport = null; impRow.hidden = true; toast('Ошибка: ' + err.message); }
-    }
-  }
-  impInput.onchange = async e => {
-    const file = e.target.files[0];
-    e.target.value = '';
-    if (!file) return;
-    if (file.size > MAX_BACKUP_BYTES) return toast('Файл слишком большой');
-    const text = await file.text();
-    if (backupKind(text) === 'encrypted') { pendingImport = text; impRow.hidden = false; impPass.focus(); toast('Копия зашифрована — введи пароль от неё'); return; }
-    await runImport(text);
-  };
-  impGo.onclick = async () => { if (pendingImport) { setBusy(impGo, true, 'Расшифровываю…'); await runImport(pendingImport, impPass.value); setBusy(impGo, false); } };
-  const impLabel = el('label', { class: 'btn' }, 'Восстановить из копии', impInput);
 
   // ---------- внешний вид и поведение ----------
   const theme = el('select', { id: 'theme-select' }, ...[['auto', 'как в системе'], ['light', 'светлая'], ['dark', 'тёмная']].map(([v, t]) => el('option', { value: v, textContent: t })));
@@ -338,10 +289,9 @@ export function createSettingsView({ lockNow, applyTheme, applyMode = () => {}, 
     accountCard,
     card('Профиль', nameForm),
     card('Защита паролем', secBox),
-    card('Резервные копии и экспорт',
-      el('div', { class: 'form-stack' }, revealable(bkPass), bkBtn),
-      el('div', { class: 'row wrap' }, plainBtn, csvBtn, mdBtn, icsBtn), ybRow,
-      el('div', { class: 'row wrap' }, impLabel), impRow),
+    card('Архив данных', archive.node,
+      el('strong', { textContent: 'Для чтения и таблиц' }),
+      el('div', { class: 'row wrap' }, csvBtn, mdBtn, icsBtn), ybRow),
     card('Внешний вид и поведение',
       el('label', {}, 'Тема: ', theme),
       el('label', {}, 'Размер текста: ', fontSel),
@@ -364,9 +314,9 @@ export function createSettingsView({ lockNow, applyTheme, applyMode = () => {}, 
     update(evs) {
       events = evs;
       if (document.activeElement !== nameInput) nameInput.value = profileOf(evs)?.payload.name || '';
-      renderStats(); renderDiag(); renderYearbook();
+      renderStats(); renderDiag(); renderYearbook(); archive.update();
     },
-    reset() { pendingImport = null; impRow.hidden = true; impPass.value = ''; bkPass.value = ''; wipeConfirm.value = ''; wipeBtn.disabled = true; renderSecurity(); },
+    reset() { archive.reset(); wipeConfirm.value = ''; wipeBtn.disabled = true; renderSecurity(); },
     renderSecurity,
     exportCsv,
   };
