@@ -43,10 +43,9 @@ test('циклических зависимостей между модулям�
 
 test('слои: логика не импортирует экраны, интерфейс и хранилище', () => {
   const UI_LAYER = new Set(['ui.js', 'store.js', 'db.js', 'platform.js', 'vault.js', 'app.js', 'app-sync.js', 'notify.js', 'errlog.js']);
-  const PURE = ['events.js', 'stats.js', 'srs.js', 'habits.js', 'money.js', 'health.js', 'diary.js', 'reflect.js', 'sick.js', 'prevent.js', 'emergency.js', 'bp.js', 'hints.js', 'registry.js', 'writing.js', 'speech.js',
-    'reports.js', 'export.js', 'planning.js', 'people.js', 'okr.js', 'academy.js', 'bt-core.js', 'bt-logic.js', 'bt-analytics.js', 'bt-export.js', 'capture.js', 'quick.js', 'ics.js', 'datacheck.js', 'search.js',
-    'journal.js', 'planday.js', 'review.js', 'reminders.js', 'meds.js', 'notes.js', 'thoughts.js', 'experiments.js', 'zip.js', 'cryptoutil.js',
-    'parked.js', 'wishes.js', 'debts.js', 'automation.js', 'changelog.js', 'migrate.js', 'devicetime.js', 'storageinfo.js', 'practice.js', 'bt-extra.js', 'skills.js', 'archive.js', 'daycards.js', 'profile.js', 'updater.js'];
+  // Чистая логика — все модули, кроме экранов (view-*), слоя интерфейса и перечисленных исключений. Новые модули попадают под правило сами.
+  const IMPURE = ['account.js', 'backup.js', 'breathing.js', 'bt-ui.js', 'focus.js', 'freewrite.js', 'speaking.js', 'sw.js'];
+  const PURE = files.filter(f => !UI_LAYER.has(f) && !f.startsWith('view-') && !f.startsWith('c-') && !IMPURE.includes(f));
   const bad = [];
   for (const f of PURE) {
     assert.ok(graph.has(f), `${f}: файла нет`);
@@ -55,14 +54,15 @@ test('слои: логика не импортирует экраны, инте�
   assert.deepEqual(bad, [], 'чистая логика зависит от интерфейса');
 });
 
-// Экран может подключать только свои дочерние блоки (разбиение больших экранов на файлы), чужие экраны — никогда.
+// Экран может подключать только свои дочерние блоки (разбиение больших экранов на файлы: view-<экран>-<часть>.js или запись ниже), чужие экраны — никогда.
 const CHILD_BLOCKS = { 'view-health.js': ['view-health-extra.js'], 'view-plans.js': ['view-plans-extra.js'], 'view-today.js': ['view-money-nudge.js', 'view-device-hints.js', 'view-day-cards.js'], 'view-learn.js': ['view-learn-extra.js'], 'view-insights.js': ['view-insights-extra.js'], 'view-settings.js': ['view-archive.js'], 'view-account.js': ['view-update.js'] };
 test('экраны не импортируют друг друга (кроме своих дочерних блоков), никто не импортирует app.js', () => {
   const bad = [];
   for (const [f, deps] of graph) {
     for (const d of deps) {
       if (d === 'app.js') bad.push(`${f} → app.js`);
-      if (f.startsWith('view-') && d.startsWith('view-') && !(CHILD_BLOCKS[f] || []).includes(d)) bad.push(`${f} → ${d}`);
+      const byName = f.startsWith('view-') && d.startsWith(f.replace(/\.js$/, '') + '-');          // view-notes.js → view-notes-history.js: дочерний блок по имени
+      if (f.startsWith('view-') && d.startsWith('view-') && !byName && !(CHILD_BLOCKS[f] || []).includes(d)) bad.push(`${f} → ${d}`);
     }
   }
   assert.deepEqual(bad, []);
