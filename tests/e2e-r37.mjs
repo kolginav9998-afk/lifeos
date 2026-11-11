@@ -130,7 +130,7 @@ await tab(page, 'reflect');
 assert.match(await text('#rit-progress'), /Сделано: 0 из 6/);
 await page.check('#rit-screen'); await page.check('#rit-plan');
 assert.match(await text('#rit-progress'), /Сделано: 2 из 6/);
-await page.waitForFunction(() => import('./store.js').then(m => m.state.events.some(e => e.type === 'ritual')));
+await page.waitForFunction(() => import('./store.js').then(m => m.state.events.some(e => e.type === 'ritual' && e.payload.steps.length === 2)));    // ждём вторую отметку, а не первую запись
 assert.deepEqual((await evs('ritual'))[0].payload.steps, ['screen', 'plan']);
 await page.reload();
 await until(page, () => !document.getElementById('app').hidden);
