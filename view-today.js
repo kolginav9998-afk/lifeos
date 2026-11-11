@@ -1,4 +1,4 @@
-import { el, fill, toast, dateRu, moneyText, weekdayOf } from './ui.js';
+import { el, fill, toast, dateRu, moneyText, weekdayOf, ring } from './ui.js';
 import { makeTask, updateTask, completeTask, reopenTask, groupTasks, todayStr, addDays, dueLabel, repeatLabel, profileOf } from './events.js';
 import { parseQuick } from './quick.js';
 import { getPref, setPref } from './prefs.js';
@@ -26,6 +26,7 @@ import { createMoneyNudge } from './view-money-nudge.js';
 import { createDeviceHints } from './view-device-hints.js';
 import { createDayCards } from './view-day-cards.js';
 import { lessonSkillStatus } from './skills.js';
+import { heroOf } from './daycards.js';
 import * as vault from './vault.js';
 import * as store from './store.js';
 
@@ -46,6 +47,8 @@ export function createTodayView({ go }) {
 
   const hello = el('div', { class: 'hello' });
   const dateLine = el('div', { id: 'date', class: 'date' });
+  const heroCap = el('div', { id: 'hero-cap', class: 'hero-cap' }), heroRing = el('div', { id: 'hero-ring', class: 'hero-ring' });
+  const hero = el('section', { id: 'hero', class: 'hero' }, el('div', { class: 'hero-text' }, hello, dateLine, heroCap), heroRing);
   const summary = el('div', { id: 'summary', class: 'chips' });
 
   const obList = el('ul', { class: 'steps', id: 'ob-steps' });
@@ -294,7 +297,7 @@ export function createTodayView({ go }) {
     toast(`Удалено сделанных: ${ids.length}`, { actionLabel: 'Отменить', onAction: () => store.saveMany(old) });
   };
 
-  root.append(hello, dateLine, whatsNew, summary, hintsBox, deviceHints.root, parkedBox, moneyNudge.root, intentionBox, planCard, dayCards.root, onboarding, wotd, focusHost, form, minimum, review, journal, ...Object.values(sections).map(s => s.sec), empty, doneBlock);
+  root.append(hero, whatsNew, summary, hintsBox, deviceHints.root, parkedBox, moneyNudge.root, intentionBox, planCard, dayCards.root, onboarding, wotd, focusHost, form, minimum, review, journal, ...Object.values(sections).map(s => s.sec), empty, doneBlock);
 
   // ----- элементы списка -----
   async function removeTask(ev) {
@@ -460,6 +463,9 @@ export function createTodayView({ go }) {
     const [y, m, d] = today.split('-').map(Number);
     const ds = new Date(y, m - 1, d, 12).toLocaleDateString('ru', { weekday: 'long', day: 'numeric', month: 'long' });
     dateLine.textContent = ds.charAt(0).toUpperCase() + ds.slice(1);
+    const hr = heroOf(events, today);
+    heroCap.textContent = hr.caption;
+    heroRing.replaceChildren(ring(hr.fraction, { label: hr.total ? `${hr.done}/${hr.total}` : '—', name: 'Дела на сегодня' }));
     renderOnboarding();
     renderWotd(today);
     const g = groupTasks(events, today);

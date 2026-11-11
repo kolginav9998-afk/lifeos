@@ -123,14 +123,14 @@ export function createAccountView({ go, onVaultChange = () => {}, gate = false, 
 
   function registerCard() {
     const user = field(`${ID}-user`, { type: 'text', placeholder: 'Логин (3–64 символа)', autocapitalize: 'off', required: true });
-    const p1 = field(`${ID}-pass`, { type: 'password', placeholder: 'Пароль (он же пароль защиты на устройстве)', autocomplete: 'new-password' });
+    const p1 = field(`${ID}-pass`, { type: 'password', placeholder: 'Пароль', autocomplete: 'new-password' });
     const p2 = field(`${ID}-pass2`, { type: 'password', placeholder: 'Повтори пароль', autocomplete: 'new-password' });
     const setup = field(`${ID}-setup`, { type: 'text', placeholder: 'Код установки сервера', hidden: !checked.setupCodeRequired });
     const meter = el('div', { id: `${ID}-strength`, class: 'strength', 'aria-live': 'polite' });
     p1.addEventListener('input', () => { const st = vault.passwordStrength(p1.value); meter.className = 'strength s' + st.score; meter.textContent = p1.value ? `Надёжность: ${st.label}` : ''; });
     const btn = el('button', { id: `${ID}-register`, type: 'submit', class: 'primary', textContent: 'Создать аккаунт' });
     const form = el('form', { id: `${ID}-reg-form`, class: 'form-stack' },
-      el('p', { class: 'muted', textContent: vault.status() === 'none' ? 'На этом устройстве будет включена защита паролем: данные зашифруются.' : 'Введи текущий пароль защиты на этом устройстве: аккаунт будет с тем же паролем.' }),
+      el('p', { class: 'muted', textContent: vault.status() === 'none' ? 'Этот же пароль включит защиту на устройстве: данные зашифруются. Забытый пароль восстанавливается только по коду восстановления.' : 'Введи текущий пароль защиты на этом устройстве: аккаунт будет с тем же паролем.' }),
       user, revealable(p1), meter, vault.status() === 'none' ? revealable(p2) : null, checked.setupCodeRequired ? setup : null, btn);
     form.onsubmit = async e => {
       e.preventDefault();

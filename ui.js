@@ -33,6 +33,21 @@ const ICONS = {
   tests: ['M22 12h-4l-3 9L9 3l-3 9H2'],
   growth: ['M23 6l-9.5 9.5-5-5L1 18', 'M17 6h6v6'],
 };
+// Кольцо прогресса: доля 0..1, текст по центру. Градиент (#ring-grad) объявлен в index.html.
+export function ring(fraction, { size = 88, stroke = 10, label = '', name = 'Выполнено' } = {}) {
+  const r = (size - stroke) / 2, c = 2 * Math.PI * r, f = Math.max(0, Math.min(1, Number(fraction) || 0));
+  const s = document.createElementNS(SVG_NS, 'svg');
+  for (const [k, v] of Object.entries({ viewBox: `0 0 ${size} ${size}`, width: size, height: size, class: 'ring', role: 'img', 'aria-label': `${name}: ${Math.round(f * 100)}%` })) s.setAttribute(k, v);
+  const circle = (cls, extra = {}) => {
+    const n = document.createElementNS(SVG_NS, 'circle');
+    for (const [k, v] of Object.entries({ cx: size / 2, cy: size / 2, r, 'stroke-width': stroke, class: cls, ...extra })) n.setAttribute(k, v);
+    return n;
+  };
+  s.append(circle('ring-track'), circle('ring-bar', { 'stroke-dasharray': c.toFixed(2), 'stroke-dashoffset': (c * (1 - f)).toFixed(2), transform: `rotate(-90 ${size / 2} ${size / 2})` }));
+  if (label) { const t = document.createElementNS(SVG_NS, 'text'); t.setAttribute('x', size / 2); t.setAttribute('y', size / 2); t.setAttribute('class', 'ring-txt'); t.setAttribute('text-anchor', 'middle'); t.setAttribute('dominant-baseline', 'central'); t.textContent = label; s.append(t); }
+  return s;
+}
+
 export function icon(name, size = 22) {
   const s = document.createElementNS(SVG_NS, 'svg');
   s.setAttribute('viewBox', '0 0 24 24'); s.setAttribute('width', size); s.setAttribute('height', size);

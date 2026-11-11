@@ -35,6 +35,15 @@ open(p, 'w', encoding='utf-8').write(s)
 cfg = open('dist/config.js', encoding='utf-8').read()
 assert "/*DEFAULT_SERVER*/ ''" in cfg, 'в config.js нет метки'
 assert "/*REQUIRE_ACCOUNT*/ true" in cfg, 'в config.js нет метки REQUIRE_ACCOUNT'
+assert "/*APP_NAME*/ 'Life OS'" in cfg, 'в config.js нет метки APP_NAME'
+# Название приложения: config/brand.json. Метка %APP_NAME% в index.html и манифесте, значение для кода — в config.js.
+name = json.load(open('config/brand.json', encoding='utf-8'))['name'].strip()
+assert 1 <= len(name) <= 30 and not any(c in name for c in '<>&"\\%'), 'недопустимое название приложения в config/brand.json'
+for f in ('dist/index.html', 'dist/manifest.webmanifest'):
+    t = open(f, encoding='utf-8').read()
+    assert '%APP_NAME%' in t, f + ': нет метки %APP_NAME%'
+    open(f, 'w', encoding='utf-8').write(t.replace('%APP_NAME%', name))
+cfg = cfg.replace("/*APP_NAME*/ 'Life OS'", json.dumps(name, ensure_ascii=False))
 require = os.environ.get('LIFEOS_REQUIRE_ACCOUNT', '1') not in ('0', 'false', 'no')     # '0' — только для автотестов
 cfg = cfg.replace("/*DEFAULT_SERVER*/ ''", json.dumps(server)).replace("/*REQUIRE_ACCOUNT*/ true", 'true' if require else 'false')
 open('dist/config.js', 'w', encoding='utf-8').write(cfg)

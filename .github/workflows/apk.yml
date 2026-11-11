@@ -42,6 +42,7 @@ jobs:
           ANDROID_VERSION_CODE: ${{ github.run_number }}
         run: |
           export ANDROID_VERSION_NAME="$(node -e "import('./version.js').then(m => console.log(m.VERSION))")"
+          export ANDROID_APP_NAME="$(node -e "console.log(JSON.parse(require('fs').readFileSync('config/brand.json', 'utf8')).name)")"
           python3 scripts/patch-android.py android
       - name: Собрать debug-APK
         working-directory: android
@@ -71,6 +72,7 @@ jobs:
           GH_TOKEN: ${{ github.token }}
         run: |
           VERSION="$(node -e "import('./version.js').then(m => console.log(m.VERSION))")"
+          APP_NAME="$(node -e "console.log(JSON.parse(require('fs').readFileSync('config/brand.json', 'utf8')).name)")"
           NOTES="$(node -e "import('./changelog.js').then(m => console.log(JSON.stringify(m.CHANGELOG[0].items).replaceAll('--', '-')))")"
           # Первая строка — машиночитаемые сведения для кнопки «Обновить» в приложении (см. updater.js).
           cat > release-notes.md <<EOF
@@ -80,5 +82,5 @@ jobs:
           gh release delete latest-apk --cleanup-tag --yes || true
           gh release create latest-apk out/lifeos.apk \
             --target "$GITHUB_SHA" --prerelease \
-            --title "Life OS $VERSION — последний APK" \
+            --title "$APP_NAME $VERSION — последний APK" \
             --notes-file release-notes.md

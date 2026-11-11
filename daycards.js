@@ -88,6 +88,15 @@ export function summaryText(s) {
   return L.join('\n');
 }
 
+// ---------- «герой» экрана «Сегодня»: кольцо дел на сегодня ----------
+// Сделано сегодня и осталось (на сегодня и просроченное). Доля — сделанное от всего; если дел нет, кольцо пустое.
+export function heroOf(events, today) {
+  const s = daySummary(events, today);
+  const done = s.tasksDone, left = s.left, total = done + left;
+  const caption = total === 0 ? 'На сегодня дел нет' : left === 0 ? 'Всё сделано на сегодня' : `Осталось дел: ${left}`;
+  return { done, left, total, fraction: total ? done / total : 0, caption };
+}
+
 // ---------- когда есть 10 минут ----------
 // Быстрые дела: задачи с меткой #быстро, #10мин или #5мин, минимум привычек на сегодня и карточки. Подсказка, что сделать в «окошко» времени.
 export const QUICK_RE = /(^|\s)#(быстро|10мин|10м|5мин|5м)(?=\s|$)/i;

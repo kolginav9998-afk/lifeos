@@ -1,14 +1,14 @@
 {
-  "name": "Life OS",
-  "short_name": "Life OS",
+  "name": "%APP_NAME%",
+  "short_name": "%APP_NAME%",
   "description": "Личные задачи. Работает офлайн, данные только на телефоне.",
   "lang": "ru",
   "start_url": "./",
   "scope": "./",
   "display": "standalone",
   "orientation": "portrait",
-  "background_color": "#020816",
-  "theme_color": "#020816",
+  "background_color": "#080914",
+  "theme_color": "#080914",
   "icons": [
     {
       "src": "icons/icon-192.png",

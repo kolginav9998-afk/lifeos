@@ -3,7 +3,9 @@
 1) Запрещает автоматическое облачное резервирование данных приложения (приватность).
 2) Прописывает постоянный ключ подписи из signing/debug.keystore, чтобы новую версию можно было ставить поверх старой.
 3) Подключает обновление изнутри: плагин ApkInstaller (скачать APK и открыть установщик Android) и разрешение на установку.
-4) Ставит номер сборки (ANDROID_VERSION_CODE растёт с каждой сборкой) и имя версии (ANDROID_VERSION_NAME)."""
+4) Ставит номер сборки (ANDROID_VERSION_CODE растёт с каждой сборкой) и имя версии (ANDROID_VERSION_NAME).
+5) Тёмная заставка при запуске (Android 12+ берёт цвет из темы; рисунки для старых версий лежат в assets/android-res).
+6) Название под иконкой (ANDROID_APP_NAME), если задано."""
 import os
 import pathlib
 import re
@@ -80,4 +82,24 @@ if name:
     g, n = re.subn(r'versionName "[^"]*"', 'versionName "' + name + '"', g, count=1)
     assert n == 1, 'не найден versionName в app/build.gradle'
 gradle.write_text(g, encoding='utf-8')
+
+# 5) Заставка
+styles = root / 'app/src/main/res/values/styles.xml'
+st = styles.read_text(encoding='utf-8')
+if 'windowSplashScreenBackground' not in st:
+    anchor = '<item name="android:background">@drawable/splash</item>'
+    assert anchor in st, 'в styles.xml нет ожидаемой темы запуска'
+    st = st.replace(anchor, anchor + '\n        <item name="windowSplashScreenBackground">#070812</item>')
+    styles.write_text(st, encoding='utf-8')
+
+# 6) Название под иконкой
+app_name = os.environ.get('ANDROID_APP_NAME', '').strip()
+if app_name:
+    assert '<' not in app_name and '&' not in app_name and '"' not in app_name and len(app_name) <= 30, 'ANDROID_APP_NAME: недопустимые символы'
+    strings = root / 'app/src/main/res/values/strings.xml'
+    sx = strings.read_text(encoding='utf-8')
+    sx, n1 = re.subn(r'(<string name="app_name">)[^<]*(</string>)', r'\g<1>' + app_name + r'\g<2>', sx)
+    sx, n2 = re.subn(r'(<string name="title_activity_main">)[^<]*(</string>)', r'\g<1>' + app_name + r'\g<2>', sx)
+    assert n1 == 1 and n2 == 1, 'не найдены строки app_name и title_activity_main'
+    strings.write_text(sx, encoding='utf-8')
 print('patched:', manifest, gradle, main)

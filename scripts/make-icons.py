@@ -1,8 +1,10 @@
 #!/usr/bin/env python3
-"""Делает иконки Life OS из assets/icon-source.webp: для сайта (icons/) и Android (assets/android-res/).
-Запуск: python3 scripts/make-icons.py   (нужен Pillow). Результат коммитится в репозиторий."""
+"""Делает иконки Life OS из assets/icon-source.webp: для сайта (icons/) и Android (assets/android-res/), а также заставку (splash).
+Запуск: python3 scripts/make-icons.py   (нужен Pillow). Результат коммитится в репозиторий.
+Только заставка: python3 scripts/make-icons.py --splash-only"""
 import os
-from PIL import Image, ImageDraw, ImageChops
+import sys
+from PIL import Image, ImageDraw, ImageChops, ImageFilter
 
 ROOT = os.path.normpath(os.path.join(os.path.dirname(os.path.abspath(__file__)), '..'))
 SRC = os.path.join(ROOT, 'assets', 'icon-source.webp')
@@ -76,14 +78,39 @@ def save(im, path):
     os.makedirs(os.path.dirname(path), exist_ok=True)
     im.save(path)
 
+SPLASH_ONLY = '--splash-only' in sys.argv
+
 # Сайт
-save(rounded_icon(192), f'{ROOT}/icons/icon-192.png')
-save(rounded_icon(512), f'{ROOT}/icons/icon-512.png')
-save(full_bleed(512, 0.94), f'{ROOT}/icons/icon-maskable-512.png')
-# Android: legacy + adaptive foreground (108dp, мотив внутри безопасной зоны)
-for dens, legacy, fg in [('mdpi', 48, 108), ('hdpi', 72, 162), ('xhdpi', 96, 216), ('xxhdpi', 144, 324), ('xxxhdpi', 192, 432)]:
+if not SPLASH_ONLY:
+  save(rounded_icon(192), f'{ROOT}/icons/icon-192.png')
+  save(rounded_icon(512), f'{ROOT}/icons/icon-512.png')
+  save(full_bleed(512, 0.94), f'{ROOT}/icons/icon-maskable-512.png')
+  # Android: legacy + adaptive foreground (108dp, мотив внутри безопасной зоны)
+  for dens, legacy, fg in [('mdpi', 48, 108), ('hdpi', 72, 162), ('xhdpi', 96, 216), ('xxhdpi', 144, 324), ('xxxhdpi', 192, 432)]:
     d = f'{ROOT}/assets/android-res/mipmap-{dens}'
     save(rounded_icon(legacy), f'{d}/ic_launcher.png')
     save(round_icon(legacy), f'{d}/ic_launcher_round.png')
     save(motif(fg, 0.84), f'{d}/ic_launcher_foreground.png')
+
+# Заставка при запуске (Android до 12 показывает этот рисунок; размеры повторяют шаблон Capacitor): тёмный фон со свечением и значком.
+def splash(w, h):
+    top, bot = (12, 13, 31), (7, 8, 18)
+    im = Image.new('RGB', (w, h))
+    d = ImageDraw.Draw(im)
+    for y in range(h):
+        t = y / max(h - 1, 1)
+        d.line([(0, y), (w, y)], fill=tuple(int(top[i] + (bot[i] - top[i]) * t) for i in range(3)))
+    cx, cy, r = w // 2, int(h * 0.46), int(min(w, h) * 0.40)
+    glow = Image.new('RGBA', (w, h), (0, 0, 0, 0))
+    ImageDraw.Draw(glow).ellipse([cx - r, cy - r, cx + r, cy + r], fill=(124, 92, 255, 110))
+    glow = glow.filter(ImageFilter.GaussianBlur(r * 0.55))
+    out = Image.alpha_composite(im.convert('RGBA'), glow)
+    size = int(min(w, h) * 0.26)
+    out.alpha_composite(rounded_icon(size), (cx - size // 2, cy - size // 2))
+    return out.convert('RGB')
+
+for folder, w, h in [('drawable', 480, 320), ('drawable-land-mdpi', 480, 320), ('drawable-land-hdpi', 800, 480), ('drawable-land-xhdpi', 1280, 720), ('drawable-land-xxhdpi', 1600, 960),
+                     ('drawable-land-xxxhdpi', 1920, 1280), ('drawable-port-mdpi', 320, 480), ('drawable-port-hdpi', 480, 800), ('drawable-port-xhdpi', 720, 1280),
+                     ('drawable-port-xxhdpi', 960, 1600), ('drawable-port-xxxhdpi', 1280, 1920)]:
+    save(splash(w, h), f'{ROOT}/assets/android-res/{folder}/splash.png')
 print('ok')

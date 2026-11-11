@@ -26,6 +26,12 @@ git add -A && git commit -m "R3.x: что нового" && git push origin main
 curl -s "https://api.github.com/repos/kolginav9998-afk/lifeos/actions/runs?head_sha=ПОЛНЫЙ_ХЭШ" | python3 -c 'import sys,json;[print(r["name"],r["status"],r["conclusion"]) for r in json.load(sys.stdin)["workflow_runs"]]'
 ```
 
+## Как поменять название приложения
+Изменить `name` в `config/brand.json`: сборка сама подставит его в страницу, манифест, подпись под иконкой и заголовок выпуска. Тексты внутри программы (заметки в курсах, названия файлов экспорта) при желании поправить поиском по старому названию. Не менять: `appId` в `capacitor.config.json`, адрес сайта, имя файла `lifeos.apk`, название репозитория (от них зависят обновление поверх старого приложения и данные).
+
+## Как смотреть оформление
+`node tests/shots.mjs <метка> [dark|light|both] [экраны]` и `node tests/shots-gate.mjs <метка>` сохраняют скриншоты в папку `shots/` (она не коммитится). Контраст цветов проверяет `tests/r313.test.mjs`.
+
 ## Как работает «Обновить» в приложении
 - Сборка **apk** кладёт в описание выпуска `latest-apk` первую строку-комментарий `<!-- lifeos-update {"version":"R3.x","notes":[…]} -->` (версия и список «что нового» берутся из `version.js` и `changelog.js`). Приложение читает её через GitHub API (`updater.js`), сравнивает с собой и, если версия выше, показывает «Обновить».
 - Файл `lifeos.apk` скачивает нативный плагин `ApkInstaller` (`assets/android-java/ApkInstallerPlugin.java`, подключается скриптом `scripts/patch-android.py`): только с github.com / githubusercontent.com и только по https; потом открывается системный установщик Android. Подтверждение остаётся за человеком, а поставиться поверх можно только файлу с тем же ключом подписи.
