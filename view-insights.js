@@ -7,6 +7,8 @@ import { saveBinaryFile, saveTextFile } from './platform.js';
 import { TESTS, DOMAINS, runsOf, fmtPrimary, fmtNum } from './bt-core.js';
 import { analyzeRuns, insights, dailyRows, zText, zWord } from './bt-analytics.js';
 import { buildExport, toCsvExcel, buildTables } from './bt-export.js';
+import { monthReport, doctorSummary } from './reports.js';
+import { shiftMonth, monthLabel } from './money.js';
 
 const CONF = { low: 'предварительно', mid: 'вероятно', high: 'устойчиво' };
 
@@ -117,6 +119,14 @@ export function createInsightsView() {
 
     parts.push(el('h2', { textContent: 'Эксперименты' }), expForm, ...experimentNodes(dailyRows(events, runs, an)));
 
+    parts.push(el('h2', { textContent: 'Отчёты' }), el('div', { class: 'card', id: 'reports' },
+      el('p', { class: 'muted', textContent: 'Готовые тексты (Markdown) из твоих данных. В них только числа и названия; тексты дневника и заметок не включаются.' }),
+      el('div', { class: 'form-stack' }, el('label', {}, 'Итоги месяца: ', monthSel),
+        el('div', { class: 'row wrap' }, el('button', { type: 'button', id: 'rep-month-copy', class: 'chip', textContent: 'Скопировать', onclick: reportCopy('month') }), el('button', { type: 'button', id: 'rep-month-file', class: 'chip', textContent: 'Сохранить файл', onclick: reportFile('month') })),
+        el('strong', { textContent: 'Сводка для врача (30 дней)' }),
+        el('div', { class: 'row wrap' }, el('button', { type: 'button', id: 'rep-doc-copy', class: 'chip', textContent: 'Скопировать', onclick: reportCopy('doctor') }), el('button', { type: 'button', id: 'rep-doc-file', class: 'chip', textContent: 'Сохранить файл', onclick: reportFile('doctor') })),
+        el('p', { class: 'muted', textContent: 'Сводка для врача — не диагноз. Это удобный список замеров, чтобы быстро показать динамику на приёме.' }))));
+
     parts.push(el('h2', { textContent: 'Выгрузка для анализа' }), el('div', { class: 'card' },
       el('p', { class: 'muted', textContent: 'ZIP с таблицами CSV: дни, все проходы, все метрики и пробы, отметки, замеры, привычки, обучение. Тексты дневника, заметки и деньги не входят.' }),
       el('div', { class: 'form-stack' },
@@ -141,15 +151,22 @@ export function createInsightsView() {
       toast('Таблица готова');
     } catch (e) { toast('Не удалось выгрузить: ' + (e.message || e)); }
   }
-  async function copySummary() {
-    const text = aiSummary(events);
-    try { await navigator.clipboard.writeText(text); toast('Сводка скопирована. Вставь её в чат с ИИ.'); }
+  async function copyText(text, okMsg) {
+    try { await navigator.clipboard.writeText(text); toast(okMsg); }
     catch {
       const ta = el('textarea', { value: text, readOnly: true }); ta.style.position = 'fixed'; ta.style.opacity = '0'; document.body.append(ta); ta.select();
-      try { document.execCommand('copy'); toast('Сводка скопирована. Вставь её в чат с ИИ.'); } catch { toast('Не удалось скопировать'); }
+      try { document.execCommand('copy'); toast(okMsg); } catch { toast('Не удалось скопировать'); }
       ta.remove();
     }
   }
+  const copySummary = () => copyText(aiSummary(events), 'Сводка скопирована. Вставь её в чат с ИИ.');
+  const monthSel = el('select', { id: 'rep-month', 'aria-label': 'Месяц отчёта' }, ...Array.from({ length: 6 }, (_, i) => { const ym = shiftMonth(todayStr().slice(0, 7), -i); return el('option', { value: ym, textContent: monthLabel(ym) }); }));
+  const reportText = kind => (kind === 'month' ? monthReport(events, monthSel.value) : doctorSummary(events, todayStr()));
+  const reportCopy = kind => () => copyText(reportText(kind), 'Отчёт скопирован. Можно вставить в чат, заметку или письмо.');
+  const reportFile = kind => async () => {
+    try { await saveTextFile(kind === 'month' ? `lifeos-month-${monthSel.value}.md` : `lifeos-doctor-${todayStr()}.md`, reportText(kind), 'text/markdown'); toast('Файл готов'); }
+    catch (e) { toast('Не удалось сохранить: ' + (e.message || e)); }
+  };
 
   // Тяжёлые расчёты (связи, подсказки) делаем только когда экран открыт: обновления данных на других вкладках их не запускают.
   return { root, update(evs) { events = evs; if (!root.hidden) render(); }, show() { render(); } };

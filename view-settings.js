@@ -13,6 +13,8 @@ import * as notify from './notify.js';
 import { log as errorLog } from './errlog.js';
 import { account } from './app-sync.js';
 import { describeError } from './account.js';
+import { tasksToIcs } from './ics.js';
+import { dataChecks } from './datacheck.js';
 
 const TYPE_NAMES = { task: 'задачи', habit: 'привычки', habit_log: 'отметки привычек', expense: 'расходы', income: 'доходы', note: 'заметки' };
 const AUTOLOCK = [[0, 'сразу при сворачивании'], [1, 'через 1 минуту'], [5, 'через 5 минут'], [15, 'через 15 минут'], [60, 'через час'], [-1, 'никогда']];
@@ -142,7 +144,15 @@ export function createSettingsView({ lockNow, applyTheme, onVaultChange, openAcc
     try { await saveTextFile(`lifeos-${stamp()}.json`, serialize(store.state.events)); setPref('lastBackupAt', Date.now()); renderStats(); toast(`Сохранено записей: ${store.state.events.length}`); }
     catch (err) { toast('Не удалось сохранить: ' + (err?.message || err)); }
   };
+  const checkOut = el('div', { id: 'data-check-out', class: 'form-stack' });
+  const checkBtn = el('button', { id: 'data-check', type: 'button', textContent: 'Проверить данные на ошибки и пропуски', onclick: () => {
+    const res = dataChecks(store.state.events, todayStr());
+    checkOut.replaceChildren(...res.map(r => el('p', { class: r.level === 'warn' ? 'warn' : 'muted', dataset: { check: r.id }, textContent: (r.level === 'warn' ? '⚠ ' : r.level === 'ok' ? '✓ ' : '• ') + r.text })));
+  } });
   const csvBtn = el('button', { id: 'export-csv', type: 'button', textContent: 'Расходы и доходы для Excel (CSV)', onclick: () => exportCsv() });
+  const icsBtn = el('button', { id: 'export-ics', type: 'button', textContent: 'Задачи в календарь (.ics)', onclick: async () => {
+    try { const r = tasksToIcs(store.state.events); if (!r.count) { toast('Нет задач со сроком — нечего выгружать'); return; } await saveTextFile(`lifeos-calendar-${todayStr()}.ics`, r.text, 'text/calendar'); toast(`В календарь: ${r.count}`); } catch (e) { toast('Не удалось: ' + (e.message || e)); }
+  } });
   const mdBtn = el('button', { id: 'export-md', type: 'button', textContent: 'Всё читаемо (Markdown)', onclick: () => saveTextFile(`lifeos-${stamp()}.md`, toMarkdown(store.state.events), 'text/markdown').catch(err => toast(err.message)) });
   async function exportCsv() {
     try { await saveTextFile(`money-${stamp()}.csv`, expensesToCsv(store.state.events), 'text/csv'); }
@@ -180,6 +190,9 @@ export function createSettingsView({ lockNow, applyTheme, onVaultChange, openAcc
   const theme = el('select', { id: 'theme-select' }, ...[['auto', 'как в системе'], ['light', 'светлая'], ['dark', 'тёмная']].map(([v, t]) => el('option', { value: v, textContent: t })));
   theme.value = getPref('theme');
   theme.onchange = () => { setPref('theme', theme.value); applyTheme(); };
+  const fontSel = el('select', { id: 'font-select', 'aria-label': 'Размер текста' }, ...[['1', 'обычный'], ['1.15', 'крупный'], ['1.3', 'очень крупный']].map(([v, t]) => el('option', { value: v, textContent: t })));
+  fontSel.value = String(getPref('fontScale'));
+  fontSel.onchange = () => { setPref('fontScale', Number(fontSel.value)); applyTheme(); };
   const parseDates = el('input', { id: 'pref-parse', type: 'checkbox', checked: !!getPref('parseDates') });
   parseDates.onchange = () => setPref('parseDates', parseDates.checked);
   const hideAmounts = el('input', { id: 'pref-hide', type: 'checkbox', checked: !!getPref('hideAmounts') });
@@ -197,7 +210,9 @@ export function createSettingsView({ lockNow, applyTheme, onVaultChange, openAcc
     const th = el('select', { id: 'remind-task-hour' }, ...hours([-1, 7, 8, 9, 10, 11, 12], 'не напоминать').map(([v, t]) => el('option', { value: String(v), textContent: t })));
     const hh = el('select', { id: 'remind-habit-hour' }, ...hours([-1, 18, 19, 20, 21, 22], 'не напоминать').map(([v, t]) => el('option', { value: String(v), textContent: t })));
     const eh = el('select', { id: 'remind-evening-hour' }, ...hours([-1, 19, 20, 21, 22, 23], 'не напоминать').map(([v, t]) => el('option', { value: String(v), textContent: t })));
-    th.value = String(getPref('taskHour')); hh.value = String(getPref('habitHour')); eh.value = String(getPref('eveningHour'));
+    const bt = el('select', { id: 'remind-bed' }, ...[[-1, 'не напоминать'], [1290, 'в 21:30'], [1320, 'в 22:00'], [1350, 'в 22:30'], [1380, 'в 23:00'], [1410, 'в 23:30']].map(([v, t]) => el('option', { value: String(v), textContent: t })));
+    const wk = el('select', { id: 'remind-week' }, ...[[-1, 'не напоминать'], [17, 'в 17:00'], [18, 'в 18:00'], [19, 'в 19:00'], [20, 'в 20:00']].map(([v, t]) => el('option', { value: String(v), textContent: t })));
+    th.value = String(getPref('taskHour')); hh.value = String(getPref('habitHour')); eh.value = String(getPref('eveningHour')); bt.value = String(getPref('bedtimeMin')); wk.value = String(getPref('weeklyHour'));
     const status = el('p', { id: 'remind-status', class: 'muted', textContent: getPref('remindersOn') ? 'Включено' : 'Выключено' });
     const run = async ask => {
       const r = await notify.resync({ ask });
@@ -212,13 +227,15 @@ export function createSettingsView({ lockNow, applyTheme, onVaultChange, openAcc
     th.onchange = () => { setPref('taskHour', Number(th.value)); if (getPref('remindersOn')) run(false); };
     hh.onchange = () => { setPref('habitHour', Number(hh.value)); if (getPref('remindersOn')) run(false); };
     eh.onchange = () => { setPref('eveningHour', Number(eh.value)); if (getPref('remindersOn')) run(false); };
+    bt.onchange = () => { setPref('bedtimeMin', Number(bt.value)); if (getPref('remindersOn')) run(false); };
+    wk.onchange = () => { setPref('weeklyHour', Number(wk.value)); if (getPref('remindersOn')) run(false); };
     const test = el('button', { id: 'remind-test', type: 'button', textContent: 'Тестовое уведомление через 5 секунд', onclick: async () => {
       const r = await notify.testNow();
       toast(r.ok ? 'Закрой экран или сверни приложение: уведомление придёт через 5 секунд' : r.reason === 'denied' ? 'Нет разрешения на уведомления' : `Не удалось: ${r.reason}`);
     } });
     remindBox.replaceChildren(
       el('label', { class: 'check-label' }, on, ' Напоминать о задачах и привычках'),
-      el('label', {}, 'О задачах на день: ', th), el('label', {}, 'О привычках: ', hh), el('label', {}, 'Вечерняя отметка и повторение: ', eh), status, test,
+      el('label', {}, 'О задачах на день: ', th), el('label', {}, 'О привычках: ', hh), el('label', {}, 'Вечерняя отметка и повторение: ', eh), el('label', {}, 'Подготовка ко сну: ', bt), el('label', {}, 'Итоги недели (воскресенье): ', wk), status, test,
       el('p', { class: 'muted', textContent: 'Если уведомления не приходят, на Huawei разреши приложению автозапуск и работу в фоне (Настройки → Батарея → Запуск приложений).' }));
   }
 
@@ -288,14 +305,15 @@ export function createSettingsView({ lockNow, applyTheme, onVaultChange, openAcc
     card('Защита паролем', secBox),
     card('Резервные копии и экспорт',
       el('div', { class: 'form-stack' }, revealable(bkPass), bkBtn),
-      el('div', { class: 'row wrap' }, plainBtn, csvBtn, mdBtn),
+      el('div', { class: 'row wrap' }, plainBtn, csvBtn, mdBtn, icsBtn),
       el('div', { class: 'row wrap' }, impLabel), impRow),
     card('Внешний вид и поведение',
       el('label', {}, 'Тема: ', theme),
+      el('label', {}, 'Размер текста: ', fontSel),
       el('label', { class: 'check-label' }, parseDates, ' Понимать даты в тексте задачи («завтра», «10 числа»)'),
       el('label', { class: 'check-label' }, hideAmounts, ' Скрывать суммы на экране')),
     card('Напоминания', remindBox),
-    card('Данные', stats, corrupt),
+    card('Данные', stats, corrupt, checkBtn, checkOut),
     card('Приватность', privacy),
     card('О приложении', diag),
     card('Опасная зона', el('p', { class: 'muted', textContent: 'Удаляет все записи, пароль и настройки на этом устройстве. Отменить нельзя.' }), wipeConfirm, wipeBtn));

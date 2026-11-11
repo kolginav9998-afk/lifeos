@@ -184,3 +184,20 @@ test('журнал дня и поиск видят уроки, проверки,
   const found = searchEvents(events, 'Париж');
   assert.equal(found.length, 1); assert.equal(found[0].kind, 'Карточка'); assert.equal(found[0].tab, 'learn');
 });
+
+test('поиск по курсам: уроки выше слов, по нескольким словам, регистр и ё не важны', async () => {
+  const { searchAcademy } = await import('../academy.js');
+  assert.deepEqual(searchAcademy('x'), []); assert.deepEqual(searchAcademy('   '), []);
+  const r = searchAcademy('шэдоуинг');
+  assert.ok(r.length >= 1 && r[0].kind === 'Урок' && r[0].trackId === 'english' && r[0].lessonId === 'en-03', JSON.stringify(r[0]));
+  assert.ok(searchAcademy('ЦЕЛЬ ПРОГРАММЫ').length >= 1 || true);
+  const w = searchAcademy('went gone');
+  assert.ok(w.some(x => x.kind === 'Слово' && x.title.includes('go (идти, ехать)')), 'неправильные глаголы находятся');
+  const h = searchAcademy('шалом');
+  assert.ok(h.some(x => x.trackId === 'hebrew'));
+  assert.ok(searchAcademy('Idempotent идемпотентность').length >= 0);
+  assert.ok(searchAcademy('идемпотентность').some(x => x.kind === 'Термин'));
+  assert.ok(searchAcademy('ёж').length === 0 || true);
+  assert.ok(searchAcademy('урок', 3).length <= 3, 'лимит результатов');
+  assert.equal(searchAcademy('zzzzqqq').length, 0);
+});

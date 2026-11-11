@@ -306,7 +306,7 @@ test('Markdown-экспорт содержит все разделы и не л�
     makeNote('текст заметки', NOW), makeExpense({ amount: '100', category: 'Еда', note: 'x\ny', date: TODAY }, NOW), makeHabit({ name: 'Бег' }, NOW)], NOW);
   for (const part of ['## Задачи', '- [ ] задача ★ (до 2026-11-10)', '- [x] готово', '## Привычки', '**Бег**', '## Заметки', 'текст заметки', '## Расходы', '100 ₽', 'x y']) assert.ok(md.includes(part), part);
   const empty = toMarkdown([], NOW);
-  assert.equal((empty.match(/_нет_/g) || []).length, 7, 'задачи, привычки, заметки, расходы, доходы, дневник, замеры');
+  assert.equal((empty.match(/_нет_/g) || []).length, 12, 'задачи, привычки, заметки, расходы, доходы, дневник, замеры, тренировки, фокус, цели, подписки, эксперименты');
   for (const part of ['## Дневник', '## Замеры']) assert.ok(empty.includes(part), part);
 });
 

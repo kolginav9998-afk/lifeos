@@ -3,7 +3,7 @@
 :root[data-theme=dark]{--bg:#0b0d11;--card:#161a21;--line:#262c36;--text:#e8eaed;--muted:#8b93a1;--accent:#5b9dff;--ok:#4cc38a;--danger:#ff6b6b;--warn:#fbbf24;--soft:#1b2230}
 *{box-sizing:border-box}
 [hidden]{display:none !important}
-html,body{margin:0;background:var(--bg);color:var(--text);font:16px/1.4 system-ui,-apple-system,"Segoe UI",Roboto,sans-serif;-webkit-text-size-adjust:100%}
+html,body{margin:0;background:var(--bg);color:var(--text);font:calc(16px*var(--fs,1))/1.4 system-ui,-apple-system,"Segoe UI",Roboto,sans-serif;-webkit-text-size-adjust:100%}
 button,input,select,textarea{font:inherit;color:inherit}
 button{cursor:pointer}
 h1,h2,h3{margin:0}
@@ -161,9 +161,9 @@ html.amounts-hidden .amount{letter-spacing:.1em}
 .strength.s0,.strength.s1{color:var(--danger)}.strength.s2{color:var(--warn)}.strength.s3,.strength.s4{color:var(--ok)}
 
 /* ---- вторая строка переключателей и синхронизация ---- */
-.subnav{display:flex;gap:6px;margin:0 0 12px;overflow-x:auto;scrollbar-width:none}
+.subnav{display:flex;flex-wrap:wrap;gap:6px;margin:0 0 12px}
 .subnav::-webkit-scrollbar{display:none}
-.subnav button{min-height:40px;padding:6px 14px;border-radius:999px;border:1px solid var(--line);background:var(--card);color:var(--muted);white-space:nowrap}
+.subnav button{min-height:40px;padding:6px 11px;font-size:.93rem;border-radius:999px;border:1px solid var(--line);background:var(--card);color:var(--muted);white-space:nowrap}
 .subnav button[aria-pressed=true]{background:var(--accent);border-color:transparent;color:#fff;font-weight:600}
 .sync-badge{min-height:32px;padding:2px 8px;border-radius:999px;border:1px solid var(--line);background:var(--card);font-size:.72rem;color:var(--muted)}
 .sync-badge[data-state=idle]{color:var(--ok)}
@@ -284,3 +284,24 @@ html.amounts-hidden .amount{letter-spacing:.1em}
 .q-row{display:flex;flex-direction:column;gap:4px;align-items:flex-start}
 .q-row .q-label{font-size:.8rem;color:var(--muted)}
 .q-row .q-text{font-weight:600}
+/* ---- тренировки ---- */
+.wk-input input{min-width:0;flex:1}
+.wk-input .primary{flex:none}
+.wk-set{display:flex;align-items:center;gap:8px;list-style:none;margin-left:-18px}
+.wk-hint{margin:6px 0}
+.wk-rpe{grid-template-columns:repeat(5,1fr)}
+/* ---- планы ---- */
+.progress.warn span{background:var(--warn)}
+.progress.ok span{background:var(--ok)}
+.lim-row,.goal,.sub{display:flex;flex-direction:column;gap:4px;padding:8px 0;border-top:1px solid var(--line)}
+.lim-row:first-of-type,.goal:first-of-type,.sub:first-of-type{border-top:0}
+.goal.done strong{color:var(--ok)}
+.sub.off{opacity:.6}
+.goal .row input{min-width:0;flex:1}
+/* ---- тяжёлый день: только минимум ---- */
+#minimum{border-left:4px solid var(--accent)}
+#minimum h3{margin-bottom:6px}
+.mini-head{display:flex;gap:8px;align-items:center;justify-content:space-between}
+.med{display:flex;align-items:center;gap:8px;padding:4px 0}
+.med.off{opacity:.6}
+.goal .goal-amt{flex:1 1 100%}

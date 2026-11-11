@@ -6,6 +6,8 @@ import { todayStr } from './events.js';
 import { SLOTS, RATINGS, NUMBERS } from './diary.js';
 import { measureLabel } from './health.js';
 import { statesOf } from './academy.js';
+import { workoutRows } from './workouts.js';
+import { focusMinutes } from './focus.js';
 
 // Обычный CSV (RFC 4180): запятая, точка как десятичный разделитель, UTF-8 с BOM. Текстовые ячейки защищены от формул.
 function cell(v) {
@@ -48,8 +50,8 @@ export function buildTables(events) {
   for (const e of events) if (e.type === 'measure' && e.payload.kind === 'weight') (wt[e.payload.date] ||= []).push(e.payload.value);
   const dayCols = ['date', 'runs', 'composite', ...Object.keys(DOMAINS).map(d => 'z_' + d),
     'sleepHours', 'sleepQuality', 'moodMorning', 'energyMorning', 'stressMorning', 'moodEvening', 'energyEvening', 'stressEvening', 'focus', 'productivity', 'social',
-    'caffeine', 'alcohol', 'water', 'exercise', 'screen', 'outdoors', 'habitsDone', 'tasksDone', 'weightKg'];
-  const dayRows = days.map(r => ({ ...r, habitsDone: habitsByDate[r.date] ?? 0, tasksDone: tasksByDate[r.date] ?? 0, weightKg: wt[r.date] ? wt[r.date].reduce((a, b) => a + b, 0) / wt[r.date].length : null }));
+    'caffeine', 'alcohol', 'water', 'exercise', 'screen', 'outdoors', 'habitsDone', 'tasksDone', 'focusMin', 'weightKg'];
+  const dayRows = days.map(r => ({ ...r, focusMin: focusMinutes(events, r.date), habitsDone: habitsByDate[r.date] ?? 0, tasksDone: tasksByDate[r.date] ?? 0, weightKg: wt[r.date] ? wt[r.date].reduce((a, b) => a + b, 0) / wt[r.date].length : null }));
   T.daily = { cols: dayCols, rows: dayRows };
 
   // ----- проходы -----
@@ -84,6 +86,7 @@ export function buildTables(events) {
   const hnames = Object.fromEntries(events.filter(e => e.type === 'habit').map(e => [e.id, e.payload.name]));
   T.habits = { cols: ['date', 'habit', 'level'], rows: events.filter(e => e.type === 'habit_log').map(e => ({ date: e.payload.date, habit: hnames[e.payload.habitId] ?? '', level: e.payload.level })).sort((a, b) => a.date.localeCompare(b.date)) };
   T.learning = { cols: ['card', 'box', 'reps', 'lapses', 'first', 'last', 'due', 'recall_rate'], rows: statesOf(events).map(s => ({ card: s.card, box: s.box, reps: s.reps, lapses: s.lapses, first: s.first, last: s.last ?? '', due: s.due, recall_rate: s.hist?.length ? s.hist.filter(h => h[1] > 0).length / s.hist.length : null })) };
+  T.workouts = { cols: ['date', 'workout', 'exercise', 'set', 'reps', 'kg', 'sec', 'rpe'], rows: workoutRows(events) };
   T.lessons = { cols: ['date', 'track', 'lesson', 'minutes'], rows: events.filter(e => e.type === 'lesson').map(e => ({ date: e.payload.date, track: e.payload.track, lesson: e.payload.lesson, minutes: e.payload.minutes })).sort((a, b) => a.date.localeCompare(b.date)) };
   return { T, runs, an };
 }
@@ -102,6 +105,7 @@ test_trials.csv  — все отдельные пробы: время реакц
 checkins.csv     — утренние и вечерние отметки.
 measures.csv     — замеры здоровья (вес, давление, пульс и др.).
 habits.csv       — отметки привычек по дням.
+workouts.csv     — тренировки: каждый подход (дата, упражнение, повторения, вес, секунды, усилие).
 lessons.csv      — пройденные уроки; learning.csv — состояние карточек для повторения.
 testruns.json    — исходные записи проверок без изменений.
 
@@ -120,7 +124,7 @@ testruns.json    — исходные записи проверок без из�
 export function buildExport(events, now = Date.now()) {
   const { T, runs } = buildTables(events);
   const files = [{ name: 'README.txt', data: README }];
-  const names = { daily: 'daily.csv', runs: 'test_runs.csv', metrics: 'test_metrics.csv', trials: 'test_trials.csv', checkins: 'checkins.csv', measures: 'measures.csv', habits: 'habits.csv', lessons: 'lessons.csv', learning: 'learning.csv' };
+  const names = { daily: 'daily.csv', runs: 'test_runs.csv', metrics: 'test_metrics.csv', trials: 'test_trials.csv', checkins: 'checkins.csv', measures: 'measures.csv', habits: 'habits.csv', workouts: 'workouts.csv', lessons: 'lessons.csv', learning: 'learning.csv' };
   for (const [k, name] of Object.entries(names)) files.push({ name, data: toCsv(T[k].cols, T[k].rows) });
   files.push({ name: 'daily_excel.csv', data: toCsvExcel(T.daily.cols, T.daily.rows) });
   files.push({ name: 'testruns.json', data: JSON.stringify(runs, null, 1) });

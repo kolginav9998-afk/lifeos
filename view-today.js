@@ -8,6 +8,10 @@ import { dayLog } from './journal.js';
 import { spentBetween } from './money.js';
 import { todayLoad, wordOfDay } from './academy.js';
 import { activeExperiments, phaseOf } from './experiments.js';
+import { parseCapture, captureLabel, buildCapture } from './capture.js';
+import { strengthDays, doneWorkouts, WEEKLY_STRENGTH_GOAL } from './workouts.js';
+import { openFocus, hasRunningFocus, focusMinutes } from './focus.js';
+import { makeNote, templateText } from './notes.js';
 import * as vault from './vault.js';
 import * as store from './store.js';
 
@@ -52,6 +56,10 @@ export function createTodayView({ go }) {
       done ? el('span', { textContent: text }) : el('button', { type: 'button', class: 'link', textContent: text, onclick: act }))));
   }
 
+  // фокус-таймер
+  const focusHost = el('div', { id: 'focus-host', class: 'overlay', hidden: true, tabIndex: -1, role: 'dialog', 'aria-modal': 'true', 'aria-label': 'Фокус' });
+  const startFocus = (resume = false) => { openFocus(focusHost, { tasks: events.filter(e => e.type === 'task' && !e.payload.done).map(e => e.payload.text), resume }); focusHost.focus({ preventScroll: true }); };
+
   // слово дня: английский и иврит, перевод по касанию
   const wotd = el('div', { id: 'wotd', class: 'card tight', hidden: true });
   function renderWotd(today) {
@@ -67,18 +75,19 @@ export function createTodayView({ go }) {
   }
 
   // ----- форма добавления -----
-  const input = el('input', { id: 'add-input', type: 'text', placeholder: 'Что нужно сделать?', enterKeyHint: 'done', maxLength: 500, required: true, autocomplete: 'off' });
+  const input = el('input', { id: 'add-input', type: 'text', placeholder: 'Задача, расход или замер…', enterKeyHint: 'done', maxLength: 500, required: true, autocomplete: 'off' });
   const addBtn = el('button', { type: 'submit', 'aria-label': 'Добавить', textContent: '+' });
   const due = el('input', { id: 'add-due', type: 'date' });
   const rep = repeatSelect('', ''); rep.id = 'add-repeat';
   const high = el('input', { id: 'add-high', type: 'checkbox' });
   const hint = el('div', { id: 'add-hint', class: 'hint', hidden: true });
+  const cap = el('div', { id: 'cap-suggest', class: 'hint', hidden: true });
   const form = el('form', { id: 'add-form', autocomplete: 'off' },
     el('div', { class: 'add-row' }, input, addBtn),
     el('div', { class: 'opts-row' },
       el('label', {}, 'Срок ', due), el('label', {}, 'Повтор ', rep),
       el('label', { class: 'check-label' }, high, ' Важное')),
-    hint);
+    hint, cap);
 
   function parsed() {
     if (!getPref('parseDates') || skipParse || due.value || rep.value) return null;
@@ -99,7 +108,25 @@ export function createTodayView({ go }) {
       el('button', { type: 'button', class: 'link', textContent: 'Не надо', onclick: () => { skipParse = true; updateHint(); } }));
     hint.hidden = false;
   }
-  input.addEventListener('input', () => { skipParse = false; updateHint(); });
+  // умный ввод: «потратил 350 на кофе», «вес 72,4», «заметка: …» — предлагаем, человек подтверждает
+  function updateCapture() {
+    cap.replaceChildren();
+    if (due.value || rep.value || !input.value.trim()) { cap.hidden = true; return; }
+    const habits = activeHabits(events, todayStr()).map(({ h }) => ({ id: h.id, name: h.payload.name }));
+    const c = parseCapture(input.value, { habits });
+    if (!c) { cap.hidden = true; return; }
+    cap.append(el('span', { textContent: c.confidence === 'mid' ? 'Возможно, это: ' : 'Это похоже на: ' }),
+      el('button', { type: 'button', id: 'cap-chip', class: 'chip', textContent: `Добавить ${captureLabel(c)}`, onclick: async () => {
+        try {
+          const ev = buildCapture(c, { habits });
+          input.value = ''; updateHint(); updateCapture();
+          await store.save(ev);
+          toast(`Добавлено: ${captureLabel(c)}`, { actionLabel: 'Отменить', onAction: () => store.remove(ev.id) });
+        } catch (err) { toast('Не удалось добавить: ' + err.message); }
+      } }));
+    cap.hidden = false;
+  }
+  input.addEventListener('input', () => { skipParse = false; updateHint(); updateCapture(); });
   due.addEventListener('input', updateHint); rep.addEventListener('input', updateHint);
 
   form.addEventListener('submit', async e => {
@@ -110,7 +137,7 @@ export function createTodayView({ go }) {
     const q = parsed();
     if (q) { text = q.text; d = q.due; r = q.repeat; }
     const pr = high.checked ? 'high' : 'normal';
-    input.value = ''; due.value = ''; rep.value = ''; high.checked = false; skipParse = false; updateHint();   // чистим сразу — быстрый ввод не теряется
+    input.value = ''; due.value = ''; rep.value = ''; high.checked = false; skipParse = false; updateHint(); updateCapture();   // чистим сразу — быстрый ввод не теряется
     try { await store.save(makeTask(text, Date.now(), { due: d, repeat: r, priority: pr })); }
     catch (err) { toast('Не удалось добавить: ' + err.message); }
   });
@@ -140,6 +167,10 @@ export function createTodayView({ go }) {
     const ul = el('ul', { class: 'list open' });
     sections[key] = { sec: el('section', { id: 'g-' + key, hidden: true }, el('h2', { class: cls, textContent: title }), ul), ul };
   }
+  const minList = el('ul', { class: 'list open' });
+  const minimum = el('div', { id: 'minimum', class: 'card', hidden: true }, el('div', { class: 'mini-head' }, el('h3', { textContent: 'Минимум на сегодня' }),
+    el('button', { type: 'button', id: 'heavy-off', class: 'chip', textContent: 'Выйти из режима', onclick: () => { setPref('heavyDay', false); render(); } })),
+    el('p', { class: 'muted', textContent: 'Тяжёлый день: только самое важное. Три дела, остальное подождёт. Привычки — в минимальной версии.' }), minList);
   const empty = el('p', { id: 'empty', class: 'muted', hidden: true, textContent: 'Пока пусто. Добавь первую задачу.' });
   const doneList = el('ul', { id: 'done-list', class: 'list' });
   const doneCount = el('span', { id: 'done-count', textContent: '0' });
@@ -152,7 +183,7 @@ export function createTodayView({ go }) {
     toast(`Удалено сделанных: ${ids.length}`, { actionLabel: 'Отменить', onAction: () => store.saveMany(old) });
   };
 
-  root.append(hello, dateLine, summary, onboarding, wotd, form, review, journal, ...Object.values(sections).map(s => s.sec), empty, doneBlock);
+  root.append(hello, dateLine, summary, onboarding, wotd, focusHost, form, minimum, review, journal, ...Object.values(sections).map(s => s.sec), empty, doneBlock);
 
   // ----- элементы списка -----
   async function removeTask(ev) {
@@ -241,6 +272,10 @@ export function createTodayView({ go }) {
     if (load.due + load.fresh) chips.push(el('button', { type: 'button', id: 'learn-chip', class: 'chip', textContent: `Повторение: ${load.due + load.fresh}`, onclick: () => go('learn') }));
     if (!events.some(e => e.type === 'checkin' && e.payload.date === today && e.payload.slot === 'm')) chips.push(el('button', { type: 'button', id: 'checkin-chip', class: 'chip', textContent: 'Отметка утра', onclick: () => go('diary') }));
     if (!events.some(e => e.type === 'testrun' && e.payload.date === today)) chips.push(el('button', { type: 'button', id: 'test-chip', class: 'chip', textContent: 'Проверка дня', onclick: () => go('tests') }));
+    chips.push(el('button', { type: 'button', id: 'heavy-chip', class: 'chip', textContent: getPref('heavyDay') ? 'Тяжёлый день: включён' : 'Тяжёлый день', 'aria-pressed': String(!!getPref('heavyDay')), onclick: () => { setPref('heavyDay', !getPref('heavyDay')); render(); } }));
+    const fm = focusMinutes(events, today);
+    chips.push(el('button', { type: 'button', id: 'focus-chip', class: 'chip', textContent: fm ? `Фокус: ${fm} мин` : 'Фокус', onclick: () => startFocus() }));
+    if (doneWorkouts(events).length) chips.push(el('button', { type: 'button', id: 'strength-chip', class: 'chip', textContent: `Силовые: ${strengthDays(events, today)}/${WEEKLY_STRENGTH_GOAL}`, onclick: () => go('workouts') }));
     for (const e of activeExperiments(events, today)) chips.push(el('button', { type: 'button', class: 'chip exp-chip', dataset: { exp: e.id }, textContent: `Эксперимент: фаза ${phaseOf(e.payload, today)}`, onclick: () => go('insights') }));
     summary.replaceChildren(...chips);
   }
@@ -265,11 +300,32 @@ export function createTodayView({ go }) {
     const hl = [];
     if (r.health.sleepDays) hl.push(`Сон: в среднем ${f1(r.health.sleepAvg)} ч (лучшая ночь ${f1(r.health.sleepBest)}, худшая ${f1(r.health.sleepWorst)}; отметок: ${r.health.sleepDays})`);
     if (r.health.activityDays) hl.push(`Активность: ${r.health.activityMinutes} из ${r.health.activityGoal} минут (ориентир ВОЗ — 150 и больше в неделю)`);
+    if (r.health.strengthDays) hl.push(`Силовых дней: ${r.health.strengthDays} из ${WEEKLY_STRENGTH_GOAL}`);
     if (r.health.moodAvg !== null) hl.push(`Настроение: в среднем ${f1(r.health.moodAvg)} из 5`);
     if (hl.length) lines.push(el('p', { id: 'review-health', class: 'muted', textContent: hl.join(' · ') }));
+    if (r.focus.minutes) lines.push(el('p', { id: 'review-focus', class: 'muted', textContent: `Фокус: ${r.focus.minutes} мин за неделю (сессий: ${r.focus.sessions}, дней: ${r.focus.days})` }));
     if (r.growth.lessons || r.growth.reviews || r.growth.tests) lines.push(el('p', { id: 'review-growth', class: 'muted', textContent: `Развитие: уроков ${r.growth.lessons}, ответов на карточки ${r.growth.reviews}, проверок ${r.growth.tests}` }));
+    lines.push(el('button', { type: 'button', id: 'plan-week', class: 'chip', textContent: 'Составить план недели (заметка)', onclick: async () => { await store.save(makeNote(templateText('weekly', todayStr()))); toast('План недели создан в заметках', { actionLabel: 'Открыть', onAction: () => go('notes') }); } }));
     reviewBody.replaceChildren(...lines);
   }
+
+  // три главных дела для тяжёлого дня: сначала «важное», затем по срокам (просроченное и сегодняшнее раньше)
+  function renderMinimum(g, today, heavy) {
+    minimum.hidden = !heavy;
+    if (!heavy) return;
+    const open = events.filter(e => e.type === 'task' && !e.payload.done);
+    const rank = e => (e.payload.priority === 'high' ? 0 : 4) + (!e.payload.due ? 3 : e.payload.due < today ? 0 : e.payload.due === today ? 1 : 2);
+    const pick = [...open].sort((a, b) => rank(a) - rank(b) || (a.payload.due || '9').localeCompare(b.payload.due || '9') || a.ts - b.ts).slice(0, 3);
+    minList.replaceChildren(...(pick.length ? pick.map(e => item(e, today)) : [el('li', { class: 'muted', textContent: 'Задач нет. Отдохни.' })]));
+  }
+  const moveOverdue = el('button', { type: 'button', id: 'move-overdue', class: 'chip', textContent: 'Перенести всё на сегодня', onclick: async () => {
+    const today = todayStr();
+    const old = events.filter(e => e.type === 'task' && !e.payload.done && e.payload.due && e.payload.due < today);
+    if (!old.length) return;
+    await store.saveMany(old.map(e => updateTask(e, { text: e.payload.text, due: today, repeat: e.payload.repeat?.type || '', priority: e.payload.priority })));
+    toast(`Перенесено на сегодня: ${old.length}`, { actionLabel: 'Отменить', onAction: () => store.saveMany(old) });
+  } });
+  sections.overdue.sec.insertBefore(moveOverdue, sections.overdue.ul);
 
   function render() {
     const today = todayStr();
@@ -282,14 +338,17 @@ export function createTodayView({ go }) {
     renderOnboarding();
     renderWotd(today);
     const g = groupTasks(events, today);
+    const heavy = !!getPref('heavyDay');
+    renderMinimum(g, today, heavy);
     for (const key of Object.keys(sections)) {
-      sections[key].sec.hidden = g[key].length === 0;
+      sections[key].sec.hidden = heavy || g[key].length === 0;
       sections[key].ul.replaceChildren(...g[key].map(e => item(e, today)));
     }
+    doneBlock.hidden = heavy; review.hidden = heavy; journal.hidden = heavy;
     doneList.replaceChildren(...g.done.slice(0, 50).map(e => item(e, today)));
     doneCount.textContent = g.done.length;
     clearDone.hidden = g.done.length === 0;
-    empty.hidden = g.openCount > 0;
+    empty.hidden = heavy || g.openCount > 0;
     renderSummary(g, today);
     renderReview(today);
     renderJournal();
@@ -301,5 +360,6 @@ export function createTodayView({ go }) {
     prefill(text) { input.value = String(text).slice(0, 500); updateHint(); input.focus(); },
     focusAdd() { input.focus(); },
     hasEditing: () => !!editingId,
+    show() { render(); if (focusHost.hidden && hasRunningFocus()) startFocus(true); },
   };
 }

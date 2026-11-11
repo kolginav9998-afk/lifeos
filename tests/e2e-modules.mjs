@@ -154,10 +154,10 @@ await waitCount('.note', 1);
 // ---------- поиск ----------
 await page.click('#search-btn');
 await page.fill('#search-input', 'хлеб');
-await waitCount('#search-results .result', 1);
+await waitCount('#search-results .result:not(.course)', 1);
 assert.match(await text('#search-results'), /Расход/);
 await page.fill('#search-input', 'python');
-await waitCount('#search-results .result', 1);
+await waitCount('#search-results .result:not(.course)', 1);
 assert.match(await text('#search-results'), /Привычка/);
 await page.fill('#search-input', 'zzzz');
 assert.match(await text('#search-results'), /Ничего не найдено/);

@@ -56,7 +56,7 @@ const csvText = fs.readFileSync(await csv.path(), 'utf8');
 assert.ok(csvText.includes('Доход;') && csvText.includes(';120000,00;Зарплата;аванс') && csvText.includes('Расход;'));
 
 await page.click('#search-btn'); await page.fill('#search-input', 'аванс');
-await waitCount('#search-results .result', 1);
+await waitCount('#search-results .result:not(.course)', 1);
 assert.match(await text('#search-results'), /Доход/);
 await page.click('#search-btn');
 

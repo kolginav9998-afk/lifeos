@@ -11,7 +11,7 @@ export async function resync({ ask = false } = {}) {
   if (!isNative) return { ok: false, reason: 'web' };
   if (!getPref('remindersOn')) { info.last = await clearNotifications(); return info.last; }
   if (vault.status() === 'locked') return { ok: false, reason: 'locked' };          // не затираем план пустыми данными
-  const items = planReminders(store.state.events, Date.now(), { taskHour: getPref('taskHour'), habitHour: getPref('habitHour'), eveningHour: getPref('eveningHour') });
+  const items = planReminders(store.state.events, Date.now(), { taskHour: getPref('taskHour'), habitHour: getPref('habitHour'), eveningHour: getPref('eveningHour'), bedtimeMin: getPref('bedtimeMin'), weeklyHour: getPref('weeklyHour') });
   info.last = await syncNotifications(items, { ask });
   return info.last;
 }

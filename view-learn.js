@@ -216,5 +216,14 @@ export function createLearnView() {
       if (!session) render();
     },
     show() { if (!session) render(); },
+    // открыть курс (и урок) из поиска
+    open(trackId, lessonId = null) {
+      if (session) return;
+      page = trackById(trackId) ? { name: 'track', id: trackId } : { name: 'home' };
+      if (lessonId) openLessons.add(lessonId);
+      render();
+      if (lessonId) root.querySelector(`.lesson[data-lesson="${lessonId}"]`)?.scrollIntoView?.({ block: 'start' });
+      else window.scrollTo(0, 0);
+    },
   };
 }

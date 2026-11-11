@@ -17,7 +17,7 @@ const dateStr = off => { const d = new Date(); d.setDate(d.getDate() + off); ret
 // ---------- навигация: новая группа вкладок ----------
 await tab(page, 'diary');
 assert.equal(await text('#title'), 'Дневник');
-assert.deepEqual(await page.locator('#subnav button').allTextContents(), ['Дневник', 'Здоровье', 'Заметки']);
+assert.deepEqual(await page.locator('#subnav button').allTextContents(), ['Дневник', 'Здоровье', 'Тренировки', 'Заметки']);
 assert.equal(await page.locator('#tabs button').count(), 5);
 
 // ---------- утро ----------

@@ -15,12 +15,17 @@ function searchable(e) {
     case 'income': return { kind: 'Доход', title: `${p.category}${p.note ? ' — ' + p.note : ''}`, text: [p.category, p.note, (p.amountMinor / 100).toFixed(2), p.date].join(' ') };
     case 'diary': return { kind: 'Дневник', title: p.highlight || p.text.split('\n')[0] || p.date, text: [p.text, p.highlight, ...(p.gratitude || []), p.date, ...(p.tags || [])].join(' ') };
     case 'measure': return { kind: 'Замер', title: `${p.kind === 'custom' ? p.name : p.kind} ${p.value}${p.value2 !== undefined ? '/' + p.value2 : ''}`, text: [p.kind, p.name, p.value, p.value2, p.note, p.date].filter(x => x !== undefined).join(' ') };
+    case 'workout': return { kind: 'Тренировка', title: `${p.name} · ${p.date}`, text: [p.name, p.note, p.date, ...p.exercises.map(x => x.name)].join(' ') };
+    case 'goal': return { kind: 'Цель', title: p.title, text: p.title };
+    case 'sub': return { kind: 'Подписка', title: p.name, text: p.name };
+    case 'experiment': return { kind: 'Эксперимент', title: p.title, text: [p.title, p.change].join(' ') };
+    case 'focus': return p.label ? { kind: 'Фокус', title: `${p.label} · ${p.minutes} мин`, text: p.label } : null;
     case 'ucard': return { kind: 'Карточка', title: p.q, text: [p.q, p.a].join(' ') };
     case 'checkin': return p.note ? { kind: p.slot === 'm' ? 'Утро' : 'Вечер', title: p.note, text: [p.note, p.date].join(' ') } : null;
     default: return null;
   }
 }
-export const TAB_OF = { task: 'today', note: 'notes', habit: 'habits', expense: 'money', income: 'money', diary: 'diary', measure: 'health', checkin: 'diary', ucard: 'learn' };
+export const TAB_OF = { task: 'today', note: 'notes', habit: 'habits', expense: 'money', income: 'money', diary: 'diary', measure: 'health', checkin: 'diary', ucard: 'learn', workout: 'workouts', goal: 'plans', sub: 'plans', experiment: 'insights', focus: 'today' };
 
 export function searchEvents(events, query, limit = 50) {
   const tokens = normalize(query).split(/\s+/).filter(Boolean);

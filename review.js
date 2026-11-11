@@ -4,6 +4,8 @@ import { activeHabits } from './habits.js';
 import { spentBetween, sumBetween } from './money.js';
 import { logsOf } from './habits.js';
 import { checkinOf, dayMood } from './diary.js';
+import { strengthDays } from './workouts.js';
+import { focusWeek } from './focus.js';
 
 const localDate = ts => todayStr(ts);
 
@@ -38,8 +40,9 @@ export function weekReview(events, today) {
   const health = {
     sleepDays: sleeps.length, sleepAvg: avg(sleeps), sleepBest: sleeps.length ? Math.max(...sleeps) : null, sleepWorst: sleeps.length ? Math.min(...sleeps) : null,
     activityMinutes: minutes.reduce((x, y) => x + y, 0), activityDays: minutes.length, activityGoal: 150,
-    moodAvg: avg(moods),
+    moodAvg: avg(moods), strengthDays: strengthDays(events, today),
   };
+  const focus = focusWeek(events, today);
   const growth = {
     lessons: events.filter(e => e.type === 'lesson' && inRange(e.payload.date)).length,
     reviews: events.filter(e => e.type === 'srs').reduce((n, e) => n + (e.payload.hist || []).filter(h => inRange(h[0])).length, 0),
@@ -47,7 +50,7 @@ export function weekReview(events, today) {
   };
 
   return {
-    from, to: today, tasksDone, prevDone, perDay, habits, health, growth,
+    from, to: today, tasksDone, prevDone, perDay, habits, health, growth, focus,
     spent: spentBetween(events, from, today),
     income: sumBetween(events, 'income', from, today),
     spentPrev: spentBetween(events, prevFrom, prevTo),

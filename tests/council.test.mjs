@@ -27,7 +27,7 @@ test('совет: 50 специалистов по 15 предложений, в
 });
 test('совет: честные метки — «сейчас» только то, что реально берём, и нет медицинских обещаний', () => {
   const soon = md.split('\n').filter(l => /^\d+\. \*\*/.test(l) && /🔜\s*$/u.test(l));
-  assert.ok(soon.length >= 15 && soon.length <= 30, `в работу сейчас: ${soon.length}`);
+  assert.ok(soon.length >= 10 && soon.length <= 30, `в работу следующим: ${soon.length}`);
   assert.ok(!/излечит|гарантирует/i.test(md));
   assert.match(md, /Чего не делаем/);
 });

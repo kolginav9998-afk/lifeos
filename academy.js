@@ -162,3 +162,23 @@ export function wordOfDay(date, trackId) {
   const [front, back] = t.deck[((n % t.deck.length) + t.deck.length) % t.deck.length];
   return { track: trackId, title: t.title, front, back };
 }
+
+// Поиск по содержимому курсов: уроки (название, текст, задание) и слова/термины колод. Без индексов: данных немного.
+const nrm = x => String(x ?? '').normalize('NFKC').toLowerCase().replace(/ё/g, 'е');
+export function searchAcademy(query, limit = 12) {
+  const tokens = nrm(query).split(/\s+/).filter(Boolean);
+  if (!tokens.length || tokens.join('').length < 2) return [];
+  const lessons = [], words = [];
+  for (const t of TRACKS) {
+    for (const l of t.lessons) {
+      const title = nrm(l.title), hay = nrm([l.title, ...l.body, l.task].join(' '));
+      if (tokens.every(k => hay.includes(k))) lessons.push({ kind: 'Урок', title: `${l.title} · ${t.title}`, trackId: t.id, lessonId: l.id, score: tokens.every(k => title.includes(k)) ? 0 : 1 });
+    }
+    for (const [q, a] of t.deck || []) {
+      const hay = nrm(`${q} ${a}`);
+      if (tokens.every(k => hay.includes(k))) words.push({ kind: t.id === 'english' || t.id === 'hebrew' ? 'Слово' : 'Термин', title: `${q} — ${a}`, trackId: t.id, lessonId: null, score: 2 });
+    }
+  }
+  lessons.sort((a, b) => a.score - b.score);
+  return [...lessons, ...words].slice(0, limit);
+}

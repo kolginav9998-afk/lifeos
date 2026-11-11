@@ -81,7 +81,7 @@ test('выгрузка: таблицы, ZIP и приватность', () => {
   const { files, zip } = buildExport(events, T0);
   const back = readZip(zip);
   assert.deepEqual(back.map(f => f.name).sort(), files.map(f => f.name).sort());
-  for (const need of ['README.txt', 'daily.csv', 'daily_excel.csv', 'test_runs.csv', 'test_metrics.csv', 'test_trials.csv', 'checkins.csv', 'measures.csv', 'habits.csv', 'lessons.csv', 'learning.csv', 'testruns.json']) assert.ok(back.some(f => f.name === need), need);
+  for (const need of ['README.txt', 'workouts.csv', 'daily.csv', 'daily_excel.csv', 'test_runs.csv', 'test_metrics.csv', 'test_trials.csv', 'checkins.csv', 'measures.csv', 'habits.csv', 'lessons.csv', 'learning.csv', 'testruns.json']) assert.ok(back.some(f => f.name === need), need);
   const all = back.map(f => dec.decode(f.data)).join('\n');
   assert.ok(!all.includes('очень личный текст'), 'текст дневника не выгружается');
   assert.ok(README.includes('Чего нет в выгрузке'));

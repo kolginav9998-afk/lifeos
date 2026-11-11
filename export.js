@@ -3,6 +3,8 @@ import { todayStr } from './events.js';
 import { formatMoney } from './money.js';
 import { activeHabits } from './habits.js';
 import { formatMeasure } from './health.js';
+import { doneWorkouts, setsOf } from './workouts.js';
+import { goalProgress, subsOf } from './planning.js';
 
 const esc = s => String(s).replace(/\r?\n/g, ' ');
 
@@ -40,5 +42,28 @@ export function toMarkdown(events, now = Date.now()) {
   const ms = events.filter(e => e.type === 'measure').sort((a, b) => a.payload.date.localeCompare(b.payload.date));
   for (const m of ms) L.push(`- ${m.payload.date} — ${m.payload.kind === 'custom' ? esc(m.payload.name) : m.payload.kind}: ${formatMeasure(m.payload)}${m.payload.note ? ` (${esc(m.payload.note)})` : ''}`);
   if (!ms.length) L.push('_нет_');
+  L.push('', '## Тренировки', '');
+  for (const w of doneWorkouts(events).slice().reverse()) {
+    L.push(`### ${w.payload.date} — ${esc(w.payload.name)} (подходов: ${setsOf(w)}${w.payload.minutes ? `, ${w.payload.minutes} мин` : ''})`);
+    for (const ex of w.payload.exercises) L.push(`- ${esc(ex.name)}: ${ex.sets.map(s => ex.kind === 'time' ? `${s.sec} с` : ex.kind === 'cardio' ? `${Math.round((s.sec || 0) / 60)} мин` : `${s.reps}${s.kg ? '×' + s.kg : ''}`).join(', ')}`);
+    L.push('');
+  }
+  if (!doneWorkouts(events).length) L.push('_нет_');
+  const focus = events.filter(e => e.type === 'focus').sort((a, b) => a.payload.date.localeCompare(b.payload.date));
+  L.push('', '## Фокус', '');
+  for (const f of focus) L.push(`- ${f.payload.date} — ${f.payload.minutes} мин${f.payload.label ? ` — ${esc(f.payload.label)}` : ''}`);
+  if (!focus.length) L.push('_нет_');
+  const goals = goalProgress(events, today);
+  L.push('', '## Цели накоплений', '');
+  for (const g of goals) L.push(`- ${esc(g.goal.payload.title)}: ${formatMoney(g.saved)} из ${formatMoney(g.target)}${g.goal.payload.dueDate ? `, срок ${g.goal.payload.dueDate}` : ''}`);
+  if (!goals.length) L.push('_нет_');
+  const subs = subsOf(events);
+  L.push('', '## Подписки', '');
+  for (const s of subs) L.push(`- ${esc(s.payload.name)}: ${formatMoney(s.payload.amountMinor)} ${s.payload.period === 'year' ? 'в год' : 'в месяц'}${s.payload.active ? '' : ' (пауза)'}`);
+  if (!subs.length) L.push('_нет_');
+  const exps = events.filter(e => e.type === 'experiment').sort((a, b) => a.payload.startDate.localeCompare(b.payload.startDate));
+  L.push('', '## Эксперименты', '');
+  for (const x of exps) L.push(`- ${x.payload.startDate} — ${esc(x.payload.title)}: ${esc(x.payload.change)}${x.payload.cancelled ? ' (остановлен)' : ''}`);
+  if (!exps.length) L.push('_нет_');
   return L.join('\n') + '\n';
 }

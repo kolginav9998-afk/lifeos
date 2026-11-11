@@ -8,6 +8,7 @@ import * as store from './store.js';
 import { getPref, setPref } from './prefs.js';
 import { isNative } from './platform.js';
 import { searchEvents } from './search.js';
+import { searchAcademy } from './academy.js';
 import { VERSION } from './version.js';
 import * as notify from './notify.js';
 
@@ -18,6 +19,8 @@ import { createNotesView } from './view-notes.js';
 import { createDiaryView } from './view-diary.js';
 import { createHealthView } from './view-health.js';
 import { createLearnView } from './view-learn.js';
+import { createWorkoutsView } from './view-workouts.js';
+import { createPlansView } from './view-plans.js';
 import { createTestsView } from './view-tests.js';
 import { createInsightsView } from './view-insights.js';
 import { createSettingsView } from './view-settings.js';
@@ -30,11 +33,13 @@ const DEFS = [
   { id: 'habits', group: 'today', title: 'Привычки', sub: 'Привычки', make: () => createHabitsView() },
   { id: 'diary', group: 'diary', title: 'Дневник', sub: 'Дневник', make: () => createDiaryView() },
   { id: 'health', group: 'diary', title: 'Здоровье', sub: 'Здоровье', make: () => createHealthView() },
+  { id: 'workouts', group: 'diary', title: 'Тренировки', sub: 'Тренировки', make: () => createWorkoutsView() },
   { id: 'notes', group: 'diary', title: 'Заметки', sub: 'Заметки', make: () => createNotesView() },
   { id: 'learn', group: 'grow', title: 'Учёба', sub: 'Учёба', make: () => createLearnView() },
   { id: 'tests', group: 'grow', title: 'Проверка', sub: 'Тесты', make: () => createTestsView() },
   { id: 'insights', group: 'grow', title: 'Аналитика', sub: 'Аналитика', make: () => createInsightsView() },
   { id: 'money', group: 'money', title: 'Деньги', sub: 'Деньги', make: ctx => createMoneyView(ctx) },
+  { id: 'plans', group: 'money', title: 'Планы', sub: 'Планы', make: () => createPlansView() },
   { id: 'more', group: 'more', title: 'Настройки', sub: 'Настройки', make: ctx => createSettingsView(ctx) },
   { id: 'account', group: 'more', title: 'Аккаунт', sub: 'Аккаунт', make: ctx => createAccountView(ctx) },
 ];
@@ -49,6 +54,8 @@ const FOCUS_TAB = { task: 'today', habit: 'habits', expense: 'money', note: 'not
 
 // ---------- тема ----------
 function applyTheme() {
+  const fs = Number(getPref('fontScale')) || 1;
+  document.documentElement.style.setProperty('--fs', String([1, 1.15, 1.3].includes(fs) ? fs : 1));
   const t = getPref('theme');
   const root = document.documentElement;
   if (t === 'light' || t === 'dark') root.setAttribute('data-theme', t); else root.removeAttribute('data-theme');
@@ -102,9 +109,12 @@ function renderSearch() {
   const box = $('search-results');
   if (!q.trim()) { box.replaceChildren(); return; }
   const res = searchEvents(store.state.events, q);
-  box.replaceChildren(...(res.length
-    ? res.map(r => el('button', { type: 'button', class: 'result', onclick: () => { closeSearch(); go(r.tab); } },
-      el('span', { class: 'kind', textContent: r.kind }), el('span', { textContent: r.title })))
+  const courses = searchAcademy(q);
+  box.replaceChildren(...(res.length || courses.length
+    ? [...res.map(r => el('button', { type: 'button', class: 'result', onclick: () => { closeSearch(); go(r.tab); } },
+      el('span', { class: 'kind', textContent: r.kind }), el('span', { textContent: r.title }))),
+      ...courses.map(r => el('button', { type: 'button', class: 'result course', dataset: { track: r.trackId }, onclick: () => { closeSearch(); go('learn'); views.learn.open(r.trackId, r.lessonId); } },
+        el('span', { class: 'kind', textContent: r.kind }), el('span', { textContent: r.title })))]
     : [el('p', { class: 'muted', textContent: 'Ничего не найдено' })]));
 }
 
