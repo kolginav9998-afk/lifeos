@@ -64,7 +64,7 @@ test('второе окно: устаревшие соседи забывают�
   const name = `lifeos-test-${Math.random().toString(36).slice(2)}`, seen = [];
   const a = createTabGuard({ name, ttl: 50, onOthers: n => seen.push(n), onRemoteWrite: () => seen.push('w') });
   const raw = new BroadcastChannel(name);
-  raw.postMessage({ type: 'hello', id: 'призрак' }); raw.postMessage(null); raw.postMessage('строка'); raw.postMessage({ type: 'что-то', id: 'x' }); raw.postMessage({ id: 'y' });
+  raw.postMessage({ kind: 'hello', id: 'призрак' }); raw.postMessage(null); raw.postMessage('строка'); raw.postMessage({ kind: 'что-то', id: 'x' }); raw.postMessage({ id: 'y' });
   await sleep(40);
   assert.equal(a.count(), 1, 'только настоящий сосед'); assert.deepEqual(seen, [1]);
   await sleep(120);

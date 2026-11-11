@@ -12,18 +12,18 @@ export function createTabGuard({ onOthers = () => {}, onRemoteWrite = () => {}, 
   ch.onmessage = e => {
     const m = e?.data;
     if (!m || typeof m !== 'object' || m.id === id) return;
-    if (m.type === 'hello') { others.set(m.id, Date.now()); ch.postMessage({ type: 'here', id }); }
-    else if (m.type === 'here') others.set(m.id, Date.now());
-    else if (m.type === 'bye') others.delete(m.id);
-    else if (m.type === 'wrote') { others.set(m.id, Date.now()); onRemoteWrite(); }
+    if (m.kind === 'hello') { others.set(m.id, Date.now()); ch.postMessage({ kind: 'here', id }); }
+    else if (m.kind === 'here') others.set(m.id, Date.now());
+    else if (m.kind === 'bye') others.delete(m.id);
+    else if (m.kind === 'wrote') { others.set(m.id, Date.now()); onRemoteWrite(); }
     changed();
   };
-  ch.postMessage({ type: 'hello', id });
-  const beat = setInterval(() => { ch.postMessage({ type: 'here', id }); changed(); }, Math.max(1000, Math.floor(ttl / 3)));
+  ch.postMessage({ kind: 'hello', id });
+  const beat = setInterval(() => { ch.postMessage({ kind: 'here', id }); changed(); }, Math.max(1000, Math.floor(ttl / 3)));
   beat.unref?.();
   return {
     id, count: alive,
-    announceWrite() { ch.postMessage({ type: 'wrote', id }); },
-    stop() { clearInterval(beat); try { ch.postMessage({ type: 'bye', id }); } catch { /* канал уже закрыт */ } ch.close(); },
+    announceWrite() { ch.postMessage({ kind: 'wrote', id }); },
+    stop() { clearInterval(beat); try { ch.postMessage({ kind: 'bye', id }); } catch { /* канал уже закрыт */ } ch.close(); },
   };
 }
