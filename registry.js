@@ -22,7 +22,7 @@ export const REGISTRY = {
   diary: { label: 'Запись дневника', group: 'Заметки и дневник', module: 'diary.js', privacy: 'text', analytics: false, fields: 'date, text, highlight, gratitude, tags' },
   checkin: { label: 'Отметка дня (утро/вечер)', group: 'Здоровье', module: 'diary.js', privacy: 'health', analytics: true, fields: 'date, slot (m|e), оценки 1–5, сон, кофе, нагрузка, питание (veg, protein, sweets), note' },
   measure: { label: 'Замер здоровья', group: 'Здоровье', module: 'health.js', privacy: 'health', analytics: true, fields: 'kind, value, value2, date, time, unit, note' },
-  profile: { label: 'Профиль', group: 'Профиль', module: 'events.js', privacy: 'health', analytics: false, fields: 'name, рост, год рождения, пол, цель сна, целевой вес' },
+  profile: { label: 'Профиль', group: 'Профиль', module: 'events.js', privacy: 'health', analytics: false, fields: 'name, avatar, color, motto, рост, год рождения, пол, цель сна, целевой вес' },
   med: { label: 'Лекарство или добавка', group: 'Здоровье', module: 'meds.js', privacy: 'health', analytics: false, fields: 'name, dose, when, note, active' },
   medlog: { label: 'Отметка «принял»', group: 'Здоровье', module: 'meds.js', privacy: 'health', analytics: false, fields: 'medId, date, takenAt' },
   workout: { label: 'Тренировка', group: 'Здоровье', module: 'workouts.js', privacy: 'health', analytics: true, fields: 'date, name, exercises[sets], done, minutes, rpe, note' },

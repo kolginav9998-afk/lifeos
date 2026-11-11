@@ -37,8 +37,12 @@ jobs:
               <color name="ic_launcher_background">#0F1115</color>
           </resources>
           XML
-      - name: "Правки Android-проекта: запрет облачного автобэкапа и постоянный ключ подписи"
-        run: python3 scripts/patch-android.py android
+      - name: "Правки Android-проекта: запрет облачного автобэкапа, постоянный ключ подписи, обновление изнутри, номер сборки"
+        env:
+          ANDROID_VERSION_CODE: ${{ github.run_number }}
+        run: |
+          export ANDROID_VERSION_NAME="$(node -e "import('./version.js').then(m => console.log(m.VERSION))")"
+          python3 scripts/patch-android.py android
       - name: Собрать debug-APK
         working-directory: android
         run: ./gradlew --no-daemon assembleDebug
@@ -66,8 +70,15 @@ jobs:
         env:
           GH_TOKEN: ${{ github.token }}
         run: |
+          VERSION="$(node -e "import('./version.js').then(m => console.log(m.VERSION))")"
+          NOTES="$(node -e "import('./changelog.js').then(m => console.log(JSON.stringify(m.CHANGELOG[0].items).replaceAll('--', '-')))")"
+          # Первая строка — машиночитаемые сведения для кнопки «Обновить» в приложении (см. updater.js).
+          cat > release-notes.md <<EOF
+          <!-- lifeos-update {"version":"$VERSION","notes":$NOTES} -->
+          Автосборка из коммита ${GITHUB_SHA::7}, версия $VERSION. Debug-подпись. Первый раз ставится вручную, дальше приложение обновляется кнопкой «Обновить» в профиле.
+          EOF
           gh release delete latest-apk --cleanup-tag --yes || true
           gh release create latest-apk out/lifeos.apk \
             --target "$GITHUB_SHA" --prerelease \
-            --title "Life OS — последний APK" \
-            --notes "Автосборка из коммита ${GITHUB_SHA::7}. Debug-подпись, ставится вручную."
+            --title "Life OS $VERSION — последний APK" \
+            --notes-file release-notes.md

@@ -46,7 +46,7 @@ test('слои: логика не импортирует экраны, инте�
   const PURE = ['events.js', 'stats.js', 'srs.js', 'habits.js', 'money.js', 'health.js', 'diary.js', 'reflect.js', 'sick.js', 'prevent.js', 'emergency.js', 'bp.js', 'hints.js', 'registry.js', 'writing.js', 'speech.js',
     'reports.js', 'export.js', 'planning.js', 'people.js', 'okr.js', 'academy.js', 'bt-core.js', 'bt-logic.js', 'bt-analytics.js', 'bt-export.js', 'capture.js', 'quick.js', 'ics.js', 'datacheck.js', 'search.js',
     'journal.js', 'planday.js', 'review.js', 'reminders.js', 'meds.js', 'notes.js', 'thoughts.js', 'experiments.js', 'zip.js', 'cryptoutil.js',
-    'parked.js', 'wishes.js', 'debts.js', 'automation.js', 'changelog.js', 'migrate.js', 'devicetime.js', 'storageinfo.js', 'practice.js', 'bt-extra.js', 'skills.js', 'archive.js', 'daycards.js'];
+    'parked.js', 'wishes.js', 'debts.js', 'automation.js', 'changelog.js', 'migrate.js', 'devicetime.js', 'storageinfo.js', 'practice.js', 'bt-extra.js', 'skills.js', 'archive.js', 'daycards.js', 'profile.js', 'updater.js'];
   const bad = [];
   for (const f of PURE) {
     assert.ok(graph.has(f), `${f}: файла нет`);
@@ -56,7 +56,7 @@ test('слои: логика не импортирует экраны, инте�
 });
 
 // Экран может подключать только свои дочерние блоки (разбиение больших экранов на файлы), чужие экраны — никогда.
-const CHILD_BLOCKS = { 'view-health.js': ['view-health-extra.js'], 'view-plans.js': ['view-plans-extra.js'], 'view-today.js': ['view-money-nudge.js', 'view-device-hints.js', 'view-day-cards.js'], 'view-learn.js': ['view-learn-extra.js'], 'view-insights.js': ['view-insights-extra.js'], 'view-settings.js': ['view-archive.js'] };
+const CHILD_BLOCKS = { 'view-health.js': ['view-health-extra.js'], 'view-plans.js': ['view-plans-extra.js'], 'view-today.js': ['view-money-nudge.js', 'view-device-hints.js', 'view-day-cards.js'], 'view-learn.js': ['view-learn-extra.js'], 'view-insights.js': ['view-insights-extra.js'], 'view-settings.js': ['view-archive.js'], 'view-account.js': ['view-update.js'] };
 test('экраны не импортируют друг друга (кроме своих дочерних блоков), никто не импортирует app.js', () => {
   const bad = [];
   for (const [f, deps] of graph) {

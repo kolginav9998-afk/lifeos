@@ -9,7 +9,8 @@ const { chromium } = createRequire(import.meta.url)('playwright');
 export const root = path.resolve(import.meta.dirname, '..');
 const types = { '.html': 'text/html; charset=utf-8', '.js': 'text/javascript', '.css': 'text/css', '.webmanifest': 'application/manifest+json', '.png': 'image/png', '.json': 'application/json' };
 
-export function build(target = 'web', env = {}) { execFileSync('bash', ['scripts/build-web.sh', target], { cwd: root, stdio: 'pipe', env: { ...process.env, ...env } }); }
+// Для автотестов вход в аккаунт по умолчанию не требуется (LIFEOS_REQUIRE_ACCOUNT=0); тест входа включает его обратно.
+export function build(target = 'web', env = {}) { execFileSync('bash', ['scripts/build-web.sh', target], { cwd: root, stdio: 'pipe', env: { ...process.env, LIFEOS_REQUIRE_ACCOUNT: '0', ...env } }); }
 
 export async function launch({ viewport = { width: 390, height: 844 }, ctxOptions = {}, buildEnv = {} } = {}) {
   build('web', buildEnv);
@@ -69,6 +70,6 @@ export async function newDevice(t, { viewport = { width: 390, height: 844 } } = 
   page.on('console', m => { if (m.type() === 'error') errors.push(m.text()); });
   page.on('dialog', d => d.accept());
   await page.goto(t.url);
-  await page.waitForFunction(() => !document.getElementById('app').hidden || !document.getElementById('lock').hidden);
+  await page.waitForFunction(() => !document.getElementById('app').hidden || !document.getElementById('lock').hidden || !document.getElementById('gate').hidden);
   return { ctx, page, errors };
 }

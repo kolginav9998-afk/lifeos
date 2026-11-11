@@ -18,7 +18,7 @@ test('настройки в архиве: берём только разрешё
   assert.deepEqual(cleanPrefs(null), {}); assert.deepEqual(cleanPrefs([1, 2]), {}); assert.deepEqual(cleanPrefs('x'), {});
   assert.deepEqual(cleanPrefs({ daysOff: [0, 1, 2, 3, 4, 5, 6, 0] }), {}, 'слишком много дней');
   const copy = cleanPrefs({ daysOff: [1] }); assert.deepEqual(copy.daysOff, [1]);
-  const deviceBound = ['remindersOn', 'lastBackupAt', 'lastOpenTs', 'clockBackFrom', 'clockAsked', 'storageAsked', 'integrityAsked', 'tab', 'onboardingDone', 'heavyDay', 'lastSeenVersion'];
+  const deviceBound = ['remindersOn', 'lastBackupAt', 'lastOpenTs', 'clockBackFrom', 'clockAsked', 'storageAsked', 'integrityAsked', 'tab', 'onboardingDone', 'heavyDay', 'lastSeenVersion', 'updateCheckedAt', 'updateNotified'];
   assert.deepEqual(Object.keys(PREF_RULES).filter(k => deviceBound.includes(k)), [], 'в архив не попадает то, что привязано к устройству');
 });
 

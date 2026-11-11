@@ -34,7 +34,10 @@ open(p, 'w', encoding='utf-8').write(s)
 
 cfg = open('dist/config.js', encoding='utf-8').read()
 assert "/*DEFAULT_SERVER*/ ''" in cfg, 'в config.js нет метки'
-open('dist/config.js', 'w', encoding='utf-8').write(cfg.replace("/*DEFAULT_SERVER*/ ''", json.dumps(server)))
+assert "/*REQUIRE_ACCOUNT*/ true" in cfg, 'в config.js нет метки REQUIRE_ACCOUNT'
+require = os.environ.get('LIFEOS_REQUIRE_ACCOUNT', '1') not in ('0', 'false', 'no')     # '0' — только для автотестов
+cfg = cfg.replace("/*DEFAULT_SERVER*/ ''", json.dumps(server)).replace("/*REQUIRE_ACCOUNT*/ true", 'true' if require else 'false')
+open('dist/config.js', 'w', encoding='utf-8').write(cfg)
 
 # Офлайн-кэш: полный список файлов и версия, зависящая от содержимого (любое изменение -> новый кэш).
 files = sorted(os.path.relpath(os.path.join(d, f), 'dist') for d, _, fs in os.walk('dist') for f in fs)

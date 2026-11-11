@@ -6,7 +6,7 @@
   "scripts": {
     "build:web": "bash scripts/build-web.sh",
     "test": "node --test \"tests/*.test.mjs\"",
-    "test:e2e": "node tests/e2e-smoke.mjs && node tests/e2e-tasks.mjs && node tests/e2e-modules.mjs && node tests/e2e-extras.mjs && node tests/e2e-security.mjs && node tests/e2e-sync.mjs && node tests/e2e-health.mjs && node tests/e2e-learn.mjs && node tests/e2e-tests.mjs && node tests/e2e-r33.mjs && node tests/e2e-r34.mjs && node tests/e2e-r35.mjs && node tests/e2e-r36.mjs && node tests/e2e-r37.mjs && node tests/e2e-r38.mjs && node tests/e2e-r39.mjs && node tests/e2e-r310.mjs && node tests/e2e-archive.mjs && node tests/e2e-r311.mjs",
+    "test:e2e": "node tests/e2e-smoke.mjs && node tests/e2e-tasks.mjs && node tests/e2e-modules.mjs && node tests/e2e-extras.mjs && node tests/e2e-security.mjs && node tests/e2e-sync.mjs && node tests/e2e-health.mjs && node tests/e2e-learn.mjs && node tests/e2e-tests.mjs && node tests/e2e-r33.mjs && node tests/e2e-r34.mjs && node tests/e2e-r35.mjs && node tests/e2e-r36.mjs && node tests/e2e-r37.mjs && node tests/e2e-r38.mjs && node tests/e2e-r39.mjs && node tests/e2e-r310.mjs && node tests/e2e-archive.mjs && node tests/e2e-r311.mjs && node tests/e2e-gate.mjs && node tests/e2e-update.mjs",
     "icons": "python3 scripts/make-icons.py"
   },
   "dependencies": {

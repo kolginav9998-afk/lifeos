@@ -12,6 +12,9 @@ import { searchAcademy } from './academy.js';
 import { VERSION } from './version.js';
 import * as notify from './notify.js';
 import { markShell, markData } from './perf.js';
+import { REQUIRE_ACCOUNT } from './config.js';
+import { profileCard } from './profile.js';
+import { autoCheckUpdate } from './view-update.js';
 
 import { createTodayView } from './view-today.js';
 import { createHabitsView } from './view-habits.js';
@@ -51,7 +54,7 @@ const DEFS = [
   { id: 'money', group: 'money', title: 'Деньги', sub: 'Деньги', make: ctx => createMoneyView(ctx) },
   { id: 'plans', group: 'money', title: 'Планы', sub: 'Планы', make: () => createPlansView() },
   { id: 'more', group: 'more', title: 'Настройки', sub: 'Настройки', make: ctx => createSettingsView(ctx) },
-  { id: 'account', group: 'more', title: 'Аккаунт', sub: 'Аккаунт', make: ctx => createAccountView(ctx) },
+  { id: 'account', group: 'more', title: 'Профиль', sub: 'Профиль', make: ctx => createAccountView(ctx) },
 ];
 const GROUPS = [
   { id: 'today', label: 'Сегодня', icon: 'tasks' },
@@ -108,6 +111,16 @@ function go(id) {
   window.scrollTo(0, 0);
 }
 
+// ---------- аватар в шапке: имя и цвет профиля ----------
+function paintAvatar(evs) {
+  const c = profileCard(evs, appSync.account.info());
+  const b = $('profile-btn');
+  b.textContent = c.face;
+  b.style.setProperty('--av', c.hex);
+  b.title = c.name || c.login || 'Профиль';
+  b.setAttribute('aria-label', `Профиль: ${c.name || c.login || 'без имени'}`);
+}
+
 // ---------- состояние синхронизации в шапке ----------
 const BADGE = { idle: ['☁ ✓', 'Всё синхронизировано'], syncing: ['☁ …', 'Синхронизация'], offline: ['☁ ✕', 'Нет связи, изменения сохранены'], error: ['☁ !', 'Ошибка синхронизации'], 'needs-login': ['☁ войти', 'Нужно войти заново'] };
 appSync.onStatus(s => {
@@ -154,6 +167,7 @@ function updateLockout() {
 function showLock() {
   appSync.stop();
   $('app').hidden = true;
+  $('gate').hidden = true; gateView = null;
   $('lock').hidden = false;
   document.body.classList.remove('privacy');
   $('lock-input').value = ''; $('lock-input').type = 'password'; $('lock-reveal').textContent = 'показать';
@@ -175,7 +189,23 @@ function lockNow() {
 
 function updateLockButton() { $('lock-top').hidden = !vault.hasVault(); }
 
+// Экран входа: пока не вошёл в аккаунт, приложение не открывается. Данные на устройстве при этом остаются на месте.
+let gateView = null;
+async function showGate() {
+  appSync.stop();
+  $('app').hidden = true; $('lock').hidden = true; $('gate').hidden = false;
+  document.body.classList.remove('privacy');
+  clearToast(); closeSearch();
+  if (gateView) return;
+  try { await store.refresh(); } catch (e) { console.error(e); }              // записи этого устройства нужны входу (присоединение к аккаунту)
+  gateView = createAccountView({ go, gate: true, onVaultChange: updateLockButton, onAuthenticated: () => { gateView = null; enterApp(); } });
+  $('gate-body').replaceChildren(gateView.root);
+}
+
 async function enterApp() {
+  if (REQUIRE_ACCOUNT && !appSync.account.isLinked()) { await showGate(); return; }
+  gateView = null;
+  $('gate').hidden = true;
   $('lock').hidden = true;
   $('app').hidden = false;
   try { const n = await db.sealPending(); if (n) toast(`Дошифровано записей: ${n}`); } catch (e) { console.error(e); }
@@ -184,7 +214,11 @@ async function enterApp() {
   updateLockButton();
   appSync.start().catch(e => console.error(e));
   startTabGuard();
-  if (!entered) { entered = true; handleUrlParams(); }
+  paintAvatar(store.state.events);
+  if (!entered) {
+    entered = true; handleUrlParams();
+    autoCheckUpdate(r => toast(`Доступна новая версия ${r.latest}`, { actionLabel: 'Обновить', onAction: () => go('account'), ms: 12000 }));
+  }
 }
 
 // Второе окно с этим же приложением: считаем окна и подтягиваем чужие записи, чтобы данные не расходились.
@@ -273,7 +307,8 @@ function handleUrlParams() {
 // ---------- сборка интерфейса ----------
 // Экраны создаются заново и при блокировке: в скрытых экранах и открытых окнах не должно оставаться личных данных.
 function buildViews() {
-  const main = $('view'), ctx = { go, lockNow, applyTheme, applyMode, onVaultChange: updateLockButton, openAccount: () => go('account'), exportCsv: () => views.more.exportCsv() };
+  const main = $('view'), ctx = { go, lockNow, applyTheme, applyMode, onVaultChange: updateLockButton, openAccount: () => go('account'), exportCsv: () => views.more.exportCsv(),
+    onLoggedOut: () => { paintAvatar(store.state.events); if (REQUIRE_ACCOUNT) showGate(); } };
   for (const d of DEFS) {
     const v = d.make(ctx);
     if (views[d.id]) views[d.id].root.replaceWith(v.root); else main.append(v.root);
@@ -306,12 +341,13 @@ function build() {
   };
   $('search-input').oninput = renderSearch;
   $('lock-top').onclick = () => lockNow();
+  $('profile-btn').onclick = () => go('account');
 
   buildViews();
   navReady = true; buildTabs();
   $('sync-badge').onclick = () => go('account');
 
-  store.onChange(evs => { for (const v of Object.values(views)) v.update(evs); renderSearch(); notify.resyncSoon(); });
+  store.onChange(evs => { for (const v of Object.values(views)) v.update(evs); renderSearch(); paintAvatar(evs); notify.resyncSoon(); });
   store.setLockedHandler(showLock);
 }
 

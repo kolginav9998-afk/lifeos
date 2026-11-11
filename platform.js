@@ -9,6 +9,9 @@ function plugin(name) {
   return C?.Plugins?.[name] || C?.registerPlugin?.(name);
 }
 
+// Нативный плагин по имени (null на сайте).
+export const nativePlugin = name => (isNative ? plugin(name) : null);
+
 // Сохранить текстовый файл: на сайте — скачивание, в приложении — окно «Поделиться/Сохранить».
 export async function saveTextFile(filename, text, mime = 'application/json') {
   if (isNative) {

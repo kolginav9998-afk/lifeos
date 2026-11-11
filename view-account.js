@@ -9,6 +9,8 @@ import { DEFAULT_SERVER } from './config.js';
 import { encryptBackup } from './backup.js';
 import { saveTextFile } from './platform.js';
 import { getPref, setPref } from './prefs.js';
+import { profileCard, saveProfileRecord, AVATARS, COLORS, COLOR_NAMES } from './profile.js';
+import { createUpdateCard } from './view-update.js';
 
 const LAST_SERVER = 'lifeos.account.lastServer';
 const STATE_TEXT = {
@@ -18,8 +20,10 @@ const STATE_TEXT = {
 const field = (id, props) => el('input', { id, autocomplete: 'off', ...props });
 const when = ts => (ts ? new Date(ts).toLocaleString('ru') : 'ещё не было');
 
-export function createAccountView({ go, onVaultChange = () => {} }) {
-  const root = el('section', { id: 'view-account', class: 'view' });
+// gate = true — экран входа до открытия приложения: те же формы, но без профиля и настроек; у элементов свои id (gate-…), чтобы не совпадать с id экрана профиля.
+export function createAccountView({ go, onVaultChange = () => {}, gate = false, onAuthenticated = () => {}, onLoggedOut = () => {} }) {
+  const ID = gate ? 'gate' : 'acc';
+  const root = el('section', { id: gate ? 'view-gate' : 'view-account', class: gate ? 'view gate-view' : 'view' });
   let checked = null;             // результат проверки сервера
   let recoveryCode = null;        // показанный код (пока не подтверждён)
   let afterCode = null;           // что сделать, когда код подтверждён
@@ -37,13 +41,13 @@ export function createAccountView({ go, onVaultChange = () => {} }) {
 
   // ---------- код восстановления ----------
   function recoveryCard(code, onDone) {
-    const ok = el('input', { id: 'acc-code-ok', type: 'checkbox' });
-    const done = el('button', { id: 'acc-code-done', type: 'button', class: 'primary', textContent: 'Готово', disabled: true });
+    const ok = el('input', { id: `${ID}-code-ok`, type: 'checkbox' });
+    const done = el('button', { id: `${ID}-code-done`, type: 'button', class: 'primary', textContent: 'Готово', disabled: true });
     ok.onchange = () => { done.disabled = !ok.checked; };
     done.onclick = async () => { const next = onDone; recoveryCode = null; afterCode = null; render(); await next?.(); };
     return card('Сохрани код восстановления',
       el('p', { class: 'warn', textContent: 'Это единственный способ вернуть доступ, если забудешь пароль. Покажу один раз. Запиши на бумагу или сохрани в менеджере паролей.' }),
-      el('div', { id: 'acc-code', class: 'code', textContent: code }),
+      el('div', { id: `${ID}-code`, class: 'code', textContent: code }),
       el('div', { class: 'row wrap' },
         el('button', { type: 'button', textContent: 'Скопировать', onclick: async () => { try { await navigator.clipboard.writeText(code); toast('Скопировано'); } catch { toast('Не удалось скопировать: выдели код вручную'); } } }),
         el('button', { type: 'button', textContent: 'Сохранить в файл', onclick: () => saveTextFile('lifeos-recovery-code.txt', `Life OS — код восстановления\n${code}\n\nХрани отдельно от пароля.\n`, 'text/plain').catch(e => toast(e.message)) })),
@@ -59,6 +63,7 @@ export function createAccountView({ go, onVaultChange = () => {} }) {
 
   // ---------- вход на устройстве с данными: сначала копия, затем присоединение ----------
   async function joinWithLocalData(auth, password, btn) {
+    await store.refresh();
     const snapshot = store.state.events.filter(e => e.type);                // расшифрованные записи этого устройства
     setBusy(btn, true, 'Сохраняю копию…');
     try {
@@ -91,9 +96,9 @@ export function createAccountView({ go, onVaultChange = () => {} }) {
   // ---------- неподключённое состояние ----------
   function unlinkedCards() {
     const cards = [];
-    const server = field('acc-server', { type: 'text', placeholder: 'Адрес сервера, например https://…workers.dev', value: lastServer(), inputMode: 'url', autocapitalize: 'off', spellcheck: false });
-    const check = el('button', { id: 'acc-check', type: 'button', class: 'primary', textContent: 'Проверить сервер' });
-    const msg = el('p', { id: 'acc-msg', class: 'muted', textContent: checked ? (checked.registered ? 'Сервер найден. Аккаунт уже создан — войди.' : 'Сервер найден. Аккаунта ещё нет — создай его.') : '' });
+    const server = field(`${ID}-server`, { type: 'text', placeholder: 'Адрес сервера, например https://…workers.dev', value: lastServer(), inputMode: 'url', autocapitalize: 'off', spellcheck: false });
+    const check = el('button', { id: `${ID}-check`, type: 'button', class: 'primary', textContent: 'Проверить сервер' });
+    const msg = el('p', { id: `${ID}-msg`, class: 'muted', textContent: checked ? (checked.registered ? 'Сервер найден. Аккаунт уже создан — войди.' : 'Сервер найден. Аккаунта ещё нет — создай его.') : '' });
     check.onclick = () => guard(check, 'Проверяю…', async () => {
       checked = await account.checkServer(server.value);
       server.value = checked.server;
@@ -117,14 +122,14 @@ export function createAccountView({ go, onVaultChange = () => {} }) {
   }
 
   function registerCard() {
-    const user = field('acc-user', { type: 'text', placeholder: 'Логин (3–64 символа)', autocapitalize: 'off', required: true });
-    const p1 = field('acc-pass', { type: 'password', placeholder: 'Пароль (он же пароль защиты на устройстве)', autocomplete: 'new-password' });
-    const p2 = field('acc-pass2', { type: 'password', placeholder: 'Повтори пароль', autocomplete: 'new-password' });
-    const setup = field('acc-setup', { type: 'text', placeholder: 'Код установки сервера', hidden: !checked.setupCodeRequired });
-    const meter = el('div', { id: 'acc-strength', class: 'strength', 'aria-live': 'polite' });
+    const user = field(`${ID}-user`, { type: 'text', placeholder: 'Логин (3–64 символа)', autocapitalize: 'off', required: true });
+    const p1 = field(`${ID}-pass`, { type: 'password', placeholder: 'Пароль (он же пароль защиты на устройстве)', autocomplete: 'new-password' });
+    const p2 = field(`${ID}-pass2`, { type: 'password', placeholder: 'Повтори пароль', autocomplete: 'new-password' });
+    const setup = field(`${ID}-setup`, { type: 'text', placeholder: 'Код установки сервера', hidden: !checked.setupCodeRequired });
+    const meter = el('div', { id: `${ID}-strength`, class: 'strength', 'aria-live': 'polite' });
     p1.addEventListener('input', () => { const st = vault.passwordStrength(p1.value); meter.className = 'strength s' + st.score; meter.textContent = p1.value ? `Надёжность: ${st.label}` : ''; });
-    const btn = el('button', { id: 'acc-register', type: 'submit', class: 'primary', textContent: 'Создать аккаунт' });
-    const form = el('form', { id: 'acc-reg-form', class: 'form-stack' },
+    const btn = el('button', { id: `${ID}-register`, type: 'submit', class: 'primary', textContent: 'Создать аккаунт' });
+    const form = el('form', { id: `${ID}-reg-form`, class: 'form-stack' },
       el('p', { class: 'muted', textContent: vault.status() === 'none' ? 'На этом устройстве будет включена защита паролем: данные зашифруются.' : 'Введи текущий пароль защиты на этом устройстве: аккаунт будет с тем же паролем.' }),
       user, revealable(p1), meter, vault.status() === 'none' ? revealable(p2) : null, checked.setupCodeRequired ? setup : null, btn);
     form.onsubmit = async e => {
@@ -143,11 +148,11 @@ export function createAccountView({ go, onVaultChange = () => {} }) {
   }
 
   function loginCard() {
-    const user = field('acc-user', { type: 'text', placeholder: 'Логин', autocapitalize: 'off', required: true });
-    const pass = field('acc-pass', { type: 'password', placeholder: 'Пароль', autocomplete: 'current-password' });
-    const btn = el('button', { id: 'acc-login', type: 'submit', class: 'primary', textContent: 'Войти' });
-    const form = el('form', { id: 'acc-login-form', class: 'form-stack' }, user, revealable(pass), btn,
-      el('button', { type: 'button', class: 'link', id: 'acc-forgot', textContent: 'Забыл пароль', onclick: () => { showRecover = !showRecover; render(); } }));
+    const user = field(`${ID}-user`, { type: 'text', placeholder: 'Логин', autocapitalize: 'off', required: true });
+    const pass = field(`${ID}-pass`, { type: 'password', placeholder: 'Пароль', autocomplete: 'current-password' });
+    const btn = el('button', { id: `${ID}-login`, type: 'submit', class: 'primary', textContent: 'Войти' });
+    const form = el('form', { id: `${ID}-login-form`, class: 'form-stack' }, user, revealable(pass), btn,
+      el('button', { type: 'button', class: 'link', id: `${ID}-forgot`, textContent: 'Забыл пароль', onclick: () => { showRecover = !showRecover; render(); } }));
     form.onsubmit = async e => {
       e.preventDefault();
       await guard(btn, 'Вхожу…', async () => {
@@ -161,11 +166,11 @@ export function createAccountView({ go, onVaultChange = () => {} }) {
 
   function recoverCard() {
     if (!showRecover) return el('span');
-    const user = field('acc-rec-user', { type: 'text', placeholder: 'Логин', autocapitalize: 'off', required: true });
-    const code = field('acc-rec-code', { type: 'text', placeholder: 'Код восстановления (XXXX-XXXX-…)', autocapitalize: 'characters', spellcheck: false, required: true });
-    const pass = field('acc-rec-pass', { type: 'password', placeholder: 'Новый пароль', autocomplete: 'new-password' });
-    const btn = el('button', { id: 'acc-rec-go', type: 'submit', class: 'primary', textContent: 'Задать новый пароль и войти' });
-    const form = el('form', { id: 'acc-rec-form', class: 'form-stack' }, user, code, revealable(pass), btn);
+    const user = field(`${ID}-rec-user`, { type: 'text', placeholder: 'Логин', autocapitalize: 'off', required: true });
+    const code = field(`${ID}-rec-code`, { type: 'text', placeholder: 'Код восстановления (XXXX-XXXX-…)', autocapitalize: 'characters', spellcheck: false, required: true });
+    const pass = field(`${ID}-rec-pass`, { type: 'password', placeholder: 'Новый пароль', autocomplete: 'new-password' });
+    const btn = el('button', { id: `${ID}-rec-go`, type: 'submit', class: 'primary', textContent: 'Задать новый пароль и войти' });
+    const form = el('form', { id: `${ID}-rec-form`, class: 'form-stack' }, user, code, revealable(pass), btn);
     form.onsubmit = async e => {
       e.preventDefault();
       await guard(btn, 'Восстанавливаю…', async () => {
@@ -180,12 +185,89 @@ export function createAccountView({ go, onVaultChange = () => {} }) {
   }
 
   function joinCard() {
-    const btn = el('button', { id: 'acc-join-go', type: 'button', class: 'primary', textContent: 'Сохранить копию и присоединить устройство' });
+    const btn = el('button', { id: `${ID}-join-go`, type: 'button', class: 'primary', textContent: 'Сохранить копию и присоединить устройство' });
     btn.onclick = () => guard(btn, 'Работаю…', () => joinWithLocalData(pendingJoin.auth, pendingJoin.password, btn));
     return card('На этом устройстве уже есть данные',
       el('p', { textContent: `Записей на устройстве: ${pendingJoin.count}. Они зашифрованы другим ключом или не защищены. Сначала я сохраню зашифрованную копию (файл), затем присоединю устройство к аккаунту и добавлю эти записи к общим.` }),
       el('p', { class: 'warn', textContent: 'Файл с копией сохрани: это страховка.' }), btn,
       el('button', { type: 'button', textContent: 'Отмена', onclick: () => { pendingJoin = null; render(); } }));
+  }
+
+  // ---------- экран входа (до открытия приложения) ----------
+  let checking = false, checkError = '';
+  async function autoCheck() {
+    if (checking) return;
+    checking = true; checkError = '';
+    try { checked = await account.checkServer(lastServer()); }
+    catch (e) { checkError = describeError(e); }
+    finally { checking = false; render(); }
+  }
+  function serverDetails(open) {
+    const server = field(`${ID}-server`, { type: 'text', placeholder: 'Адрес сервера, например https://…workers.dev', value: lastServer(), inputMode: 'url', autocapitalize: 'off', spellcheck: false });
+    const check = el('button', { id: `${ID}-check`, type: 'button', textContent: 'Проверить сервер' });
+    check.onclick = () => guard(check, 'Проверяю…', async () => { checked = await account.checkServer(server.value); checkError = ''; server.value = checked.server; render(); });
+    return el('details', { id: `${ID}-server-box`, open: !!open }, el('summary', { textContent: 'Сервер' }), el('div', { class: 'form-stack' }, server, check));
+  }
+  function gateCards() {
+    if (pendingJoin) return [joinCard()];
+    if (!checked) {
+      if (DEFAULT_SERVER && !checkError) {
+        if (!checking) queueMicrotask(autoCheck);
+        return [card('Подключаюсь к серверу…', el('p', { id: `${ID}-msg`, class: 'muted', role: 'status', textContent: 'Это займёт несколько секунд.' }))];
+      }
+      const retry = el('button', { id: `${ID}-retry`, type: 'button', class: 'primary', textContent: 'Повторить', onclick: () => { checkError = ''; checked = null; render(); } });
+      return [card(DEFAULT_SERVER ? 'Нет связи с сервером' : 'Адрес сервера',
+        el('p', { id: `${ID}-msg`, class: checkError ? 'error' : 'muted', role: 'alert', textContent: checkError || 'Чтобы войти, нужен адрес сервера синхронизации (docs/SERVER.md).' }),
+        DEFAULT_SERVER ? retry : null, serverDetails(!DEFAULT_SERVER))];
+    }
+    const cards = [checked.registered ? loginCard() : registerCard()];
+    if (checked.registered) cards.push(recoverCard());
+    cards.push(el('div', { class: 'gate-foot' }, el('p', { id: `${ID}-msg`, class: 'muted', textContent: checked.registered ? 'Аккаунт уже создан на этом сервере. Войди в него.' : 'Аккаунта ещё нет. Создай его: это нужно один раз.' }), serverDetails(false)));
+    return cards;
+  }
+
+  // ---------- профиль ----------
+  const updateUi = createUpdateCard();
+  let pfAvatar = null, pfColor = null;
+  function profileSection() {
+    const c = profileCard(store.state.events, account.info());
+    pfAvatar = c.emoji; pfColor = c.color;
+    const avatarBtns = [el('button', { type: 'button', class: 'pf-avatar', dataset: { v: '' }, 'aria-pressed': String(!c.emoji), 'aria-label': 'Буквы имени', textContent: c.letters })]
+      .concat(AVATARS.map(a => el('button', { type: 'button', class: 'pf-avatar', dataset: { v: a }, 'aria-pressed': String(a === c.emoji), 'aria-label': `Значок ${a}`, textContent: a })));
+    const swatches = Object.entries(COLORS).map(([k, hex]) => el('button', { type: 'button', class: 'pf-color', dataset: { v: k }, style: `--sw:${hex}`, 'aria-pressed': String(k === c.color), 'aria-label': `Цвет: ${COLOR_NAMES[k]}` }));
+    const name = field('pf-name', { type: 'text', maxLength: 60, placeholder: 'Как к тебе обращаться', value: c.name, 'aria-label': 'Имя' });
+    const motto = field('pf-motto', { type: 'text', maxLength: 80, placeholder: 'Девиз или цель (по желанию)', value: c.motto, 'aria-label': 'Девиз' });
+    const err = el('p', { class: 'error', id: 'pf-err', role: 'alert' });
+    const preview = el('div', { class: 'avatar', id: 'pf-preview', style: `--av:${c.hex}`, textContent: c.face });
+    const repaint = () => {
+      const look = profileCard([{ id: 'profile', type: 'profile', payload: { name: name.value, avatar: pfAvatar, color: pfColor } }], account.info());
+      preview.textContent = look.face; preview.style.setProperty('--av', look.hex);
+      avatarBtns[0].textContent = look.letters;
+      for (const b of avatarBtns) b.setAttribute('aria-pressed', String(b.dataset.v === (pfAvatar || '')));
+      for (const b of swatches) b.setAttribute('aria-pressed', String(b.dataset.v === pfColor));
+    };
+    avatarBtns.forEach(b => { b.onclick = () => { pfAvatar = b.dataset.v; repaint(); }; });
+    swatches.forEach(b => { b.onclick = () => { pfColor = b.dataset.v; repaint(); }; });
+    name.addEventListener('input', repaint);
+    const save = el('button', { id: 'pf-save', type: 'submit', class: 'primary', textContent: 'Сохранить профиль' });
+    const form = el('form', { id: 'pf-form', class: 'form-stack' }, el('div', { class: 'row' }, preview, el('div', { class: 'grow' }, name)), motto,
+      el('div', { class: 'pf-grid', role: 'group', 'aria-label': 'Значок' }, ...avatarBtns), el('div', { class: 'pf-colors', role: 'group', 'aria-label': 'Цвет' }, ...swatches), err, save);
+    form.onsubmit = async e => {
+      e.preventDefault();
+      try {
+        const rec = saveProfileRecord(store.state.events, { name: name.value, avatar: pfAvatar, color: pfColor, motto: motto.value });
+        await store.save(rec);
+        toast('Профиль сохранён');
+        render();
+      } catch (x) { err.textContent = x.message; }
+    };
+    const a = account.info();
+    return el('section', { id: 'profile-card', class: 'card profile-card' },
+      el('div', { class: 'profile-head' }, el('div', { class: 'avatar big', id: 'profile-avatar', style: `--av:${c.hex}`, textContent: c.face }),
+        el('div', { class: 'profile-who' }, el('strong', { id: 'profile-who-name', textContent: c.name || c.login || 'Без имени' }),
+          el('span', { class: 'muted', id: 'profile-who-login', textContent: a ? `@${a.username}` : 'Аккаунт не подключён' }),
+          c.motto ? el('span', { class: 'profile-motto', id: 'profile-who-motto', textContent: c.motto }) : null)),
+      el('details', { id: 'profile-edit' }, el('summary', { textContent: 'Изменить профиль' }), form));
   }
 
   // ---------- подключённое состояние ----------
@@ -251,7 +333,7 @@ export function createAccountView({ go, onVaultChange = () => {} }) {
     const df = el('form', { class: 'form-stack' }, el('p', { class: 'muted', textContent: 'С сервера исчезнут все данные. На устройствах данные останутся. Потом можно создать аккаунт заново.' }), revealable(dp), dc, db_);
     df.onsubmit = async e => {
       e.preventDefault();
-      await guard(db_, 'Удаляю…', async () => { await account.deleteServerAccount(dp.value); sync.stop(); checked = null; toast('Аккаунт на сервере удалён'); render(); });
+      await guard(db_, 'Удаляю…', async () => { await account.deleteServerAccount(dp.value); sync.stop(); checked = null; toast('Аккаунт на сервере удалён'); render(); onLoggedOut(); });
     };
 
     cards.push(card('Безопасность аккаунта',
@@ -260,8 +342,8 @@ export function createAccountView({ go, onVaultChange = () => {} }) {
       el('details', {}, el('summary', { textContent: 'Удалить аккаунт на сервере' }), df)));
 
     const out = el('button', { id: 'acc-logout', type: 'button', textContent: 'Выйти (данные останутся на устройстве)' });
-    out.onclick = () => guard(out, 'Выхожу…', async () => { sync.stop(); await account.logout(); checked = null; onVaultChange(); toast('Вы вышли из аккаунта'); render(); });
-    cards.push(card('Выход', el('p', { class: 'muted', textContent: 'Выход не стирает данные на этом устройстве и не удаляет аккаунт.' }), out));
+    out.onclick = () => guard(out, 'Выхожу…', async () => { sync.stop(); await account.logout(); checked = null; onVaultChange(); toast('Вы вышли из аккаунта'); render(); onLoggedOut(); });
+    cards.push(card('Выход', el('p', { class: 'muted', textContent: 'Выход не стирает данные на этом устройстве и не удаляет аккаунт. Пока не войдёшь снова, приложение не откроется.' }), out));
     return cards;
   }
 
@@ -269,10 +351,20 @@ export function createAccountView({ go, onVaultChange = () => {} }) {
   function render() {
     unsub?.(); unsub = null;
     if (recoveryCode) { root.replaceChildren(recoveryCard(recoveryCode, afterCode)); return; }
-    root.replaceChildren(...(account.isLinked() ? linkedCards() : unlinkedCards()));
+    if (gate) {
+      if (account.isLinked()) { onAuthenticated(); return; }       // вошли или создали аккаунт: открываем приложение
+      root.replaceChildren(...gateCards());
+      return;
+    }
+    if (account.isLinked()) {
+      const [first, ...rest] = linkedCards();
+      root.replaceChildren(profileSection(), first, updateUi.root, ...rest);
+    } else {
+      root.replaceChildren(profileSection(), updateUi.root, ...unlinkedCards());
+    }
   }
   render();
 
   // Данные обновляются часто (в том числе синхронизацией) — экран перерисовываем только при открытии, чтобы не стирать вводимое.
-  return { root, update() {}, show: render, render };
+  return { root, update() {}, show() { updateUi.refresh(); render(); }, render };
 }

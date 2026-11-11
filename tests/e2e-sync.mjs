@@ -37,7 +37,7 @@ await tab(A.page, 'notes'); await A.page.fill('#note-input', 'секретная
 await tab(A.page, 'more');
 assert.match(await A.page.textContent('#settings-account'), /Не подключён/);
 await A.page.click('#open-account');
-assert.equal(await A.page.textContent('#title'), 'Аккаунт');
+assert.equal(await A.page.textContent('#title'), 'Профиль');
 await checkServer(A.page);
 assert.match(await A.page.textContent('#acc-msg'), /Аккаунта ещё нет/);
 await A.page.fill('#acc-user', 'Владелец'); await A.page.fill('#acc-pass', PW); await A.page.fill('#acc-pass2', PW + 'x');

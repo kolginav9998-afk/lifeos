@@ -387,3 +387,29 @@ html.amounts-hidden .amount{letter-spacing:.1em}
 .learning-row{display:flex;flex-direction:column;gap:4px;padding:6px 0;border-top:1px solid var(--line)}
 .ready-row{padding:6px 0;border-top:1px solid var(--line)}
 @media (prefers-reduced-motion: reduce){*,*::before,*::after{animation-duration:.01ms !important;animation-iteration-count:1 !important;transition-duration:.01ms !important;scroll-behavior:auto !important}}
+
+/* ---- экран входа ---- */
+.gate{min-height:100vh;display:grid;place-items:start center;padding:max(24px,env(safe-area-inset-top)) 20px 32px}
+.gate-card{width:100%;max-width:420px;display:flex;flex-direction:column;gap:10px;align-items:stretch}
+.gate-logo{align-self:center;border-radius:20px;margin-top:12px}
+.gate-title{text-align:center;font-size:1.7rem}
+.gate-sub{text-align:center;margin:0 0 6px}
+.gate-view{gap:12px}
+.gate-foot{display:flex;flex-direction:column;gap:6px}
+
+/* ---- профиль и аватар ---- */
+.avatar{--av:#7c5cff;width:44px;height:44px;flex:none;border-radius:50%;display:grid;place-items:center;background:var(--av);color:#fff;font-weight:700;font-size:1.05rem;letter-spacing:.02em;user-select:none}
+.avatar.big{width:64px;height:64px;font-size:1.6rem}
+.avatar-btn{--av:#7c5cff;width:40px;height:40px;flex:none;border:0;border-radius:50%;padding:0;min-height:0;display:grid;place-items:center;background:var(--av);color:#fff;font-weight:700;font-size:.95rem}
+.avatar-btn:active{transform:scale(.94)}
+.profile-head{display:flex;gap:14px;align-items:center}
+.profile-who{display:flex;flex-direction:column;gap:2px;min-width:0}
+.profile-who strong{font-size:1.15rem;overflow-wrap:anywhere}
+.profile-motto{font-style:italic;opacity:.85;overflow-wrap:anywhere}
+.pf-grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(44px,1fr));gap:6px}
+.pf-avatar{min-height:44px;padding:0;font-size:1.3rem;border-radius:12px}
+.pf-avatar[aria-pressed=true],.pf-color[aria-pressed=true]{outline:2px solid var(--accent);outline-offset:2px}
+.pf-colors{display:flex;gap:10px;flex-wrap:wrap}
+.pf-color{width:36px;height:36px;min-height:0;padding:0;border-radius:50%;background:var(--sw);border:2px solid transparent}
+.link-out{color:var(--accent);display:inline-block;padding:8px 0}
+.upd-notes{margin:2px 0 8px}
