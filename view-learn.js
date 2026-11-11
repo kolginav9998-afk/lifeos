@@ -8,6 +8,7 @@ import { newState, grade, studyStreak, INTERVALS } from './srs.js';
 import { canSpeak, foreignSide, speak } from './speech.js';
 import { openSpeaking, hasRunningSpeak, speakWeek, SPEAK_LANGS } from './speaking.js';
 import { plateauInfo } from './practice.js';
+import { lessonSkillStatus, skillFromLesson, skillFromTask } from './skills.js';
 import { practiceCard } from './view-learn-extra.js';
 
 const QUALITY_LABEL = { again: 'Забыл', hard: 'Трудно', good: 'Помню' };
@@ -198,7 +199,8 @@ export function createLearnView() {
         quizNode(t, l),
         el('p', { class: 'muted', textContent: `Карточек в уроке: ${l.cards.length}` }),
         el('button', { type: 'button', class: 'chip', dataset: { aiCheck: l.id }, textContent: 'Проверить мой ответ с ИИ', onclick: () => copyText(`Я прохожу урок «${l.title}» из курса «${t.title}».\nЗадание: ${l.task}\nМой ответ: <вставь свой ответ>\n\nПроверь ответ как доброжелательный наставник: что верно, что неверно или неполно, один совет и один следующий шаг. Объясняй простыми словами и не выдумывай факты.`) }),
-        el('button', { type: 'button', class: isDone ? '' : 'primary', dataset: { done: l.id }, textContent: isDone ? 'Снять отметку «пройден»' : 'Отметить пройденным', onclick: () => toggleLesson(t, l, isDone) }));
+        el('button', { type: 'button', class: isDone ? '' : 'primary', dataset: { done: l.id }, textContent: isDone ? 'Снять отметку «пройден»' : 'Отметить пройденным', onclick: () => toggleLesson(t, l, isDone) }),
+        isDone ? el('button', { type: 'button', class: 'chip task-skill', dataset: { taskSkill: l.id }, textContent: 'Задание выполнено → навык «Умею»', onclick: () => taskSkill(t, l) }) : null);
       d.addEventListener('toggle', () => { if (d.open) openLessons.add(l.id); else openLessons.delete(l.id); });
       return d;
     });
@@ -213,6 +215,14 @@ export function createLearnView() {
       plateau, mentor, curveBox, plan, el('h2', { textContent: 'Уроки' }), ...lessons, sources);
   }
 
+  // «Задание выполнено» → навык «Умею» (если навык из этого урока уже есть, поднимает его уровень)
+  async function taskSkill(t, l) {
+    try {
+      const old = events.find(e => e.id === `skill:lesson:${l.id}`), ev = skillFromTask(t, l, events);
+      await store.save(ev);
+      toast(old ? 'Навык обновлён: теперь «Умею»' : 'Навык добавлен: «Умею»', { actionLabel: 'Отменить', onAction: () => (old ? store.save(old) : store.remove(ev.id)) });
+    } catch (x) { toast(x.message); }
+  }
   async function toggleLesson(t, l, wasDone) {
     if (wasDone) {
       const old = await store.remove(lessonEventId(l.id));
@@ -251,7 +261,7 @@ export function createLearnView() {
     const t0 = today();
     const queue = opts.queue ?? (opts.exam ? examQueue({ events, trackId, n: 20 }) : sessionQueue({ events, today: t0, trackId, max: opts.max ?? 30 }));
     if (!queue.length) { toast('Сейчас повторять нечего'); return; }
-    session = { queue, i: 0, shown: false, counts: { again: 0, hard: 0, good: 0 }, again: new Map(), today: t0, fresh: queue.filter(x => !x.state).length, startedAt: Date.now(), exam: !!opts.exam, missed: [] };
+    session = { queue, i: 0, shown: false, counts: { again: 0, hard: 0, good: 0 }, again: new Map(), today: t0, fresh: queue.filter(x => !x.state).length, startedAt: Date.now(), exam: !!opts.exam, missed: [], skillsBefore: new Set(lessonSkillStatus(events).ready.map(r => r.lesson.id)) };
     overlay.hidden = false;
     renderSession();
   }
@@ -317,12 +327,19 @@ export function createLearnView() {
     if (session.exam) return renderExamSummary();
     const s = session, total = s.counts.again + s.counts.hard + s.counts.good;
     const pct = total ? Math.round(((s.counts.hard + s.counts.good) / total) * 100) : 0;
+    const gained = lessonSkillStatus(events).ready.filter(r => !s.skillsBefore?.has(r.lesson.id));          // уроки, карточки которых выучены именно сейчас
+    const skillsBox = gained.length ? el('div', { class: 'card calm', id: 'sess-skills' }, el('strong', { textContent: `Освоено: ${gained.length}` }),
+      ...gained.slice(0, 3).map(r => el('p', { textContent: r.goal ? r.goal.charAt(0).toUpperCase() + r.goal.slice(1) : r.lesson.title })),
+      el('button', { type: 'button', id: 'sess-skills-add', class: 'chip', textContent: 'Добавить в «Навыки»', onclick: async e => {
+        const evs = gained.map(r => skillFromLesson(r.track, r.lesson, events)); e.target.disabled = true;
+        await store.saveMany(evs); toast(`Добавлено навыков: ${evs.length}`, { actionLabel: 'Отменить', onAction: () => store.removeMany(evs.map(x => x.id)) });
+      } })) : null;
     overlay.replaceChildren(
       el('div', { class: 'flash' },
         el('h3', { textContent: 'Сессия завершена' }),
         el('p', { class: 'big', id: 'sess-result', textContent: `${pct}%` }),
         el('p', { class: 'muted', textContent: `Ответов: ${total} · помню: ${s.counts.good} · трудно: ${s.counts.hard} · забыл: ${s.counts.again} · новых: ${s.fresh}` }),
-        el('p', { class: 'muted', textContent: 'Забытые карточки вернутся сегодня, остальные — через нарастающие интервалы.' })),
+        el('p', { class: 'muted', textContent: 'Забытые карточки вернутся сегодня, остальные — через нарастающие интервалы.' }), skillsBox),
       el('button', { type: 'button', id: 'sess-done', class: 'primary big-btn', textContent: 'Готово', onclick: closeSession }));
     overlay.focus({ preventScroll: true });
   }

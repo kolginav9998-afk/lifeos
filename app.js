@@ -20,6 +20,7 @@ import { createNotesView } from './view-notes.js';
 import { createDiaryView } from './view-diary.js';
 import { createHealthView } from './view-health.js';
 import { createLearnView } from './view-learn.js';
+import { createSkillsView } from './view-skills.js';
 import { createWorkoutsView } from './view-workouts.js';
 import { createPlansView } from './view-plans.js';
 import { createPeopleView } from './view-people.js';
@@ -42,6 +43,7 @@ const DEFS = [
   { id: 'notes', group: 'diary', title: 'Заметки', sub: 'Заметки', make: () => createNotesView() },
   { id: 'reflect', group: 'diary', title: 'Рефлексия', sub: 'Рефлексия', make: () => createReflectView() },
   { id: 'learn', group: 'grow', title: 'Учёба', sub: 'Учёба', make: () => createLearnView() },
+  { id: 'skills', group: 'grow', title: 'Навыки', sub: 'Навыки', make: () => createSkillsView() },
   { id: 'tests', group: 'grow', title: 'Проверка', sub: 'Тесты', make: () => createTestsView() },
   { id: 'insights', group: 'grow', title: 'Аналитика', sub: 'Аналитика', make: () => createInsightsView() },
   { id: 'okr', group: 'grow', title: 'Цели', sub: 'Цели', make: () => createOkrView() },

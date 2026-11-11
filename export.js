@@ -13,6 +13,7 @@ import { checkupsOf } from './prevent.js';
 import { parkedOf } from './parked.js';
 import { wishesOf } from './wishes.js';
 import { debtsOf, debtLeft, DIRECTIONS } from './debts.js';
+import { skillGroups, LEVELS } from './skills.js';
 import { lessonTitle } from './academy.js';
 import { sickRanges } from './sick.js';
 import { medsOf } from './meds.js';
@@ -93,6 +94,7 @@ export function toMarkdown(events, now = Date.now()) {
   for (const e of parkedOf(events)) ref.push(`- ${e.payload.date} — отложено на ${e.payload.forDate}: ${esc(e.payload.text)}${e.payload.done ? ' (разобрано)' : ''}`);
   part('Рефлексия', ref);
   part('Хочу купить (отсрочка)', wishesOf(events).slice().reverse().map(w => `- ${w.payload.date} — ${esc(w.payload.text)}${w.payload.amountMinor ? `, ${formatMoney(w.payload.amountMinor)}` : ''}: ${{ wait: 'ждёт решения', bought: 'куплено', dropped: 'передумал' }[w.payload.status]}`));
+  part('Навыки', skillGroups(events).flatMap(g => [`**${esc(g.area)}**`, ...g.items.map(e => `- ${esc(e.payload.title)} — ${LEVELS[e.payload.level].toLowerCase()}, с ${e.payload.date}${e.payload.evidence ? ` (${esc(e.payload.evidence)})` : ''}${e.payload.note ? `. ${esc(e.payload.note)}` : ''}`)]));
   part('Долги и займы', debtsOf(events).map(d => `- ${DIRECTIONS[d.payload.direction]}: ${esc(d.payload.who)}, ${formatMoney(d.payload.amountMinor)}${d.payload.due ? `, срок ${d.payload.due}` : ''}${d.payload.settled ? ' (закрыт)' : d.payload.paidMinor ? `, осталось ${formatMoney(debtLeft(d))}` : ''}${d.payload.note ? `; ${esc(d.payload.note)}` : ''}`));
   part('Конспекты уроков', events.filter(e => e.type === 'lessonnote').sort((a, b) => a.payload.date.localeCompare(b.payload.date)).map(e => `- ${lessonTitle(e.payload.lesson)?.title ?? e.payload.lesson} (${e.payload.date}): ${esc(e.payload.text)}`));
   part('Профилактика', checkupsOf(events).map(c => `- ${esc(c.payload.name)}: раз в ${c.payload.months} мес.; последний раз ${c.payload.last ?? 'не отмечен'}`));

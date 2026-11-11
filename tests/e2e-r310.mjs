@@ -2,7 +2,7 @@
 import assert from 'node:assert/strict';
 import { launch, tab, until } from './helpers.mjs';
 
-const t = await launch();
+const t = await launch({ ctxOptions: { permissions: ['clipboard-read', 'clipboard-write'] } });
 const { page, errors } = t;
 await page.goto(t.url);
 await until(page, () => !document.getElementById('app').hidden);
@@ -162,6 +162,103 @@ await page.fill('#habit-name', 'Без дней');
 for (let d = 0; d < 7; d++) await page.uncheck(`#habit-form .hday-box[data-day="${d}"]`);
 await clearToast(); await page.click('#habit-form button[type=submit]'); await toast(/Выбери хотя бы один день недели/);
 assert.equal((await evs('habit')).length, 1, 'привычка без дней не создаётся');
+
+
+// ---------- навыки ----------
+await tab(page, 'skills');
+assert.deepEqual(await page.locator('#subnav button').allTextContents(), ['Учёба', 'Навыки', 'Тесты', 'Аналитика', 'Цели']);
+assert.match(await text('#skills-empty'), /Пока навыков нет/);
+await page.locator('#skill-new').evaluate(d => { d.open = true; });
+await page.click('#skill-add'); assert.match(await text('#skill-err'), /Напиши, что ты умеешь/);
+await page.fill('#skill-title', 'Менять колесо'); await page.fill('#skill-area', 'Дом и быт'); await page.fill('#skill-note', 'в гараже, без подсказок');
+assert.equal(await page.inputValue('#skill-level'), '2', 'по умолчанию «Умею»');
+await clearToast(); await page.click('#skill-add'); await toast(/Навык добавлен/);
+await until(page, () => document.querySelector('.skill-group[data-area="Дом и быт"] .skill-row'));
+assert.match(await text('.skill-row .skill-title'), /Менять колесо/); assert.equal(await text('.skill-row .badge'), 'Умею');
+assert.match(await text('#skills-count'), /Всего: 1 · знаю: 0 · умею: 1 · уверенно: 0 · областей: 1/);
+assert.match(await text('.skill-row'), /вручную/); assert.match(await text('.skill-row .skill-note-text'), /в гараже/);
+assert.equal(await page.locator('#skills-empty').count(), 0);
+// уровень выше
+await page.click('.skill-row .skill-up');
+await until(page, () => document.querySelector('.skill-row .badge')?.textContent === 'Уверенно');
+assert.equal(await page.locator('.skill-row .skill-up').count(), 0, 'выше «Уверенно» некуда');
+await page.click('#toast button'); await until(page, () => document.querySelector('.skill-row .badge')?.textContent === 'Умею');      // «Отменить»
+await page.click('.skill-row .skill-edit');
+await page.fill('.edit-skill-title', 'Менять колесо и проверять давление'); await page.selectOption('.edit-skill-level', '3');
+await page.click('form.editing .save');
+await until(page, () => /проверять давление/.test(document.querySelector('.skill-row .skill-title')?.textContent ?? ''));
+assert.equal(await text('.skill-row .badge'), 'Уверенно');
+await clearToast(); await page.click('.skill-row .skill-del'); await toast(/Навык удалён/);
+await until(page, () => !document.querySelector('.skill-row'));
+await page.click('#toast button'); await until(page, () => document.querySelector('.skill-row'));        // вернули
+
+// навыки из уроков: пройден урок и выучены карточки
+await page.evaluate(async () => {
+  const store = await import('./store.js'), ev = await import('./events.js'), ac = await import('./academy.js'), srs = await import('./srs.js');
+  const t0 = ev.todayStr(), en = ac.trackById('english'), back = n => ev.addDays(t0, -n), out = [];
+  for (const [li, box] of [[0, 5], [1, 5], [2, 1]]) {                                     // два урока выучены, третий только начат
+    const l = en.lessons[li];
+    out.push(ac.makeLessonDone(en, l, back(40 - li)));
+    l.cards.forEach((_, i) => out.push(ac.makeSrsEvent({ ...srs.newState(`${l.id}:${i}`, back(40)), box, reps: 6, last: back(1), due: ev.addDays(t0, 20), hist: [[back(1), 2]] })));
+  }
+  await store.saveMany(out);
+});
+await tab(page, 'today');
+await until(page, () => document.getElementById('skills-chip'));
+assert.equal(await text('#skills-chip'), 'Новые навыки: 2');
+await page.click('#skills-chip');
+await until(page, () => !document.getElementById('view-skills').hidden);
+await until(page, () => document.getElementById('skills-ready'));
+assert.match(await text('#skills-ready'), /Можно добавить в навыки \(2\)/);
+assert.match(await text('.ready-row[data-lesson="en-01"]'), /Выбирать пять частотных слов на день и повторять их вечером/); assert.match(await text('.ready-row[data-lesson="en-01"]'), /выучено карточек \d+ из \d+/);
+assert.equal(await page.locator('#skills-learning .learning-row[data-lesson="en-03"]').count(), 1, 'урок с начатыми, но не выученными карточками — в «Изучаю»'); assert.match(await text('#skills-learning .learning-row[data-lesson="en-03"]'), /Повторять за диктором.*0 из 2 \(нужно 2\)/);
+assert.equal(await page.locator('#skills-learning .learning-row[data-lesson="en-04"]').count(), 0, 'непройденный урок не показываем');
+await clearToast(); await page.click('.ready-row[data-lesson="en-01"] .ready-add'); await toast(/Навык добавлен/);
+await until(page, () => document.querySelector('.skill-row[data-source="lesson"]'));
+assert.equal(await page.locator('.ready-row').count(), 1, 'добавленный урок ушёл из списка готовых');
+assert.match(await text('.skill-group[data-area="Английский: быстро"]'), /Урок «Как учить быстро/);
+await page.click('#toast button'); await until(page, () => !document.querySelector('.skill-row[data-source="lesson"]'));          // отмена
+await until(page, () => document.querySelectorAll('.ready-row').length === 2);
+await page.click('#ready-add-all'); await toast(/Добавлено навыков: 2/);
+await until(page, () => document.querySelectorAll('.skill-row[data-source="lesson"]').length === 2);
+assert.equal(await page.locator('#skills-ready').count(), 0); assert.match(await text('#skills-learning'), /из \d+ \(нужно \d+\)/);
+assert.deepEqual((await evs('skill')).map(e => e.id).filter(id => id.startsWith('skill:lesson:')).sort(), ['skill:lesson:en-01', 'skill:lesson:en-02']);
+await tab(page, 'today'); assert.equal(await page.locator('#skills-chip').count(), 0, 'готовых навыков больше нет');
+// список для копирования
+await tab(page, 'skills');
+await clearToast(); await page.click('#skills-copy'); await toast(/Список навыков скопирован/);
+const copied = await page.evaluate(() => navigator.clipboard.readText());
+assert.match(copied, /^Навыки\n\nАнглийский: быстро\n— Выбирать пять частотных слов на день и повторять их вечером \(знаю\)/); assert.match(copied, /Дом и быт\n— Менять колесо и проверять давление \(уверенно\)/);
+
+// «Задание выполнено» поднимает навык из урока до «Умею»
+// «Задание выполнено» поднимает навык из урока до «Умею»
+await tab(page, 'learn');
+if (await page.locator('#learn-back').count()) await page.click('#learn-back');
+await page.click('.track-card[data-track="english"]');
+await page.locator('.lesson[data-lesson="en-01"]').evaluate(d => { d.open = true; });
+await clearToast(); await page.click('.task-skill[data-task-skill="en-01"]'); await toast(/Навык обновлён: теперь «Умею»/);
+await until(page, async () => (await (await import('./store.js')).state.events.find(e => e.id === 'skill:lesson:en-01')).payload.level === 2);
+assert.match((await evs('skill')).find(e => e.id === 'skill:lesson:en-01').payload.evidence, /^Задание урока «Как учить быстро.*выполнено\. Урок «/);
+assert.equal(await page.locator('.task-skill').count() >= 1, true);
+await page.click('#learn-back');
+
+// навык появляется в конце сессии повторения, когда карточки урока выучены
+await page.evaluate(async () => {
+  const store = await import('./store.js'), ev = await import('./events.js'), ac = await import('./academy.js'), srs = await import('./srs.js');
+  const t0 = ev.todayStr(), en = ac.trackById('english'), l = en.lessons[3], back = n => ev.addDays(t0, -n), out = [ac.makeLessonDone(en, l, back(30))];
+  l.cards.forEach((_, i) => out.push(ac.makeSrsEvent({ ...srs.newState(`${l.id}:${i}`, back(60)), box: 3, reps: 5, last: back(8), due: t0, hist: [[back(8), 2]] })));
+  await store.saveMany(out);
+});
+await tab(page, 'learn');
+if (await page.locator('#learn-back').count()) await page.click('#learn-back');          // экран «Учёба» помнит, что был на странице курса
+await page.click('#learn-start');
+for (let i = 0; i < 40 && !(await page.locator('#sess-result').count()); i++) { if (await page.locator('#sess-show').count()) { await page.click('#sess-show'); await page.click('.grade.good'); } }
+await until(page, () => document.getElementById('sess-result'));
+await until(page, () => document.getElementById('sess-skills'));
+assert.match(await text('#sess-skills'), /Освоено: 1/);
+await page.click('#sess-skills-add'); await toast(/Добавлено навыков: 1/);
+assert.ok((await evs('skill')).some(e => e.id === 'skill:lesson:en-04'));
+await page.click('#sess-done');
 
 assert.deepEqual(errors, [], 'нет ошибок в консоли:\n' + errors.join('\n'));
 await t.close();

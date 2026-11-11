@@ -30,6 +30,7 @@ function searchable(e) {
     case 'weekreflect': return { kind: 'Итоги недели', title: p.went || p.blocked || p.change || p.week, text: [p.went, p.blocked, p.change].join(' ') };
     case 'decision': return { kind: 'Решение', title: p.title, text: [p.title, p.why, p.expect, p.closed?.outcome].join(' ') };
     case 'lessonnote': return { kind: 'Конспект', title: `${lessonTitle(p.lesson)?.title ?? 'Урок'}: ${p.text}`, text: [lessonTitle(p.lesson)?.title, p.text].join(' ') };
+    case 'skill': return { kind: 'Навык', title: p.title, text: [p.title, p.area, p.note, p.evidence].join(' ') };
     case 'parked': return { kind: 'Отложено', title: p.text, text: p.text };
     case 'wish': return { kind: 'Хочу купить', title: p.text, text: p.text };
     case 'debt': return { kind: 'Долг', title: `${p.who}${p.note ? ' — ' + p.note : ''}`, text: [p.who, p.note].join(' ') };
@@ -38,7 +39,7 @@ function searchable(e) {
     default: return null;
   }
 }
-export const TAB_OF = { task: 'today', note: 'notes', habit: 'habits', expense: 'money', income: 'money', diary: 'diary', measure: 'health', checkin: 'diary', ucard: 'learn', workout: 'workouts', goal: 'plans', sub: 'plans', experiment: 'insights', focus: 'today', person: 'people', okr: 'okr', thought: 'health', intention: 'today', dayreview: 'reflect', weekreflect: 'reflect', decision: 'reflect', joy: 'reflect', parked: 'reflect', wish: 'plans', debt: 'plans', lessonnote: 'learn' };
+export const TAB_OF = { task: 'today', note: 'notes', habit: 'habits', expense: 'money', income: 'money', diary: 'diary', measure: 'health', checkin: 'diary', ucard: 'learn', skill: 'skills', workout: 'workouts', goal: 'plans', sub: 'plans', experiment: 'insights', focus: 'today', person: 'people', okr: 'okr', thought: 'health', intention: 'today', dayreview: 'reflect', weekreflect: 'reflect', decision: 'reflect', joy: 'reflect', parked: 'reflect', wish: 'plans', debt: 'plans', lessonnote: 'learn' };
 
 export function searchEvents(events, query, limit = 50) {
   const tokens = normalize(query).split(/\s+/).filter(Boolean);

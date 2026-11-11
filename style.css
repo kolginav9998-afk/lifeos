@@ -377,3 +377,12 @@ html.amounts-hidden .amount{letter-spacing:.1em}
 .factor-row{padding:6px 0;border-top:1px solid var(--line)}
 .hdays{margin:4px 0}.hday{margin-right:2px}.h-days,.h-off{font-size:.85rem}
 .h-cal .dot.off{opacity:.35}
+
+.skill-row{display:flex;flex-direction:column;gap:4px;padding:8px 0;border-top:1px solid var(--line)}
+.skill-group h3{margin:0 0 4px}.skill-group .skill-row:first-of-type{border-top:0}
+.skill-note-text{font-size:.92rem}
+.badge.lvl1{background:#e0e7ff;color:#3730a3}.badge.lvl2{background:#dcfce7;color:#166534}.badge.lvl3{background:#fef3c7;color:#92400e}
+@media (prefers-color-scheme: dark){:root:not([data-theme=light]) .badge.lvl1{background:#312e81;color:#c7d2fe}:root:not([data-theme=light]) .badge.lvl2{background:#14532d;color:#bbf7d0}:root:not([data-theme=light]) .badge.lvl3{background:#78350f;color:#fde68a}}
+:root[data-theme=dark] .badge.lvl1{background:#312e81;color:#c7d2fe}:root[data-theme=dark] .badge.lvl2{background:#14532d;color:#bbf7d0}:root[data-theme=dark] .badge.lvl3{background:#78350f;color:#fde68a}
+.learning-row{display:flex;flex-direction:column;gap:4px;padding:6px 0;border-top:1px solid var(--line)}
+.ready-row{padding:6px 0;border-top:1px solid var(--line)}

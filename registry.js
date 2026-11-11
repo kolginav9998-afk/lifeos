@@ -36,6 +36,7 @@ export const REGISTRY = {
   lessonnote: { label: 'Конспект урока', group: 'Учёба', module: 'academy.js', privacy: 'text', analytics: false, fields: 'lesson, text, date' },
   srs: { label: 'Состояние карточки', group: 'Учёба', module: 'srs.js', privacy: 'learning', analytics: true, fields: 'card, box, due, first, last, reps, lapses, hist' },
   speak: { label: 'Говорение вслух', group: 'Учёба', module: 'speaking.js', privacy: 'learning', analytics: false, fields: 'date, lang, seconds, minutes, topic' },
+  skill: { label: 'Навык (что умею)', group: 'Учёба', module: 'skills.js', privacy: 'learning', analytics: false, fields: 'title, area, level, date, source, ref, evidence, note' },
   learngoal: { label: 'Недельная цель по курсу (минуты)', group: 'Учёба', module: 'practice.js', privacy: 'learning', analytics: false, fields: 'track, minutes' },
   ucard: { label: 'Своя карточка', group: 'Учёба', module: 'academy.js', privacy: 'text', analytics: false, fields: 'q, a, hint' },
   testrun: { label: 'Прохождение проверки', group: 'Проверки', module: 'bt-core.js', privacy: 'numbers', analytics: true, fields: 'date, mode, tests{metrics, trials}, state, startedAt, durationMs' },

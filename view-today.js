@@ -24,6 +24,7 @@ import { planDay, planText, rankTasks } from './planday.js';
 import { parkedDue, finishPark } from './parked.js';
 import { createMoneyNudge } from './view-money-nudge.js';
 import { createDeviceHints } from './view-device-hints.js';
+import { lessonSkillStatus } from './skills.js';
 import * as vault from './vault.js';
 import * as store from './store.js';
 
@@ -383,6 +384,8 @@ export function createTodayView({ go }) {
     if (!sickNow && !events.some(e => e.type === 'testrun' && e.payload.date === today)) opt.push(el('button', { type: 'button', id: 'test-chip', class: 'chip', textContent: 'Проверка дня', onclick: () => go('tests') }));
     chips.push(el('button', { type: 'button', id: 'heavy-chip', class: 'chip', textContent: getPref('heavyDay') ? 'Тяжёлый день: включён' : 'Тяжёлый день', 'aria-pressed': String(!!getPref('heavyDay')), onclick: () => { setPref('heavyDay', !getPref('heavyDay')); render(); } }));
     const goalsOn = okrsOf(events, 'active');
+    const skillsReady = lessonSkillStatus(events).ready.length;
+    if (skillsReady) opt.push(el('button', { type: 'button', id: 'skills-chip', class: 'chip', textContent: `Новые навыки: ${skillsReady}`, onclick: () => go('skills') }));
     if (goalsOn.length) opt.push(el('button', { type: 'button', id: 'okr-chip', class: 'chip', textContent: `Цели: ${goalsOn.length}${goalsOn.some(g => okrPace(g, today).state === 'behind') ? ' ⚠' : ''}`, onclick: () => go('okr') }));
     const bds = upcomingBirthdays(events, today, 7), dueP = dueContacts(events, today);
     if (bds.length) opt.push(el('button', { type: 'button', id: 'bday-chip', class: 'chip', textContent: `🎂 ${bds[0].person.payload.name}: ${bds[0].inDays === 0 ? 'сегодня' : bds[0].inDays === 1 ? 'завтра' : `через ${bds[0].inDays} дн.`}${bds.length > 1 ? ` (+${bds.length - 1})` : ''}`, onclick: () => go('people') }));
