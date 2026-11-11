@@ -21,6 +21,9 @@ export const TESTS = [
   { id: 'digits', title: 'Цифры по памяти', domain: 'memory', minutes: 2, desc: 'Запомни цифры и повтори их: сначала в том же порядке, потом задом наперёд.',
     primary: { key: 'total', label: 'Объём памяти', unit: '', better: 'higher', digits: 0 },
     metrics: { forward: 'Прямо', backward: 'Задом наперёд', total: 'Сумма', attempts: 'Попыток' } },
+  { id: 'nback', title: 'Буквы: две назад', domain: 'memory', minutes: 1, desc: 'Буквы идут по одной. Нажми «Совпало», если буква такая же, как две назад.',
+    primary: { key: 'dPrime', label: 'Рабочая память (d′)', unit: '', better: 'higher', digits: 2 },
+    metrics: { n: 'Оценено букв', hits: 'Верно «совпало»', misses: 'Пропущено', falseAlarms: 'Ложных «совпало»', correctRejections: 'Верно «не совпало»', accuracy: 'Точность', medianRT: 'Медиана реакции, мс', dPrime: 'd′' } },
   { id: 'words', title: 'Слова: узнавание', domain: 'memory', minutes: 1, desc: 'Запомни слова в начале, а в конце скажи, какие из них были.',
     primary: { key: 'dPrime', label: 'Узнавание (d′)', unit: '', better: 'higher', digits: 2 },
     metrics: { n: 'Слов', hits: 'Узнано', misses: 'Пропущено', falseAlarms: 'Ложных «были»', correctRejections: 'Верных «не было»', accuracy: 'Точность', dPrime: 'd′' } },
@@ -48,7 +51,7 @@ export const PLANS = {
     { id: 'wordsLearn', n: 8 }, { id: 'reaction', n: 5 }, { id: 'gonogo', n: 16 }, { id: 'stroop', n: 12 }, { id: 'digits', max: 7 },
     { id: 'math', seconds: 45 }, { id: 'recall', n: 6 }, { id: 'wordsRecall' }] },
   full: { id: 'full', title: 'Полная проверка', about: 'около 12 минут', steps: [
-    { id: 'wordsLearn', n: 12 }, { id: 'reaction', n: 8 }, { id: 'gonogo', n: 32 }, { id: 'stroop', n: 24 }, { id: 'digits', max: 10 },
+    { id: 'wordsLearn', n: 12 }, { id: 'reaction', n: 8 }, { id: 'gonogo', n: 32 }, { id: 'stroop', n: 24 }, { id: 'digits', max: 10 }, { id: 'nback', n: 2, length: 24 },
     { id: 'schulte', size: 25 }, { id: 'series', n: 8 }, { id: 'math', seconds: 90 }, { id: 'time', targets: [5000, 10000, 15000] }, { id: 'recall', n: 10 }, { id: 'wordsRecall' }] },
 };
 export function singlePlan(testId) {
@@ -94,6 +97,7 @@ export function validity(testId, m) {
     case 'gonogo': if (!(m.n >= 10)) return bad('мало заданий'); if (m.hits + m.omissions > 0 && m.hits / (m.hits + m.omissions) < 0.5) return bad('большинство «жми» пропущено'); break;
     case 'stroop': if (!(m.n >= 8)) return bad('мало заданий'); if (m.accuracy < 0.5) return bad('точность ниже половины'); break;
     case 'digits': if (!(m.forward >= 2)) return bad('не пройдена даже короткая последовательность'); break;
+    case 'nback': if (!(m.n >= 10)) return bad('мало букв'); if (m.hits + m.falseAlarms === 0) return bad('не было ни одного нажатия'); if (m.hits + m.falseAlarms >= m.n) return bad('нажато на каждую букву'); break;
     case 'words': if (!(m.n >= 8)) return bad('мало слов'); break;
     case 'math': if (!(m.n >= 3)) return bad('мало примеров'); break;
     case 'series': if (!(m.n >= 3)) return bad('мало рядов'); break;
@@ -132,6 +136,12 @@ export function makeRun({ mode, startedAt, durationMs, state = null, results, ab
 export function makeRunEvent(payload, now = Date.now()) {
   return { id: runId(payload.startedAt), type: 'testrun', ts: now, payload, source: 'manual', confidence: 1, evidence: [] };
 }
+// Метрика усилия: насколько трудно было (1–5). Ставится после проверки, по желанию.
+export function setEffort(ev, v) {
+  if (!Number.isInteger(v) || v < 1 || v > 5) throw new Error('Усилие: от 1 до 5');
+  return { ...ev, payload: { ...ev.payload, effort: v } };
+}
+export const EFFORT_LABEL = ['очень легко', 'легко', 'средне', 'трудно', 'очень трудно'];
 export const runsOf = events => events.filter(e => e.type === 'testrun' && e.payload && e.payload.tests).map(e => e.payload).sort((a, b) => a.startedAt - b.startedAt);
 
 // Состояние перед тестом (самооценка) — помогает отделять «плохой день» от «плохой формы».

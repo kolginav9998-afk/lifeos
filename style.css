@@ -334,3 +334,13 @@ html.amounts-hidden .amount{letter-spacing:.1em}
 .em-row{margin:4px 0}
 .em-big{font-size:1.4rem;font-weight:600;overflow-wrap:anywhere;margin-top:2px}
 .em-line{padding:10px 14px}
+.nb-letter{font-size:4.5rem;min-height:6rem;display:flex;align-items:center;justify-content:center}
+#nb-btn.pressed{opacity:.55}
+.speak-topic{font-size:1.15rem;line-height:1.5;margin:8px 0}
+.quiz{margin:8px 0;display:flex;flex-direction:column;gap:8px}
+.quiz-q{font-size:1.05rem;font-weight:600;margin:0}
+.quiz-opt{justify-content:flex-start;text-align:left;white-space:normal}
+.quiz-opt.right{border-color:var(--ok);background:rgba(22,163,74,.15)}.quiz-opt.wrong{border-color:var(--danger);background:rgba(220,38,38,.12)}
+.exam-miss{margin:4px 0}
+.fw-clock{font-size:1.6rem;font-weight:700}
+#fw-text{flex:1;min-height:50vh;font-size:1.05rem;line-height:1.5}

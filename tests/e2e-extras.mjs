@@ -62,7 +62,7 @@ await page.click('#search-btn');
 
 // ---------- шаблоны привычек ----------
 await tab(page, 'habits');
-assert.equal(await count('#habit-templates .tpl'), 5);
+assert.equal(await count('#habit-templates .tpl'), 8);
 await page.click('#habit-templates .tpl:has-text("Зарядка")');
 assert.equal(await page.inputValue('#habit-name'), 'Зарядка');
 assert.equal(await page.inputValue('#habit-min'), '5 приседаний');

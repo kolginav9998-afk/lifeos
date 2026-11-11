@@ -15,7 +15,7 @@ import { makeNote, templateText } from './notes.js';
 import { upcomingBirthdays, dueContacts } from './people.js';
 import { okrsOf, okrPace } from './okr.js';
 import { makeIntention, intentionOf, decisionsDue, lowMoodNotice, LOW_MOOD_TEXT } from './reflect.js';
-import { lightDayHint, overloadHint } from './hints.js';
+import { lightDayHint, overloadHint, caffeineHint } from './hints.js';
 import { activeSick, startSick, endSick } from './sick.js';
 import { checkupsDue } from './prevent.js';
 import * as vault from './vault.js';
@@ -116,6 +116,10 @@ export function createTodayView({ go }) {
       el('button', { type: 'button', id: 'hint-light-on', class: 'chip', textContent: 'Включить «Тяжёлый день»', onclick: () => { setPref('heavyDay', true); setPref('lightDayAsked', today); render(); } }),
       el('button', { type: 'button', id: 'hint-light-sick', class: 'chip', textContent: 'Я заболел', onclick: async () => { try { setPref('lightDayAsked', today); await store.save(startSick(events)); } catch (e) { toast(e.message); } } }),
       el('button', { type: 'button', class: 'chip', textContent: 'Не сейчас', onclick: () => { setPref('lightDayAsked', today); render(); } })));
+    const caf = !sickEv && getPref('caffeineAsked') !== today && caffeineHint(events, today);
+    if (caf) out.push(hintCard('hint-caffeine', caf.text,
+      el('button', { type: 'button', id: 'hint-caffeine-exp', class: 'chip', textContent: 'Проверить экспериментом', onclick: () => { setPref('caffeineAsked', today); go('insights'); } }),
+      el('button', { type: 'button', class: 'chip', textContent: 'Понял', onclick: () => { setPref('caffeineAsked', today); render(); } })));
     const over = !heavy && !sickEv && getPref('overloadAsked') !== today && overloadHint(events, today);
     if (over) out.push(hintCard('hint-overload', over.text,
       el('button', { type: 'button', id: 'hint-overload-on', class: 'chip', textContent: 'Оставить три главных', onclick: () => { setPref('heavyDay', true); setPref('overloadAsked', today); render(); } }),

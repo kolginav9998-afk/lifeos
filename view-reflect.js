@@ -5,6 +5,7 @@ import * as store from './store.js';
 import { getPref, setPref } from './prefs.js';
 import {
   DAY_QUESTIONS, WEEK_QUESTIONS, VERDICTS, CHARGER_IDEAS, LOW_MOOD_TEXT,
+  RITUAL_STEPS, makeRitual, ritualOf,
   makeDayReview, dayReviewOf, makeWeekReflection, weekReflectionOf, weekReflections, weekStart,
   makeDecision, closeDecision, decisionsOf, decisionStats, makeJoy, joysOf, pickJoy, makeCharger, chargersOf, lowMoodNotice,
 } from './reflect.js';
@@ -35,6 +36,23 @@ export function createReflectView() {
   const rvCard = el('div', { class: 'card', id: 'rv-card' }, el('strong', { textContent: 'Вечерний обзор' }),
     el('p', { class: 'muted', textContent: 'Три коротких ответа перед сном: что получилось, что мешало, что изменю. Хватит одной строки.' }),
     ...DAY_QUESTIONS.map(([k, q]) => el('label', { class: 'field' }, el('span', { class: 'rating-label', textContent: q }), rv[k])), rvSave, rvState);
+
+  // ----- вечерний ритуал -----
+  const ritBoxes = {};
+  for (const [k] of RITUAL_STEPS) ritBoxes[k] = el('input', { type: 'checkbox', class: 'rit-step', id: `rit-${k}`, dataset: { step: k } });
+  const ritProgress = el('p', { class: 'muted', id: 'rit-progress' });
+  async function saveRitual() {
+    const date = todayStr(), prev = ritualOf(events, date), on = RITUAL_STEPS.map(([k]) => k).filter(k => ritBoxes[k].checked);
+    try {
+      if (!on.length) { if (prev) await store.remove(prev.id); return; }
+      await store.save(makeRitual(date, on, Date.now(), prev));
+    } catch (e) { toast(e.message); }
+  }
+  for (const b of Object.values(ritBoxes)) b.onchange = () => { ritProgress.textContent = `Сделано: ${Object.values(ritBoxes).filter(x => x.checked).length} из ${RITUAL_STEPS.length}`; saveRitual(); };
+  const groups = [...new Set(RITUAL_STEPS.map(x => x[2]))];
+  const ritCard = el('div', { class: 'card', id: 'rit-card' }, el('strong', { textContent: 'Вечерний ритуал' }),
+    el('p', { class: 'muted', textContent: 'Короткий порядок на вечер помогает спокойно закончить день и лучше заснуть.' }),
+    ...groups.flatMap(g => [el('div', { class: 'rating-label', textContent: g }), ...RITUAL_STEPS.filter(x => x[2] === g).map(([k, text]) => el('label', { class: 'check-label rit-row' }, ritBoxes[k], ` ${text}`))]), ritProgress);
 
   // ----- рефлексия недели -----
   const wk = Object.fromEntries(WEEK_QUESTIONS.map(([k, q]) => [k, area(`wk-${k}`, 'Пара предложений', 3)]));
@@ -128,7 +146,7 @@ export function createReflectView() {
       chgForm, chgErr);
   }
 
-  root.append(lowBox, rvCard, wkCard, decCard, joyCard, chgCard);
+  root.append(lowBox, rvCard, ritCard, wkCard, decCard, joyCard, chgCard);
 
   function renderLow(today) {
     const n = lowMoodNotice(events, today);
@@ -146,6 +164,9 @@ export function createReflectView() {
       const r = dayReviewOf(events, today)?.payload ?? {};
       for (const [k] of DAY_QUESTIONS) rv[k].value = r[k] ?? '';
     }
+    const rit = ritualOf(events, today);
+    if (!ritCard.contains(document.activeElement)) { for (const [k] of RITUAL_STEPS) ritBoxes[k].checked = !!rit?.payload.steps.includes(k); }
+    ritProgress.textContent = `Сделано: ${rit ? rit.payload.steps.length : 0} из ${RITUAL_STEPS.length}`;
     rvState.textContent = dayReviewOf(events, today) ? 'Обзор за сегодня сохранён. Можно дополнить.' : '';
     if (!dirty.wk) {
       const w = weekReflectionOf(events, today)?.payload ?? {};

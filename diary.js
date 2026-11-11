@@ -1,6 +1,6 @@
 // Дневник и ежедневные отметки самочувствия: утро (сон, состояние) и вечер (день, привычки тела).
 // Всё это — данные для поиска закономерностей (аналитика строится на них вместе с тестами и привычками).
-import { isYmd, todayStr } from './events.js';
+import { isYmd, todayStr, addDays } from './events.js';
 
 const clean = (s, n) => String(s ?? '').trim().slice(0, n);
 
@@ -17,11 +17,20 @@ export const NUMBERS = {
   screen: { label: 'Экран', min: 0, max: 24, step: 0.5, unit: 'ч', start: 3 },
   outdoors: { label: 'На улице', min: 0, max: 600, step: 5, unit: 'мин', start: 30 },
 };
-export const FLAGS = { veg: 'Овощи или фрукты были', protein: 'Белок был', sweets: 'Сладкое было' };      // быстрая отметка питания: только «да» (без счёта калорий)
+export const FLAGS = { veg: 'Овощи или фрукты были', protein: 'Белок был', sweets: 'Сладкое было', noise: 'Мешал шум', worry: 'Тревожные мысли', lateMeal: 'Поздний ужин', hot: 'Было душно или жарко' };      // быстрая отметка питания: только «да» (без счёта калорий)
 export const SLOTS = {
-  m: { label: 'Утро', ratings: ['sleepQuality', 'energy', 'mood', 'stress'], numbers: ['sleepHours'] },
+  m: { label: 'Утро', ratings: ['sleepQuality', 'energy', 'mood', 'stress'], numbers: ['sleepHours'], flags: ['noise', 'worry', 'lateMeal', 'hot'] },
   e: { label: 'Вечер', ratings: ['mood', 'energy', 'stress', 'focus', 'productivity', 'social'], numbers: ['caffeine', 'alcohol', 'water', 'exercise', 'screen', 'outdoors'], flags: ['veg', 'protein', 'sweets'] },
 };
+
+// Что мешало спать: по утренним отметкам за последние дни (только счёт, без выводов о причинах).
+export const SLEEP_REASONS = ['noise', 'worry', 'lateMeal', 'hot'];
+export function sleepReasons(events, today, days = 30) {
+  const from = addDays(today, -(days - 1));
+  const mornings = events.filter(e => e.type === 'checkin' && e.payload.slot === 'm' && e.payload.date >= from && e.payload.date <= today);
+  const reasons = SLEEP_REASONS.map(key => ({ key, label: FLAGS[key], n: mornings.filter(e => e.payload[key]).length })).filter(x => x.n > 0).sort((a, b) => b.n - a.n || a.key.localeCompare(b.key));
+  return { nights: mornings.length, reasons };
+}
 
 export const checkinId = (date, slot) => `ci:${date}:${slot}`;
 export const diaryId = date => `diary:${date}`;

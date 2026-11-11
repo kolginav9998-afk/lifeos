@@ -122,6 +122,28 @@ export function createRunner(host, { history = {}, cards = { started: [], pool: 
     return { metrics: L.scoreGoNoGo(trials), trials };
   }
 
+  // ---------- n-back: две назад ----------
+  async function nback({ n = 2, length = 24 }) {
+    await intro('nback', 'Буквы: две назад', ['Буквы появляются по одной.', `Нажми «Совпало», если буква такая же, как ${n === 2 ? 'две' : n} назад. Если не совпала, ничего не нажимай.`, `Первые ${n} буквы просто запоминай.`, 'Здесь важна точность: не нажимай «на всякий случай».']);
+    await countdown('nback');
+    const seq = L.makeNBack(rng, n, length, 0.3), trials = [];
+    for (let i = 0; i < seq.length; i++) {
+      const s = seq[i];
+      const letter = el('div', { class: 'bt-problem nb-letter', id: 'nb-letter', dataset: { match: s.match ? '1' : '0', i: String(i) }, textContent: s.letter });
+      const btn = el('button', { type: 'button', id: 'nb-btn', class: 'primary big-btn', textContent: 'Совпало' });
+      set('nback', 'run', letter, btn);
+      const t0 = now();
+      const r = await waitFor((done, h) => {
+        let rt = null;
+        h.on(btn, 'pointerdown', e => { e.preventDefault(); if (rt === null) { rt = now() - t0; btn.classList.add('pressed'); } });
+        h.timer(() => { letter.textContent = '·'; }, 1200);                  // буква видна 1,2 с, окно ответа — 2 с
+        h.timer(() => done(rt === null ? { responded: false } : { responded: true, rt }), 2000);
+      });
+      trials.push({ match: s.match, responded: r.responded, rt: r.responded ? r.rt : null });
+    }
+    return { metrics: L.scoreNBack(trials, n), trials };
+  }
+
   // ---------- 3. Струп ----------
   async function stroop({ n = 12 }) {
     await intro('stroop', 'Цвет слова', ['На экране появится слово, написанное цветом.', 'Нажми кнопку с названием ЦВЕТА, которым слово написано, а не того, что оно значит.', 'Например, слово «СИНИЙ», написанное красным, — это красный.']);
@@ -313,7 +335,7 @@ export function createRunner(host, { history = {}, cards = { started: [], pool: 
     return { metrics: L.scoreRecall(trials), trials };
   }
 
-  const RUNNERS = { reaction, gonogo, stroop, digits, wordsLearn, wordsRecall, math, series, schulte, time, recall };
+  const RUNNERS = { reaction, gonogo, stroop, digits, nback, wordsLearn, wordsRecall, math, series, schulte, time, recall };
 
   // ---------- сценарий ----------
   // plan.steps выполняются по очереди. Возвращает { results, state, aborted, durationMs }.

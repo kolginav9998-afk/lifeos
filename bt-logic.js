@@ -44,6 +44,35 @@ export function scoreGoNoGo(trials) {
   };
 }
 
+// =============== n-back (рабочая память) ===============
+// Буквы идут одна за другой; нужно нажать «Совпало», если буква такая же, как n шагов назад. Совпадений около 30% позиций.
+export const NBACK_LETTERS = ['Б', 'В', 'Г', 'Д', 'К', 'Л', 'М', 'Н', 'П', 'Р', 'С', 'Т'];
+export function makeNBack(rng, n = 2, length = 24, pMatch = 0.3) {
+  const room = Math.max(0, length - n), matches = new Set(rng.shuffle(Array.from({ length: room }, (_, i) => i + n)).slice(0, Math.round(room * pMatch)));
+  const seq = [];
+  for (let i = 0; i < length; i++) {
+    const match = matches.has(i);
+    let letter = match ? seq[i - n].letter : rng.pick(NBACK_LETTERS);
+    while (!match && i >= n && letter === seq[i - n].letter) letter = rng.pick(NBACK_LETTERS);   // случайных совпадений быть не должно
+    seq.push({ letter, match });
+  }
+  return seq;
+}
+// Считаем только позиции, где совпадение возможно (начиная с n-й): первые буквы просто запоминаются.
+export function scoreNBack(trials, n = 2) {
+  const t = trials.slice(n);
+  const m = t.filter(x => x.match), non = t.filter(x => !x.match);
+  const hits = m.filter(x => x.responded).length, misses = m.length - hits;
+  const falseAlarms = non.filter(x => x.responded).length, cr = non.length - falseAlarms;
+  const rts = finite(m.filter(x => x.responded).map(x => x.rt));
+  return {
+    n: t.length, hits, misses, falseAlarms, correctRejections: cr,
+    accuracy: t.length ? round((hits + cr) / t.length, 3) : null,
+    medianRT: rts.length ? Math.round(median(rts)) : null,
+    dPrime: m.length && non.length ? round(dPrime(hits, misses, falseAlarms, cr), 2) : null,
+  };
+}
+
 // =============== 3. Струп (цвет чернил против названия цвета) ===============
 export const STROOP_COLORS = [
   { id: 'red', word: 'КРАСНЫЙ', name: 'красный', hex: '#e53935' },

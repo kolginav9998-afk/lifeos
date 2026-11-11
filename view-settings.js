@@ -1,6 +1,7 @@
 import { el, toast, setBusy, agoText, revealable } from './ui.js';
 import * as vault from './vault.js';
 import { startupText } from './perf.js';
+import { yearBook, diaryYears } from './writing.js';
 import * as db from './db.js';
 import * as store from './store.js';
 import { serialize, makeProfile, profileOf, todayStr } from './events.js';
@@ -155,6 +156,17 @@ export function createSettingsView({ lockNow, applyTheme, applyMode = () => {}, 
     try { const r = tasksToIcs(store.state.events); if (!r.count) { toast('Нет задач со сроком — нечего выгружать'); return; } await saveTextFile(`lifeos-calendar-${todayStr()}.ics`, r.text, 'text/calendar'); toast(`В календарь: ${r.count}`); } catch (e) { toast('Не удалось: ' + (e.message || e)); }
   } });
   const mdBtn = el('button', { id: 'export-md', type: 'button', textContent: 'Всё читаемо (Markdown)', onclick: () => saveTextFile(`lifeos-${stamp()}.md`, toMarkdown(store.state.events), 'text/markdown').catch(err => toast(err.message)) });
+  // «Книга года»: красивый Markdown из записей дневника за выбранный год
+  const ybSel = el('select', { id: 'yearbook-year', 'aria-label': 'Год' });
+  const ybBtn = el('button', { id: 'export-yearbook', type: 'button', textContent: 'Книга года (Markdown)', onclick: () => saveTextFile(`lifeos-book-${ybSel.value}.md`, yearBook(store.state.events, ybSel.value), 'text/markdown').catch(err => toast(err.message)) });
+  const ybRow = el('div', { id: 'yearbook-row', class: 'row wrap', hidden: true }, ybSel, ybBtn);
+  function renderYearbook() {
+    const years = diaryYears(events);
+    ybRow.hidden = years.length === 0;
+    const keep = ybSel.value;
+    ybSel.replaceChildren(...years.map(y => el('option', { value: y, textContent: y })));
+    if (years.includes(keep)) ybSel.value = keep;
+  }
   async function exportCsv() {
     try { await saveTextFile(`money-${stamp()}.csv`, expensesToCsv(store.state.events), 'text/csv'); }
     catch (err) { toast('Не удалось сохранить: ' + (err?.message || err)); }
@@ -309,7 +321,7 @@ export function createSettingsView({ lockNow, applyTheme, applyMode = () => {}, 
     card('Защита паролем', secBox),
     card('Резервные копии и экспорт',
       el('div', { class: 'form-stack' }, revealable(bkPass), bkBtn),
-      el('div', { class: 'row wrap' }, plainBtn, csvBtn, mdBtn, icsBtn),
+      el('div', { class: 'row wrap' }, plainBtn, csvBtn, mdBtn, icsBtn), ybRow,
       el('div', { class: 'row wrap' }, impLabel), impRow),
     card('Внешний вид и поведение',
       el('label', {}, 'Тема: ', theme),
@@ -333,7 +345,7 @@ export function createSettingsView({ lockNow, applyTheme, applyMode = () => {}, 
     update(evs) {
       events = evs;
       if (document.activeElement !== nameInput) nameInput.value = profileOf(evs)?.payload.name || '';
-      renderStats(); renderDiag();
+      renderStats(); renderDiag(); renderYearbook();
     },
     reset() { pendingImport = null; impRow.hidden = true; impPass.value = ''; bkPass.value = ''; wipeConfirm.value = ''; wipeBtn.disabled = true; renderSecurity(); },
     renderSecurity,

@@ -10,6 +10,7 @@ import ai from './c-ai.js';
 import { summary, srsId, buildQueue, newState, isDue, MASTERED_BOX } from './srs.js';
 import { daysBetween } from './events.js';
 import { isSick } from './sick.js';
+import { makeRng } from './stats.js';
 
 export const TRACKS = [english, hebrew, health, ai, backend, data, analyst, engineer];
 export const trackById = id => TRACKS.find(t => t.id === id) || null;
@@ -190,6 +191,32 @@ export function nextLesson(events) {
 export function fifteenPlan(events, today, cardLimit = 10) {
   const next = nextLesson(events), load = todayLoad(events, today);
   return { next, cards: Math.min(cardLimit, load.due + load.fresh), minutes: (next?.lesson.minutes || 0) + Math.ceil(Math.min(cardLimit, load.due + load.fresh) / 2) };
+}
+
+
+// ---------- экзамен: случайные карточки без записи в расписание повторений ----------
+// Берём то, что уже начато (иначе экзамен проверял бы незнакомое); если учил мало, то всё доступное.
+export function examQueue({ events, trackId = null, n = 20, seed = Date.now() }) {
+  const states = new Map(statesOf(events).map(s => [s.card, s]));
+  let pool;
+  if (trackId === 'my') pool = userCards(events);
+  else if (trackId) { const t = trackById(trackId); pool = t ? availableCards(t, events) : []; }
+  else pool = [...activeTracks(events).flatMap(t => availableCards(t, events)), ...userCards(events)];
+  const started = pool.filter(c => states.has(c.id));
+  const base = started.length >= Math.min(n, 10) ? started : pool;
+  return makeRng(seed).shuffle(base).slice(0, n).map(card => ({ card, state: states.get(card.id) ?? null }));
+}
+
+// ---------- мини-квиз после урока: вопросы из карточек урока, ответы-пустышки из карточек курса ----------
+export function quizFor(track, lesson, { seed = Date.now(), n = 3, options = 4 } = {}) {
+  const rng = makeRng(seed);
+  const own = lesson.cards.map(([q, a]) => ({ q, a }));
+  const others = [...new Set(cardsOfTrack(track).filter(c => c.lesson !== lesson.id).map(c => c.a))];
+  return rng.shuffle(own).slice(0, Math.min(n, own.length)).map(c => {
+    const wrong = rng.shuffle(others.filter(a => a !== c.a)).slice(0, options - 1);
+    const all = rng.shuffle([c.a, ...wrong]);
+    return { q: c.q, options: all, answer: all.indexOf(c.a) };
+  });
 }
 
 export { newState, isDue };

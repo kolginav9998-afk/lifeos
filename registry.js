@@ -33,6 +33,7 @@ export const REGISTRY = {
   lesson: { label: 'Пройденный урок', group: 'Учёба', module: 'academy.js', privacy: 'learning', analytics: true, fields: 'lesson, track, date, minutes' },
   lessonnote: { label: 'Конспект урока', group: 'Учёба', module: 'academy.js', privacy: 'text', analytics: false, fields: 'lesson, text, date' },
   srs: { label: 'Состояние карточки', group: 'Учёба', module: 'srs.js', privacy: 'learning', analytics: true, fields: 'card, box, due, first, last, reps, lapses, hist' },
+  speak: { label: 'Говорение вслух', group: 'Учёба', module: 'speaking.js', privacy: 'learning', analytics: false, fields: 'date, lang, seconds, minutes, topic' },
   ucard: { label: 'Своя карточка', group: 'Учёба', module: 'academy.js', privacy: 'text', analytics: false, fields: 'q, a' },
   testrun: { label: 'Прохождение проверки', group: 'Проверки', module: 'bt-core.js', privacy: 'numbers', analytics: true, fields: 'date, mode, tests{metrics, trials}, state, startedAt, durationMs' },
   experiment: { label: 'Личный эксперимент', group: 'Проверки', module: 'experiments.js', privacy: 'text', analytics: false, fields: 'title, change, metric, days, blockDays, startDate, order, cancelled' },
@@ -42,6 +43,7 @@ export const REGISTRY = {
   dayreview: { label: 'Вечерний обзор', group: 'Рефлексия', module: 'reflect.js', privacy: 'text', analytics: false, fields: 'date, win, miss, learn' },
   weekreflect: { label: 'Итоги недели', group: 'Рефлексия', module: 'reflect.js', privacy: 'text', analytics: false, fields: 'week, went, blocked, change' },
   decision: { label: 'Решение', group: 'Рефлексия', module: 'reflect.js', privacy: 'text', analytics: false, fields: 'date, title, why, expect, revisit, closed{date, verdict, outcome}' },
+  ritual: { label: 'Вечерний ритуал', group: 'Рефлексия', module: 'reflect.js', privacy: 'numbers', analytics: false, fields: 'date, steps' },
   joy: { label: 'Радость', group: 'Рефлексия', module: 'reflect.js', privacy: 'text', analytics: false, fields: 'date, text' },
   charger: { label: 'Что заряжает', group: 'Рефлексия', module: 'reflect.js', privacy: 'text', analytics: false, fields: 'text' },
 };

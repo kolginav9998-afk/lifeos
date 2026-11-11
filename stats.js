@@ -121,3 +121,31 @@ export function dPrime(hits, misses, falseAlarms, correctRejections) {
 
 export const clamp = (x, lo, hi) => Math.min(hi, Math.max(lo, x));
 export const round = (x, d = 2) => Math.round(x * 10 ** d) / 10 ** d;
+
+// Наклон прямой «y от x» (метод наименьших квадратов) и интервал для него методом бутстрепа:
+// пары дней перебираются с возвращением тысячу раз, берутся 2,5% и 97,5% наклонов. Зерно фиксировано: результат повторяется.
+export function olsSlope(x, y) {
+  const n = x.length;
+  if (n < 2) return NaN;
+  const mx = x.reduce((a, b) => a + b, 0) / n, my = y.reduce((a, b) => a + b, 0) / n;
+  let sxx = 0, sxy = 0;
+  for (let i = 0; i < n; i++) { sxx += (x[i] - mx) ** 2; sxy += (x[i] - mx) * (y[i] - my); }
+  return sxx > 0 ? sxy / sxx : NaN;
+}
+export function slopeCI(x, y, { reps = 1000, seed = 1, level = 0.95, minN = 8 } = {}) {
+  const n = x.length;
+  if (n < minN || y.length !== n) return null;
+  const slope = olsSlope(x, y);
+  if (!Number.isFinite(slope)) return null;
+  const rng = makeRng(seed), slopes = [];
+  for (let r = 0; r < reps; r++) {
+    const xs = [], ys = [];
+    for (let i = 0; i < n; i++) { const j = rng.int(0, n - 1); xs.push(x[j]); ys.push(y[j]); }
+    const b = olsSlope(xs, ys);
+    if (Number.isFinite(b)) slopes.push(b);
+  }
+  if (slopes.length < reps * 0.9) return null;
+  slopes.sort((a, b) => a - b);
+  const q = p => slopes[Math.min(slopes.length - 1, Math.max(0, Math.floor(p * slopes.length)))];
+  return { slope, lo: q((1 - level) / 2), hi: q(1 - (1 - level) / 2), n, level };
+}

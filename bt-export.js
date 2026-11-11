@@ -3,7 +3,7 @@ import { runsOf, TEST_BY_ID, TESTS, DOMAINS, primaryShown } from './bt-core.js';
 import { analyzeRuns, dailyRows } from './bt-analytics.js';
 import { makeZip } from './zip.js';
 import { todayStr } from './events.js';
-import { SLOTS, RATINGS, NUMBERS } from './diary.js';
+import { SLOTS, RATINGS, NUMBERS, FLAGS } from './diary.js';
 import { measureLabel } from './health.js';
 import { statesOf } from './academy.js';
 import { workoutRows } from './workouts.js';
@@ -55,11 +55,12 @@ export function buildTables(events) {
   T.daily = { cols: dayCols, rows: dayRows };
 
   // ----- проходы -----
-  const runCols = ['run_id', 'date', 'time', 'weekday', 'mode', 'duration_s', 'aborted', 'state_sleepy', 'state_energy', 'state_mood', 'state_stress', 'state_caffeine3h', 'state_noise', 'composite_z',
+  const runCols = ['run_id', 'date', 'time', 'weekday', 'mode', 'duration_s', 'aborted', 'state_sleepy', 'state_energy', 'state_mood', 'state_stress', 'state_caffeine3h', 'state_noise', 'effort', 'composite_z',
     ...Object.keys(DOMAINS).map(d => 'z_' + d), ...TESTS.flatMap(t => [`${t.id}_value`, `${t.id}_z`, `${t.id}_valid`])];
   const runRows = runs.map((r, i) => {
     const a = an.perRun[i], o = { run_id: r.startedAt, date: r.date, time: hhmm(r.startedAt), weekday: r.weekday, mode: r.mode, duration_s: Math.round(r.durationMs / 1000), aborted: r.aborted, composite_z: a.composite };
     for (const k of ['sleepy', 'energy', 'mood', 'stress', 'caffeine3h', 'noise']) o['state_' + k] = r.state?.[k] ?? null;
+    o.effort = r.effort ?? null;
     for (const d of Object.keys(DOMAINS)) o['z_' + d] = a.domains[d] ?? null;
     for (const t of TESTS) { const x = r.tests[t.id]; o[`${t.id}_value`] = x && !x.skipped ? primaryShown(t.id, x.metrics) : null; o[`${t.id}_z`] = a.z[t.id] ?? null; o[`${t.id}_valid`] = x && !x.skipped ? x.ok : null; }
     return o;
@@ -80,7 +81,7 @@ export function buildTables(events) {
   T.trials = { cols: ['run_id', 'date', 'test', 'trial', 'field', 'value'], rows: trialRows };
 
   // ----- отметки, замеры, привычки, обучение -----
-  const ciCols = ['date', 'slot', ...Object.keys(RATINGS), ...Object.keys(NUMBERS), 'bed', 'wake'];
+  const ciCols = ['date', 'slot', ...Object.keys(RATINGS), ...Object.keys(NUMBERS), 'bed', 'wake', ...Object.keys(FLAGS)];
   T.checkins = { cols: ciCols, rows: events.filter(e => e.type === 'checkin').map(e => ({ ...e.payload, slot: SLOTS[e.payload.slot]?.label ?? e.payload.slot })).sort((a, b) => a.date.localeCompare(b.date) || String(a.slot).localeCompare(String(b.slot))) };
   T.measures = { cols: ['date', 'time', 'kind', 'name', 'value', 'value2', 'unit'], rows: events.filter(e => e.type === 'measure').map(e => ({ date: e.payload.date, time: e.payload.time ?? '', kind: e.payload.kind, name: measureLabel(e.payload), value: e.payload.value, value2: e.payload.value2 ?? null, unit: e.payload.unit ?? '' })).sort((a, b) => a.date.localeCompare(b.date)) };
   const hnames = Object.fromEntries(events.filter(e => e.type === 'habit').map(e => [e.id, e.payload.name]));

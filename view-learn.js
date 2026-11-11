@@ -1,10 +1,12 @@
 // Экран «Учёба»: курсы (уроки + наставник), повторение карточек, свои карточки.
-import { el, toast } from './ui.js';
+import { el, fill, toast } from './ui.js';
 import { todayStr } from './events.js';
 import * as store from './store.js';
 import { TRACKS, trackById, trackProgress, doneLessons, makeLessonDone, lessonEventId, makeSrsEvent, makeUserCard, userCards, sessionQueue, todayLoad, studyDates, MY_TRACK,
-  leeches, comebackInfo, fifteenPlan, lessonNoteOf, makeLessonNote } from './academy.js';
+  leeches, comebackInfo, fifteenPlan, lessonNoteOf, makeLessonNote, examQueue, quizFor, cardsOfTrack } from './academy.js';
 import { newState, grade, studyStreak, INTERVALS } from './srs.js';
+import { canSpeak, foreignSide, speak } from './speech.js';
+import { openSpeaking, hasRunningSpeak, speakWeek, SPEAK_LANGS } from './speaking.js';
 
 const QUALITY_LABEL = { again: 'Забыл', hard: 'Трудно', good: 'Помню' };
 
@@ -24,10 +26,13 @@ export function createLearnView() {
   let page = { name: 'home' };
   let session = null;
   const openLessons = new Set();
+  const quizzes = new Map();                          // ход мини-квиза по урокам (не сохраняется)
   const noteDrafts = new Map();                       // несохранённые конспекты переживают перерисовку экрана
   const root = el('section', { id: 'view-learn', class: 'view' });
   const overlay = el('div', { id: 'sess', class: 'overlay', hidden: true, tabIndex: -1, role: 'dialog', 'aria-modal': 'true', 'aria-label': 'Повторение' });
-  const mount = (...nodes) => root.replaceChildren(...nodes.filter(Boolean), overlay);     // окно повторения живёт внутри экрана (шторка приватности его тоже скрывает)
+  const speakHost = el('div', { id: 'speak-host', class: 'overlay', hidden: true, tabIndex: -1, role: 'dialog', 'aria-modal': 'true', 'aria-label': 'Говорение вслух' });
+  const startSpeaking = (lang, resume = false) => { openSpeaking(speakHost, { lang, resume }); speakHost.focus({ preventScroll: true }); };
+  const mount = (...nodes) => root.replaceChildren(...nodes.filter(Boolean), overlay, speakHost);     // окно повторения живёт внутри экрана (шторка приватности его тоже скрывает)
   const today = () => todayStr();
 
   // ---------- общие куски ----------
@@ -46,7 +51,8 @@ export function createLearnView() {
       el('p', { class: 'muted', textContent: total ? `к повторению: ${load.due} · новых: ${load.fresh}` : 'На сегодня всё повторено ✓' }),
       el('p', { class: 'muted', id: 'learn-streak', textContent: streak ? `Занятий подряд: ${streak} дн.` : 'Занимайся каждый день по чуть-чуть: серия растёт.' }),
       total ? el('button', { type: 'button', id: 'learn-start', class: 'primary', textContent: 'Начать повторение', onclick: () => startSession(null) })
-        : el('p', { class: 'hint', textContent: 'Выбери курс ниже и пройди первый урок — его карточки появятся здесь.' }));
+        : el('p', { class: 'hint', textContent: 'Выбери курс ниже и пройди первый урок — его карточки появятся здесь.' }),
+      examQueue({ events, n: 20, seed: 1 }).length >= 5 ? el('button', { type: 'button', id: 'exam-all', class: 'chip', textContent: 'Экзамен: 20 случайных карточек', onclick: () => startSession(null, { exam: true }) }) : null);
     const cb = comebackInfo(events, t0);
     const comeback = cb ? el('div', { class: 'card calm', id: 'comeback' }, el('strong', { textContent: 'С возвращением' }),
       el('p', { textContent: `Ты не занимался ${cb.days} дн., накопилось повторений: ${cb.due}. Это не страшно. Начни с десяти карточек, остальные подождут.` }),
@@ -65,6 +71,11 @@ export function createLearnView() {
       ...lc.map(({ card }) => el('div', { class: 'row leech-row', dataset: { card: card.id } }, el('span', { class: 'grow' }, el('strong', { textContent: card.q })),
         el('button', { type: 'button', class: 'chip leech-own', textContent: 'Своя карточка', onclick: () => go({ name: 'my', prefill: { q: card.q, a: card.a } }) }))),
       el('button', { type: 'button', id: 'leech-start', class: 'chip', textContent: 'Повторить только их', onclick: () => startSession(null, { queue: lcAll.map(x => ({ card: x.card, state: x.state })).slice(0, 20) }) })) : null;
+    const sw = speakWeek(events, t0);
+    const speaking = el('div', { class: 'card', id: 'speak-card' }, el('strong', { textContent: 'Говорение вслух' }),
+      el('p', { class: 'muted', id: 'speak-week', textContent: `За неделю: ${sw.minutes} из ${sw.goal} мин${sw.minutes ? ` (${Object.entries(sw.byLang).map(([k, v]) => `${SPEAK_LANGS[k].toLowerCase()} ${v}`).join(', ')})` : ''}. Говорить вслух полезнее, чем читать молча.` }),
+      bar(Math.min(sw.minutes, sw.goal), sw.goal),
+      el('div', { class: 'row wrap' }, ...Object.entries(SPEAK_LANGS).map(([k, name]) => el('button', { type: 'button', id: `speak-${k}`, class: 'chip', textContent: name, onclick: () => startSpeaking(k) }))));
     const mine = userCards(events);
     const cards = TRACKS.map(t => {
       const p = trackProgress(t, events, t0);
@@ -79,7 +90,7 @@ export function createLearnView() {
       el('span', { class: 'track-ic', style: `background:${MY_TRACK.color}`, textContent: MY_TRACK.icon, 'aria-hidden': 'true' }),
       el('span', { class: 'track-body' }, el('strong', { textContent: MY_TRACK.title }), el('span', { class: 'muted', textContent: mine.length ? `Карточек: ${mine.length}` : 'Добавляй свои вопросы и ответы' })));
     const note = el('p', { class: 'muted', textContent: 'Курсы — учебный материал, а не медицинская, юридическая или финансовая консультация.' });
-    mount(head, comeback, fifteen, leech, el('h2', { textContent: 'Курсы' }), ...cards, my, note);
+    mount(head, comeback, fifteen, speaking, leech, el('h2', { textContent: 'Курсы' }), ...cards, my, note);
   }
 
   // ---------- конспект урока и открытие урока ----------
@@ -104,6 +115,25 @@ export function createLearnView() {
       toast('Конспект сохранён');
     } catch (e) { toast(e.message); }
   }
+  function quizNode(t, l) {
+    const box = el('div', { class: 'quiz', dataset: { lesson: l.id } });
+    const draw = () => {
+      const st = quizzes.get(l.id);
+      if (!st) { fill(box, el('button', { type: 'button', class: 'chip quiz-start', textContent: 'Мини-квиз', onclick: () => { quizzes.set(l.id, { qs: quizFor(t, l), i: 0, ok: 0, picked: null }); draw(); } })); return; }
+      if (st.i >= st.qs.length) {
+        fill(box, el('p', { class: 'quiz-result', textContent: `Верно: ${st.ok} из ${st.qs.length}. ${st.ok === st.qs.length ? 'Отлично!' : 'Что не получилось, вернётся в повторении карточек урока.'}` }),
+          el('button', { type: 'button', class: 'chip quiz-again', textContent: 'Ещё раз', onclick: () => { quizzes.delete(l.id); quizzes.set(l.id, { qs: quizFor(t, l, { seed: Date.now() }), i: 0, ok: 0, picked: null }); draw(); } }));
+        return;
+      }
+      const q = st.qs[st.i];
+      fill(box, el('p', { class: 'muted', textContent: `Вопрос ${st.i + 1} из ${st.qs.length}` }), el('p', { class: 'quiz-q', textContent: q.q }),
+        ...q.options.map((o, idx) => el('button', { type: 'button', class: `quiz-opt${st.picked === null ? '' : idx === q.answer ? ' right' : idx === st.picked ? ' wrong' : ''}`, dataset: { idx: String(idx) }, disabled: st.picked !== null, textContent: o,
+          onclick: () => { st.picked = idx; if (idx === q.answer) st.ok++; draw(); } })),
+        st.picked !== null ? el('button', { type: 'button', class: 'chip quiz-next', textContent: st.i + 1 < st.qs.length ? 'Дальше' : 'Результат', onclick: () => { st.i++; st.picked = null; draw(); } }) : null);
+    };
+    draw();
+    return box;
+  }
   function openLesson(trackId, lessonId) {
     page = { name: 'track', id: trackId }; openLessons.add(lessonId);
     render();
@@ -119,6 +149,7 @@ export function createLearnView() {
     const startBtn = (load.due + load.fresh)
       ? el('button', { type: 'button', class: 'primary', id: 'track-start', textContent: `Повторять карточки курса (${load.due + load.fresh})`, onclick: () => startSession(t.id) })
       : el('p', { class: 'muted', textContent: 'Карточки курса на сегодня закончились. Пройди следующий урок — появятся новые.' });
+    const examBtn = cardsOfTrack(t).length >= 10 ? el('button', { type: 'button', id: 'track-exam', class: 'chip', textContent: 'Экзамен: 20 случайных карточек', onclick: () => startSession(t.id, { exam: true }) }) : null;
     const prompts = t.mentor.prompts.map((pr, i) => el('div', { class: 'prompt' },
       el('p', { textContent: pr }),
       el('button', { type: 'button', class: 'chip', dataset: { prompt: String(i) }, textContent: 'Копировать', onclick: () => copyText(pr) })));
@@ -138,6 +169,7 @@ export function createLearnView() {
         el('p', { class: 'task' }, el('strong', { textContent: 'Задание: ' }), l.task),
         el('label', { class: 'field' }, el('span', { class: 'rating-label', textContent: 'Мой конспект' }), noteBox(l)),
         el('button', { type: 'button', class: 'chip note-save', dataset: { note: l.id }, textContent: 'Сохранить конспект', onclick: () => saveNote(l) }),
+        quizNode(t, l),
         el('p', { class: 'muted', textContent: `Карточек в уроке: ${l.cards.length}` }),
         el('button', { type: 'button', class: 'chip', dataset: { aiCheck: l.id }, textContent: 'Проверить мой ответ с ИИ', onclick: () => copyText(`Я прохожу урок «${l.title}» из курса «${t.title}».\nЗадание: ${l.task}\nМой ответ: <вставь свой ответ>\n\nПроверь ответ как доброжелательный наставник: что верно, что неверно или неполно, один совет и один следующий шаг. Объясняй простыми словами и не выдумывай факты.`) }),
         el('button', { type: 'button', class: isDone ? '' : 'primary', dataset: { done: l.id }, textContent: isDone ? 'Снять отметку «пройден»' : 'Отметить пройденным', onclick: () => toggleLesson(t, l, isDone) }));
@@ -151,7 +183,7 @@ export function createLearnView() {
         el('div', { class: 'row' }, el('span', { class: 'track-ic', style: `background:${t.color}`, textContent: t.icon, 'aria-hidden': 'true' }), el('h3', { textContent: t.title })),
         el('p', { textContent: t.intro }),
         el('p', { class: 'muted', textContent: `Уроки ${p.lessons}/${p.lessonsTotal} · выучено карточек ${p.mastered}/${p.total}` + (p.retention !== null ? ` · помню ${Math.round(p.retention * 100)}%` : '') }),
-        bar(p.lessons, p.lessonsTotal), startBtn),
+        bar(p.lessons, p.lessonsTotal), startBtn, examBtn),
       mentor, plan, el('h2', { textContent: 'Уроки' }), ...lessons, sources);
   }
 
@@ -190,9 +222,9 @@ export function createLearnView() {
   // ---------- сессия повторения ----------
   function startSession(trackId, opts = {}) {
     const t0 = today();
-    const queue = opts.queue ?? sessionQueue({ events, today: t0, trackId, max: opts.max ?? 30 });
+    const queue = opts.queue ?? (opts.exam ? examQueue({ events, trackId, n: 20 }) : sessionQueue({ events, today: t0, trackId, max: opts.max ?? 30 }));
     if (!queue.length) { toast('Сейчас повторять нечего'); return; }
-    session = { queue, i: 0, shown: false, counts: { again: 0, hard: 0, good: 0 }, again: new Map(), today: t0, fresh: queue.filter(x => !x.state).length, startedAt: Date.now() };
+    session = { queue, i: 0, shown: false, counts: { again: 0, hard: 0, good: 0 }, again: new Map(), today: t0, fresh: queue.filter(x => !x.state).length, startedAt: Date.now(), exam: !!opts.exam, missed: [] };
     overlay.hidden = false;
     renderSession();
   }
@@ -203,8 +235,12 @@ export function createLearnView() {
   async function answer(q) {
     const s = session; if (!s || !s.shown) return;
     const item = s.queue[s.i];
-    const next = grade(item.state ?? newState(item.card.id, s.today), q, s.today);
     s.counts[q]++;
+    if (s.exam) {                                       // экзамен: ничего не пишем в расписание повторений
+      if (q === 'again') s.missed.push(item.card);
+      s.i++; s.shown = false; renderSession(); return;
+    }
+    const next = grade(item.state ?? newState(item.card.id, s.today), q, s.today);
     item.state = next;
     const tries = s.again.get(item.card.id) || 0;
     if (q === 'again' && tries < 2) { s.again.set(item.card.id, tries + 1); s.queue.splice(Math.min(s.queue.length, s.i + 4), 0, { card: item.card, state: next }); }
@@ -218,12 +254,15 @@ export function createLearnView() {
     const item = s.queue[s.i], c = item.card;
     const tr = c.track === 'my' ? MY_TRACK : trackById(c.track);
     const interval = q => { const nb = q === 'again' ? 0 : q === 'hard' ? Math.max(1, item.state?.box ?? 0) : Math.min(INTERVALS.length - 1, (item.state?.box ?? 0) + 1); return q === 'again' ? 'сегодня' : q === 'hard' ? `через ${Math.max(1, Math.floor(INTERVALS[nb] / 2))} дн.` : `через ${INTERVALS[nb]} дн.`; };
+    const fs = canSpeak() && (c.track === 'english' || c.track === 'hebrew') ? foreignSide(c, c.track) : null;
+    const speakBtn = fs && (fs.side === 'q' || s.shown) ? el('button', { type: 'button', id: 'sess-speak', class: 'chip', 'aria-label': 'Произнести', textContent: '🔊',
+      onclick: () => { if (!speak(fs.text, c.track, () => toast('На телефоне нет голоса для этого языка. Установи голосовой движок в настройках телефона.'))) toast('Озвучка недоступна на этом устройстве'); } }) : null;
     const face = el('div', { class: 'flash', id: 'sess-card' },
-      el('span', { class: 'muted', textContent: `${tr?.title ?? ''}${item.state ? '' : ' · новая'}` }),
-      el('p', { class: 'flash-q', id: 'sess-q', textContent: c.q }),
+      el('span', { class: 'muted', textContent: s.exam ? `Экзамен · ${tr?.title ?? ''}` : `${tr?.title ?? ''}${item.state ? '' : ' · новая'}` }),
+      el('p', { class: 'flash-q', id: 'sess-q', textContent: c.q }), speakBtn,
       s.shown ? el('p', { class: 'flash-a', id: 'sess-a', textContent: c.a }) : null);
     const controls = s.shown
-      ? el('div', { class: 'grade-row' }, ...['again', 'hard', 'good'].map(q => el('button', { type: 'button', class: `grade ${q}`, dataset: { q }, onclick: () => answer(q) }, el('strong', { textContent: QUALITY_LABEL[q] }), el('span', { class: 'muted', textContent: interval(q) }))))
+      ? el('div', { class: 'grade-row' }, ...['again', 'hard', 'good'].map(q => el('button', { type: 'button', class: `grade ${q}`, dataset: { q }, onclick: () => answer(q) }, el('strong', { textContent: QUALITY_LABEL[q] }), s.exam ? null : el('span', { class: 'muted', textContent: interval(q) }))))
       : el('button', { type: 'button', id: 'sess-show', class: 'primary big-btn', textContent: 'Показать ответ', onclick: () => { s.shown = true; renderSession(); } });
     overlay.replaceChildren(
       el('div', { class: 'sess-top' }, el('span', { class: 'muted', id: 'sess-pos', textContent: `${s.i + 1} / ${s.queue.length}` }),
@@ -231,7 +270,20 @@ export function createLearnView() {
       bar(s.i, s.queue.length), face, controls);
     overlay.focus({ preventScroll: true });
   }
+  function renderExamSummary() {
+    const s = session, total = s.counts.again + s.counts.hard + s.counts.good, ok = s.counts.good + s.counts.hard;
+    const pct = total ? Math.round((ok / total) * 100) : 0;
+    overlay.replaceChildren(
+      el('div', { class: 'flash' },
+        el('h3', { textContent: 'Экзамен завершён' }),
+        el('p', { class: 'big', id: 'sess-result', textContent: `${pct}%` }),
+        el('p', { class: 'muted', id: 'exam-line', textContent: `Верно: ${ok} из ${total} (уверенно: ${s.counts.good}, с трудом: ${s.counts.hard}). Расписание повторений не менялось.` }),
+        s.missed.length ? el('div', { id: 'exam-missed' }, el('p', { class: 'muted', textContent: 'Не вспомнил:' }), ...s.missed.map(c => el('p', { class: 'exam-miss' }, el('strong', { textContent: c.q }), el('span', { class: 'muted', textContent: ` — ${c.a}` })))) : el('p', { textContent: 'Ни одной ошибки!' })),
+      el('button', { type: 'button', id: 'sess-done', class: 'primary big-btn', textContent: 'Готово', onclick: closeSession }));
+    overlay.focus({ preventScroll: true });
+  }
   function renderSummary() {
+    if (session.exam) return renderExamSummary();
     const s = session, total = s.counts.again + s.counts.hard + s.counts.good;
     const pct = total ? Math.round(((s.counts.hard + s.counts.good) / total) * 100) : 0;
     overlay.replaceChildren(
@@ -263,10 +315,11 @@ export function createLearnView() {
     overlay,
     update(evs) {
       events = evs;
+      if (!evs.length) { speakHost.hidden = true; speakHost.replaceChildren(); }
       if (session && !evs.length) { session = null; overlay.hidden = true; overlay.replaceChildren(); }   // приложение заблокировано
       if (!session) render();
     },
-    show() { if (!session) render(); },
+    show() { if (!session) render(); if (speakHost.hidden && hasRunningSpeak()) startSpeaking('english', true); },
     // открыть курс (и урок) из поиска
     open(trackId, lessonId = null) {
       if (session) return;

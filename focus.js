@@ -73,7 +73,7 @@ export function openFocus(host, { tasks = [], resume = false } = {}) {
     const f = focusLeft(run);
     const minutes = completed ? run.minutes : f.elapsedMin;
     if (minutes < MIN_SAVE_MIN) { writeRun(null); toast(`Меньше ${MIN_SAVE_MIN} минут — не записываю`); close(); return; }
-    try { navigator.vibrate?.(completed ? [200, 100, 200] : 0); } catch { /* не везде есть */ }
+    try { if (navigator.userActivation?.hasBeenActive) navigator.vibrate?.(completed ? [200, 100, 200] : 0); } catch { /* не везде есть; без касания браузер вибрацию блокирует */ }
     const ok = await store.save(makeFocus({ date: todayStr(run.startedAt), minutes, planned: run.minutes, label, completed }));
     if (!ok) { close(); return; }                       // приложение заблокировано: сессию допишем при следующем запуске
     writeRun(null);

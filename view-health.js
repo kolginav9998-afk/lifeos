@@ -1,5 +1,6 @@
 import { el, fill, toast, dateRu, sparkline } from './ui.js';
 import { createHealthExtras } from './view-health-extra.js';
+import { sleepReasons } from './diary.js';
 import { todayStr } from './events.js';
 import { makeProfile } from './events.js';
 import { MEASURES, makeMeasure, updateMeasure, measureKeys, measuresOf, dailySeries, linearTrend, changeOver, bmi, whtr, bmiNote, whtrNote,
@@ -146,6 +147,8 @@ export function createHealthView() {
     if (p.nights < 3) return;
     const lines = [`В среднем ${num(p.avg)} ч · лучшая ${num(p.best)} · худшая ${num(p.worst)} (ночей с отметкой: ${p.nights})`,
       `Меньше цели (${num(p.target)} ч): ${p.under} из ${p.nights} ночей${p.debt !== null ? ` · недосып за неделю: ${num(p.debt)} ч` : ''}`];
+    const sr = sleepReasons(events, today, 30);
+    if (sr.reasons.length) lines.push(`Что чаще мешало спать за 30 дней: ${sr.reasons.slice(0, 3).map(r => `${r.label.toLowerCase()} — ${r.n}`).join(', ')}.`);
     if (p.regularity) lines.push(`Режим: ${REGULARITY_TEXT[p.regularity]}${p.bedSd !== null ? `; отбой в среднем ±${Math.round(p.bedSd)} мин` : ''}`);
     fill(sleepCard, el('strong', { textContent: 'Сон за 14 дней' }), sparkline(p.days.map(d => d.hours), { width: 280, height: 44 }),
       ...lines.map(t => el('p', { class: 'muted', textContent: t })),

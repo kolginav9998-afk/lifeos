@@ -3,6 +3,8 @@ import { todayStr, addDays } from './events.js';
 import { makeCheckin, makeDiary, checkinOf, diaryOf, recentDays, sleepFromTimes, SLOTS, RATINGS, NUMBERS, FLAGS, hashtags, questionOfDay, onThisDay } from './diary.js';
 import { makeMeasure } from './health.js';
 import * as store from './store.js';
+import { openFreeWrite } from './freewrite.js';
+import { diaryStats } from './writing.js';
 
 export function createDiaryView() {
   let events = [];
@@ -30,11 +32,15 @@ export function createDiaryView() {
   bed.oninput = onTimes; wake.oninput = onTimes;
   const weight = el('input', { id: 'ci-weight', type: 'text', inputMode: 'decimal', placeholder: 'Вес, кг (необязательно)', autocomplete: 'off' });
   weight.oninput = () => { dirty.m = true; };
+  const mF = {};
+  for (const f of SLOTS.m.flags) { const cb = el('input', { type: 'checkbox', id: `ci-mflag-${f}`, onchange: () => { dirty.m = true; } }); mF[f] = cb; }
+  const reasons = el('details', { id: 'ci-m-reasons' }, el('summary', { textContent: 'Что мешало спать (по желанию)' }),
+    el('div', { class: 'flags', id: 'ci-m-flags' }, ...SLOTS.m.flags.map(f => el('label', { class: 'check-label' }, mF[f], ` ${FLAGS[f]}`))));
   const mSave = el('button', { id: 'ci-m-save', type: 'button', class: 'primary', textContent: 'Сохранить утро' });
   const mSum = el('summary', { id: 'ci-m-sum' });
   const mBox = el('details', { id: 'ci-m', class: 'card' }, mSum,
     el('div', { class: 'grid2' }, el('label', { class: 'rating' }, el('span', { class: 'rating-label', textContent: 'Лёг' }), bed), el('label', { class: 'rating' }, el('span', { class: 'rating-label', textContent: 'Встал' }), wake)),
-    mW.sleepHours, mW.sleepQuality, mW.energy, mW.mood, mW.stress, weight, mSave);
+    mW.sleepHours, mW.sleepQuality, reasons, mW.energy, mW.mood, mW.stress, weight, mSave);
 
   // ----- вечер -----
   const eW = {};
@@ -68,15 +74,21 @@ export function createDiaryView() {
   } });
   qText.className = 'q-text';
   const qRow = el('div', { class: 'q-row' }, el('span', { class: 'q-label', textContent: 'Вопрос дня' }), qText, qBtn);
+  const stats = el('span', { id: 'diary-stats', class: 'muted' });
+  const fwHost = el('div', { id: 'fw-host', class: 'overlay', hidden: true, tabIndex: -1, role: 'dialog', 'aria-modal': 'true', 'aria-label': 'Свободное письмо' });
+  const fwBtn = el('button', { type: 'button', id: 'fw-open', class: 'chip', textContent: 'Свободное письмо', onclick: () => {
+    if (dirty.d) { toast('Сначала сохрани запись дня, потом пиши свободно'); return; }
+    openFreeWrite(fwHost); fwHost.focus({ preventScroll: true });
+  } });
   const past = el('div', { id: 'diary-past' });
-  const dBox = el('details', { id: 'diary-box', class: 'card', open: true }, dSum, el('div', { class: 'form-stack' }, qRow, dText, tags, dHigh, ...dG, el('div', { class: 'row' }, dSave, dDel), past));
+  const dBox = el('details', { id: 'diary-box', class: 'card', open: true }, dSum, el('div', { class: 'form-stack' }, qRow, el('div', { class: 'row wrap' }, fwBtn, stats), dText, tags, dHigh, ...dG, el('div', { class: 'row' }, dSave, dDel), past));
 
   // ----- история -----
   const strip = el('div', { id: 'mood-strip', class: 'mood-strip', 'aria-label': 'Настроение за 14 дней' });
   const hist = el('div', { id: 'diary-history', class: 'hist' });
   const histBox = el('div', { class: 'card' }, el('strong', { textContent: 'Последние дни' }), strip, hist);
 
-  root.append(nav, mBox, eBox, dBox, histBox);
+  root.append(nav, mBox, eBox, dBox, histBox, fwHost);
 
   // ----- сохранение -----
   mSave.onclick = async () => {
@@ -85,6 +97,7 @@ export function createDiaryView() {
       const fields = { bed: bed.value, wake: wake.value };
       for (const f of SLOTS.m.ratings) fields[f] = mW[f].value;
       fields.sleepHours = mW.sleepHours.value;
+      for (const f of SLOTS.m.flags) fields[f] = mF[f].checked;
       const batch = [makeCheckin('m', date, fields, '', Date.now(), prev)];
       if (weight.value.trim()) {
         const old = events.find(e => e.id === `mw:${date}`);
@@ -124,6 +137,7 @@ export function createDiaryView() {
     if (!dirty.m) {
       for (const f of [...SLOTS.m.ratings, 'sleepHours']) mW[f].setValue(cm[f] ?? null);
       bed.value = cm.bed ?? ''; wake.value = cm.wake ?? '';
+      for (const f of SLOTS.m.flags) mF[f].checked = !!cm[f];
       weight.value = (events.find(e => e.id === `mw:${date}`)?.payload.value ?? '').toString().replace('.', ',');
     }
     if (!dirty.e) {
@@ -136,6 +150,8 @@ export function createDiaryView() {
       dG.forEach((inp, i) => { inp.value = d.gratitude?.[i] ?? ''; });
       paintTags();
     }
+    const st = diaryStats(events, todayStr());
+    stats.textContent = `Слов сегодня: ${st.wordsToday}${st.streak ? ` · записей подряд: ${st.streak}` : ''}`;
     qText.textContent = questionOfDay(date);
     past.replaceChildren(...onThisDay(events, date).map(x => el('p', { class: 'muted past' }, el('strong', { textContent: `${x.label} · ${dateRu(x.date)}: ` }), x.text)));
     mSum.textContent = `Утро${cm.date ? ' ✓' : ''}${cm.sleepHours ? ` · сон ${String(cm.sleepHours).replace('.', ',')} ч` : ''}`;

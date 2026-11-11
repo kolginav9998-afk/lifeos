@@ -14,7 +14,7 @@ const text = sel => page.textContent(sel);
 await tab(page, 'tests');
 assert.equal(await text('#title'), 'Проверка');
 assert.deepEqual(await page.locator('#subnav button').allTextContents(), ['Учёба', 'Тесты', 'Аналитика', 'Цели']);
-assert.equal(await page.locator('.test-row').count(), 10);
+assert.equal(await page.locator('.test-row').count(), 11);
 assert.match(await text('#bt-status'), /ещё не проходил/);
 
 // управляемое время: часы ставим после загрузки и останавливаем
@@ -33,14 +33,14 @@ const snap = () => page.evaluate(() => {
     ink: q('bt-word')?.dataset.ink ?? null, digit: q('bt-digit')?.textContent ?? null,
     prompt: st.querySelector('p.muted')?.textContent ?? '', learnWord: q('bt-learn-word')?.textContent ?? null, recallWord: q('bt-recall-word')?.textContent ?? null,
     problem: q('bt-problem')?.textContent ?? null, next: q('bt-schulte-next')?.textContent ?? null, hold: q('bt-hold')?.dataset.target ?? null,
-    opts: st.querySelectorAll('.series-opt').length,
+    opts: st.querySelectorAll('.series-opt').length, nb: q('nb-letter')?.dataset.match ?? null, nbI: q('nb-letter')?.dataset.i ?? null,
   };
 });
 const tap = async (sel, o = {}) => { try { await page.click(sel, { timeout: 1500, ...o }); return true; } catch { return false; } };
 const evalMath = s => { const e = s.replace(/\s*=\s*\?/, '').replace(/×/g, '*').replace(/÷/g, '/').replace(/−/g, '-'); return Function(`"use strict";return (${e})`)(); };
 
 async function runBot({ useState }) {
-  const learned = new Set(); let digitsSeen = [], lastDigit = '', steps = 0, clicked = 0;
+  const learned = new Set(); let digitsSeen = [], lastDigit = '', steps = 0, clicked = 0, lastNb = null;
   for (; steps < 9000; steps++) {
     const s = await snap();
     if (s.done) return { steps };
@@ -54,6 +54,7 @@ async function runBot({ useState }) {
     else if (s.test === 'reaction' && s.hasBox) { if (s.boxState === 'go') { await step(260); await tap('#bt-box'); adv = 50; } else adv = 300; }
     else if (s.test === 'gonogo' && s.stim !== null) { if (s.stim === '1') { await step(300); await tap('#bt-box'); } adv = 100; }
     else if (s.test === 'stroop' && s.ink) { await step(500); await tap(`.stroop-btn[data-c="${s.ink}"]`); adv = 50; }
+    else if (s.test === 'nback' && s.nb !== null) { if (s.nb === '1' && s.nbI !== lastNb) await tap('#nb-btn'); lastNb = s.nbI; adv = 400; }
     else if (s.test === 'digits' && s.phase === 'show') { if (s.digit && !lastDigit) digitsSeen.push(s.digit); lastDigit = s.digit; adv = 100; }
     else if (s.test === 'digits' && s.phase === 'input') {
       lastDigit = '';
@@ -177,6 +178,7 @@ await until(page, () => /Прохождений: 3\d/.test(document.getElementBy
 assert.ok(await page.locator('#ins-domains .zrow').count() >= 3, 'отклонения по областям');
 await until(page, () => !!document.querySelector('.insight[data-id="rel-sleepHours-composite"]'));
 assert.match(await text('.insight[data-id="rel-sleepHours-composite"]'), /не доказанная причина/);
+assert.match(await text('.insight[data-id="rel-sleepHours-composite"]'), /Грубая оценка: на каждый дополнительный час сна в среднем \+\d,\d\dσ \(интервал от/);
 assert.ok(await page.locator('#view-insights .entry[data-test="reaction"] svg.spark').count() === 1, 'график динамики');
 
 // выгрузка
@@ -191,6 +193,27 @@ const [dl2] = await Promise.all([page.waitForEvent('download'), page.click('#ins
 assert.match(fs.readFileSync(await dl2.path(), 'utf8'), /^﻿date;runs;composite/);
 await page.click('#ins-copy');
 assert.match(await page.evaluate(() => navigator.clipboard.readText()), /Life OS[\s\S]*sleepHours/);
+
+// ---------- отдельный тест: n-back («две назад»); бот нажимает только на совпадения ----------
+await page.evaluate(() => { document.getElementById('toast').hidden = true; });      // сообщение о копировании не должно перекрывать кнопки
+await pause();
+await tab(page, 'tests');
+assert.match(await text('#bt-vs'), /^С собой: .*σ/);
+await page.click('#bt-single-nback');
+await until(page, () => !!document.getElementById('bt-state-skip'));
+await page.click('#bt-state-skip');
+await runBot({ useState: false });
+assert.match(await row('nback'), /\d/);
+await page.click('.effort-btn[data-v="4"]');
+await until(page, () => document.querySelector('.effort-btn[data-v="4"]').getAttribute('aria-pressed') === 'true');
+await page.click('#bt-done');
+const runs3 = await page.evaluate(async () => (await import('./store.js')).state.events.filter(e => e.type === 'testrun').map(e => e.payload).sort((a, b) => a.startedAt - b.startedAt));
+assert.equal(runs3.at(-1).effort, 4, 'усилие сохранено в записи');
+const nb = runs3.at(-1).tests.nback;
+assert.ok(nb && nb.ok, `n-back достоверен: ${JSON.stringify(nb)}`);
+assert.equal(nb.metrics.n, 22, 'оценены 22 буквы из 24'); assert.equal(nb.metrics.misses, 0); assert.equal(nb.metrics.falseAlarms, 0); assert.equal(nb.metrics.accuracy, 1);
+assert.equal(nb.trials.length, 24);
+await page.clock.resume();
 
 assert.deepEqual(errors, [], 'нет ошибок в консоли:\n' + errors.join('\n'));
 await t.close();

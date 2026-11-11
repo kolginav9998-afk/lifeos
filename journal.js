@@ -23,6 +23,7 @@ export function dayLog(events, date) {
     else if (e.type === 'dayreview' && p.date === date) out.push({ ts: e.ts, kind: 'Обзор дня', text: p.win || p.miss || p.learn || '', id: e.id });
     else if (e.type === 'joy' && p.date === date) out.push({ ts: e.ts, kind: 'Радость', text: p.text, id: e.id });
     else if (e.type === 'decision' && p.date === date) out.push({ ts: e.ts, kind: 'Решение', text: p.title, id: e.id });
+    else if (e.type === 'speak' && p.date === date) out.push({ ts: e.ts, kind: 'Говорение', text: `${p.minutes} мин (${p.lang === 'hebrew' ? 'иврит' : 'английский'})`, id: e.id });
     else if (e.type === 'breath' && p.date === date) out.push({ ts: e.ts, kind: 'Дыхание', text: `${Math.round(p.seconds / 60 * 10) / 10} мин${p.before && p.after ? `, стресс ${p.before} → ${p.after}` : ''}`, id: e.id });
     else if (e.type === 'note' && todayStr(e.ts) === date) out.push({ ts: e.ts, kind: 'Заметка', text: p.text.split('\n').find(l => l.trim()) || '', id: e.id });
   }

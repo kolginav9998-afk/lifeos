@@ -4,8 +4,8 @@ import { todayStr } from './events.js';
 import * as store from './store.js';
 import { isNative } from './platform.js';
 import { VERSION } from './version.js';
-import { PLANS, singlePlan, TESTS, TEST_BY_ID, makeRun, makeRunEvent, runsOf, runId, fmtPrimary, fmtMetric } from './bt-core.js';
-import { analyzeRuns, zText, zWord } from './bt-analytics.js';
+import { PLANS, singlePlan, TESTS, TEST_BY_ID, makeRun, makeRunEvent, runsOf, runId, fmtPrimary, fmtMetric, setEffort, EFFORT_LABEL } from './bt-core.js';
+import { analyzeRuns, zText, zWord, selfCompare } from './bt-analytics.js';
 import { createRunner } from './bt-ui.js';
 import { cardPool, statesOf } from './academy.js';
 import { studyStreak } from './srs.js';
@@ -22,6 +22,16 @@ export function createTestsView() {
   const host = el('div', { id: 'bt-run', class: 'overlay', hidden: true, tabIndex: -1, role: 'dialog', 'aria-modal': 'true', 'aria-label': 'Проверка' });
   const mount = (...nodes) => root.replaceChildren(...nodes.filter(Boolean), host);
 
+  // «Против себя вчерашнего»: последний день с проверкой против предыдущего и против лучшего.
+  function vsLine(today) {
+    const c = selfCompare(events);
+    if (!c) return null;
+    const when = d => (d === today ? 'сегодня' : dateRu(d));
+    const sign = v => `${v > 0 ? '+' : v < 0 ? '−' : ''}${Math.abs(v).toFixed(1).replace('.', ',')}σ`;
+    const trend = Math.abs(c.diff) < 0.15 ? 'примерно как' : c.diff > 0 ? 'лучше, чем' : 'ниже, чем';
+    return el('p', { class: 'muted', id: 'bt-vs', textContent: `С собой: ${when(c.last.date)} ${sign(c.last.value)} — ${trend} в прошлый раз (${when(c.prev.date)}, ${sign(c.prev.value)}).${c.isBest ? ' Это твой лучший день на сегодня!' : ` Лучший день: ${when(c.best.date)}, ${sign(c.best.value)}.`}` });
+  }
+
   function render() {
     const runs = runsOf(events);
     const an = analyzeRuns(runs);
@@ -34,7 +44,8 @@ export function createTestsView() {
       el('p', { class: 'muted', id: 'bt-streak', textContent: streak ? `Дней подряд: ${streak}` : `Всего прохождений: ${runs.length}` }),
       el('button', { type: 'button', id: 'bt-quick', class: 'primary big-btn', textContent: `Быстрая проверка · ${PLANS.quick.about}`, onclick: () => start(PLANS.quick) }),
       el('button', { type: 'button', id: 'bt-full', textContent: `Полная проверка · ${PLANS.full.about}`, onclick: () => start(PLANS.full) }),
-      el('p', { class: 'hint', textContent: 'Лучше проходить в тишине, примерно в одно и то же время и не торопиться: цель — сравнивать себя с собой.' }));
+      el('p', { class: 'hint', textContent: 'Лучше проходить в тишине, примерно в одно и то же время и не торопиться: цель — сравнивать себя с собой.' }),
+      vsLine(today));
 
     const list = TESTS.map(t => {
       const s = an.perTest[t.id];
@@ -57,6 +68,7 @@ export function createTestsView() {
           const all = Object.entries(t.metrics).filter(([k]) => x.metrics[k] !== undefined && x.metrics[k] !== null).map(([k, lab]) => `${lab}: ${fmtMetric(id, k, x.metrics[k])}`).join(' · ');
           return el('p', {}, el('strong', { textContent: `${t.title}: ${fmtPrimary(id, x.metrics)}` }), x.ok ? null : el('span', { class: 'warn', textContent: ` — не засчитано (${x.why})` }), el('br'), el('span', { class: 'muted', textContent: all }));
         }),
+        r.effort ? el('p', { class: 'muted', textContent: `Было трудно: ${r.effort} из 5 (${EFFORT_LABEL[r.effort - 1]})` }) : null,
         r.state ? el('p', { class: 'muted', textContent: 'Самочувствие перед проверкой: ' + Object.entries(r.state).map(([k, v]) => `${k}=${v}`).join(', ') }) : null,
         el('button', { type: 'button', class: 'chip danger', textContent: 'Удалить прохождение', onclick: async () => { const old = await store.remove(runId(r.startedAt)); toast('Прохождение удалено', old ? { actionLabel: 'Вернуть', onAction: () => store.save(old) } : {}); } }));
       d.addEventListener('toggle', () => { if (d.open) openRuns.add(r.startedAt); else openRuns.delete(r.startedAt); });
@@ -110,7 +122,14 @@ export function createTestsView() {
         el('h3', { textContent: payload.aborted ? 'Проверка прервана — сохранено то, что прошёл' : 'Готово' }),
         comp != null ? el('p', { class: 'big', id: 'bt-composite', textContent: zWord(comp) }) : el('p', { class: 'muted', id: 'bt-composite', textContent: 'Личная норма накапливается: после 5–6 прохождений появится сравнение с самим собой.' }),
         comp != null ? el('p', { class: 'muted', textContent: `Общий результат ${zText(comp)} относительно твоей нормы` }) : null,
-        ...rows),
+        ...rows,
+        el('div', { id: 'bt-effort', class: 'effort' }, el('span', { class: 'muted', textContent: 'Насколько трудно было? (по желанию, попадёт в выгрузку)' }),
+          el('div', { class: 'row wrap', role: 'group', 'aria-label': 'Усилие от 1 до 5' }, ...[1, 2, 3, 4, 5].map(v => el('button', { type: 'button', class: 'chip effort-btn', dataset: { v: String(v) }, 'aria-pressed': 'false', textContent: String(v), title: EFFORT_LABEL[v - 1],
+            onclick: async e => {
+              const ev = store.state.events.find(x => x.id === runId(payload.startedAt));
+              if (!ev) return;
+              try { await store.save(setEffort(ev, v)); for (const b of e.target.parentElement.children) b.setAttribute('aria-pressed', String(b.dataset.v === String(v))); } catch (x) { toast(x.message); }
+            } }))))),
       el('button', { type: 'button', id: 'bt-done', class: 'primary big-btn', textContent: 'Готово', onclick: () => { runner.close(); runner = null; running = false; render(); } }));
   }
 

@@ -254,6 +254,7 @@ await page.click('#learn-back');
 // ---------- «О приложении» и простой режим ----------
 await tab(page, 'more');
 assert.match(await text('#diag'), /Запуск: интерфейс за \d+(,\d)? (мс|с)/);
+{ const m = /Запуск: интерфейс за (\d+(?:,\d)?) (мс|с)/.exec(await text('#diag')); const ms = Number(m[1].replace(',', '.')) * (m[2] === 'с' ? 1000 : 1); assert.ok(ms <= 5000, `интерфейс появился за ${ms} мс (допуск 5000)`); }
 assert.match(await text('#stats'), /всего записей: \d+/);
 assert.equal(await page.locator('#tabs button').count(), 5);
 await page.check('#simple-mode');

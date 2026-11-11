@@ -113,3 +113,18 @@ export function lowMoodNotice(events, today, { days = 14, minDays = 8 } = {}) {
   const low = vals.filter(v => v <= 2.5).length;
   return mean <= 2.3 && low / vals.length >= 0.7 ? { n: vals.length, mean, low } : null;
 }
+
+// ---------- вечерний ритуал: подготовка ко сну и завершение дня (отметки по дням) ----------
+export const RITUAL_STEPS = [
+  ['screen', 'Убрать экран за час до сна', 'Подготовка ко сну'], ['light', 'Приглушить свет', 'Подготовка ко сну'], ['breath', 'Пять минут дыхания 4–6 или спокойная музыка', 'Подготовка ко сну'],
+  ['close', 'Закрыть или перенести незавершённые дела', 'Завершение дня'], ['plan', 'Выбрать три главных дела на завтра', 'Завершение дня'], ['prep', 'Приготовить вещи на утро', 'Завершение дня'],
+];
+export const ritualId = date => `ritual:${date}`;
+export function makeRitual(date, steps, now = Date.now(), prev = null) {
+  if (!isYmd(date)) throw new Error('bad date');
+  const known = new Set(RITUAL_STEPS.map(x => x[0]));
+  const list = [...new Set((steps ?? []).filter(k => known.has(k)))];
+  if (!list.length) throw new Error('Отметь хотя бы один шаг');
+  return base(ritualId(date), 'ritual', { date, steps: RITUAL_STEPS.map(x => x[0]).filter(k => list.includes(k)) }, now, prev);
+}
+export const ritualOf = (events, date) => events.find(e => e.type === 'ritual' && e.id === ritualId(date)) ?? null;

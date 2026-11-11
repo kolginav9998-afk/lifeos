@@ -1,7 +1,7 @@
 // Аналитика результатов проверок: личная норма, отклонения, домены, связи с образом жизни, подсказки.
 // Принципы: сравнение только с самим собой; устойчивая статистика (медиана/MAD); поправка на множественные сравнения;
 // формулировки осторожные — это наблюдения, а не диагнозы и не доказанные причины.
-import { mean, median, mad, robustZ, spearmanTest, round } from './stats.js';
+import { mean, median, mad, robustZ, spearmanTest, slopeCI, round } from './stats.js';
 import { TESTS, TEST_BY_ID, DOMAINS, primaryShown, runsOf, fmtNum, fmtPrimary } from './bt-core.js';
 import { dailyTable } from './diary.js';
 import { addDays, todayStr } from './events.js';
@@ -88,6 +88,25 @@ export function dailyRows(events, runs = runsOf(events), analysis = analyzeRuns(
     row.prev_focusMin = focusBy[addDays(date, -1)] ?? 0; row.prev_workoutMin = workBy[addDays(date, -1)] ?? 0;
     return row;
   });
+}
+
+// Единицы для оценки «на сколько меняется результат»: k — на сколько единиц фактора считаем шаг.
+export const SLOPE_UNITS = {
+  sleepHours: { k: 1, text: 'каждый дополнительный час сна' }, prev_caffeine: { k: 1, text: 'каждая лишняя чашка кофе накануне' }, prev_alcohol: { k: 1, text: 'каждая порция алкоголя накануне' },
+  prev_exercise: { k: 30, text: 'каждые 30 минут нагрузки накануне' }, focusMin: { k: 30, text: 'каждые 30 минут фокуса' }, workoutMin: { k: 30, text: 'каждые 30 минут тренировки' },
+  prev_focusMin: { k: 30, text: 'каждые 30 минут фокуса накануне' }, prev_workoutMin: { k: 30, text: 'каждые 30 минут тренировки накануне' },
+};
+// Фраза с оценкой и интервалом для связи c (или '' если данных мало или единица фактора неясна).
+export function slopeSentence(rows, c) {
+  const u = SLOPE_UNITS[c.x];
+  if (!u) return '';
+  const xs = [], ys = [];
+  for (const r of rows) if (Number.isFinite(r[c.x]) && Number.isFinite(r[c.y])) { xs.push(r[c.x]); ys.push(r[c.y]); }
+  const ci = slopeCI(xs, ys, { seed: 17 });
+  if (!ci) return '';
+  const sigma = c.y === 'composite' || c.y.startsWith('z_'), unit = sigma ? 'σ' : ' балла';
+  const sg = v => `${v > 0 ? '+' : v < 0 ? '−' : ''}${fmtNum(Math.abs(v * u.k), sigma ? 2 : 1)}`;
+  return ` Грубая оценка: на ${u.text} в среднем ${sg(ci.slope)}${unit} (интервал от ${sg(ci.lo)} до ${sg(ci.hi)}${unit}). Интервал широкий, пока данных мало.`;
 }
 
 // ---------- связи ----------
@@ -208,6 +227,7 @@ export function insights(events, now = Date.now()) {
       const g = groupDiff(rowsOk, 'sleepHours', 7);
       if (g) extra = ` В дни со сном от 7 часов (${g.nHi}) общий результат в среднем ${g.diff >= 0 ? 'выше' : 'ниже'} на ${fmtNum(Math.abs(g.diff), 1)}σ, чем в остальные (${g.nLo}).`;
     }
+    extra += slopeSentence(rowsOk, c);
     out.push({ id: `rel-${c.x}-${c.y}`, kind: 'relation', conf: c.n >= 30 && c.q <= 0.1 ? 'high' : 'low',
       title: `${c.xLabel} ↔ ${c.yLabel}`,
       text: `${c.rho > 0 ? 'Когда выше' : 'Когда ниже'} «${c.xLabel}», обычно ${c.rho > 0 ? 'выше' : 'ниже'} ${c.yLabel} (ρ = ${fmtNum(c.rho, 2)}, дней: ${c.n}, ${c.q < 0.01 ? 'q < 0,01' : `q = ${fmtNum(c.q, 2)}`}).${extra} Это связь, а не доказанная причина: проверь её личным экспериментом на 1–2 недели (Аналитика → Эксперименты).` });
@@ -241,3 +261,14 @@ export function summarize(events) {
 }
 
 export const round2 = x => round(x, 2);
+
+// Сравнение с самим собой: последний день с проверкой против предыдущего и против лучшего дня (по общему результату).
+export function selfCompare(events) {
+  const an = analyzeRuns(runsOf(events));
+  const byDay = new Map();
+  for (const r of an.perRun) if (Number.isFinite(r.composite)) { if (!byDay.has(r.date)) byDay.set(r.date, []); byDay.get(r.date).push(r.composite); }
+  const days = [...byDay].map(([date, v]) => ({ date, value: median(v) })).sort((a, b) => a.date.localeCompare(b.date));
+  if (days.length < 2) return null;
+  const last = days.at(-1), prev = days.at(-2), best = days.reduce((b, d) => (d.value > b.value ? d : b));
+  return { last, prev, best, diff: last.value - prev.value, days: days.length, isBest: days.length >= 3 && last.date === best.date };
+}
