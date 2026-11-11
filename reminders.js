@@ -1,7 +1,7 @@
 // План локальных напоминаний. Чистая функция: из данных получает список уведомлений на ближайшие дни.
 // Текст уведомлений общий, без названий задач: уведомления видны на экране блокировки и лежат вне шифрования приложения.
 import { todayStr, addDays } from './events.js';
-import { activeHabits } from './habits.js';
+import { activeHabits, isScheduled } from './habits.js';
 import { isSick } from './sick.js';
 
 export const HORIZON_DAYS = 14;
@@ -36,7 +36,7 @@ export function planReminders(events, now, { taskHour = 9, habitHour = 20, eveni
     }
     if (habitHour >= 0 && habits.length && !sickNow) {
       const at = atLocal(day, habitHour);
-      const pending = i === 0 ? habits.filter(h => !h.st.doneToday).length : habits.length;
+      const pending = habits.filter(h => isScheduled(h.h, day) && (i !== 0 || !h.st.doneToday)).length;
       if (pending && at > now) out.push({ id: HABIT_ID_BASE + i, at, title: 'Life OS', body: 'Привычки на сегодня. Минимум тоже считается.' });
     }
     if (bedtimeMin >= 0) {

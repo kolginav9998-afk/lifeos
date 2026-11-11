@@ -17,7 +17,7 @@ _Файл создан из `registry.js` и сверяется с ним тес
 
 | Тип | Что это | Поля | Приватность | В выгрузке | Модуль |
 |---|---|---|---|---|---|
-| `habit` | Привычка | name, anchor, minimum, full, identity, plan, startDate, archived | личный текст | да | `habits.js` |
+| `habit` | Привычка | name, anchor, minimum, full, identity, plan, days, startDate, archived | личный текст | да | `habits.js` |
 | `habit_log` | Отметка привычки | habitId, date, level (full|min) | числа и отметки | да | `habits.js` |
 
 ## Деньги

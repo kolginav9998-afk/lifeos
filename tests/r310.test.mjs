@@ -10,6 +10,11 @@ import { makeFocus } from '../focus.js';
 import { makeRun, makeRunEvent } from '../bt-core.js';
 import { makeRng } from '../stats.js';
 import { normBand, variability, variabilityTrend, CV_TESTS, comparePeriods, compareWeeks, compare90, topFactors, eventMarks } from '../bt-extra.js';
+import { makeHabit, updateHabit, makeHabitLog, habitStats, habitCalendar, cleanDays, isScheduled, daysText, activeHabits } from '../habits.js';
+import { planReminders, HABIT_ID_BASE } from '../reminders.js';
+import { planDay } from '../planday.js';
+import { weekReview } from '../review.js';
+import { habitMoodLinks } from '../bt-analytics.js';
 import { practiceBy, practiceWeek, makeLearnGoal, learnGoals, goalId, plateauInfo, CARD_SECONDS, GOAL_MIN, GOAL_MAX } from '../practice.js';
 
 const TODAY = '2026-11-14', day = n => addDays(TODAY, n);
@@ -192,4 +197,74 @@ test('отметки событий: болезнь, начало курса, э
   assert.deepEqual(eventMarks(evs, []), []);
   const gap = [{ date: day(-9), value: 1 }, { date: day(-1), value: 2 }];
   assert.equal(eventMarks([{ id: 's', type: 'sick', ts: 1, payload: { from: day(-5), to: null } }], gap)[0].i, 1, 'событие между замерами — на следующей точке');
+});
+
+// ---------- привычки по дням недели ----------
+// 2026-11-09 пн, 11 ср, 13 пт, 14 сб. Привычка «пн, ср, пт» с начала октября.
+const mwf = (extra = {}) => ({ ...makeHabit({ name: 'Зарядка', days: [1, 3, 5] }, new Date('2026-10-01T12:00:00').getTime()), ...extra });
+const logs = (h, dates) => dates.map(d => makeHabitLog(h, d, 'full', 1));
+test('дни недели привычки: проверка ввода, текст, расписание', () => {
+  assert.deepEqual(cleanDays([5, 1, 3, 3, '1', 9, -1, 1.5, 'x']), [1, 3, 5]); assert.deepEqual(cleanDays([0, 1, 2, 3, 4, 5, 6]), [], 'все дни — это «каждый день»');
+  assert.deepEqual(cleanDays(undefined), []); assert.deepEqual(cleanDays('пн'), []);
+  assert.equal(daysText([0, 1, 3]), 'пн, ср, вс', 'неделя с понедельника'); assert.equal(daysText([]), 'каждый день');
+  const h = mwf();
+  assert.deepEqual(h.payload.days, [1, 3, 5]); assert.deepEqual(makeHabit({ name: 'Вода' }, 1).payload.days, []);
+  assert.deepEqual([9, 10, 11, 12, 13, 14, 15].map(d => isScheduled(h, `2026-11-${String(d).padStart(2, '0')}`)), [true, false, true, false, true, false, false]);
+  assert.equal(isScheduled({ payload: {} }, '2026-11-14'), true, 'у старых привычек поля days нет: каждый день');
+  assert.deepEqual(updateHabit(h, { name: 'Зарядка' }).payload.days, [1, 3, 5], 'правка без поля days расписание не стирает');
+  assert.deepEqual(updateHabit(h, { name: 'Зарядка', days: [2, 4] }).payload.days, [2, 4]); assert.deepEqual(updateHabit(h, { name: 'Зарядка', days: [] }).payload.days, []);
+});
+
+test('привычка по расписанию: серия не рвётся в дни вне расписания, пропуск считается только по плану', () => {
+  const h = mwf(), every = { ...makeHabit({ name: 'Каждый день' }, new Date('2026-10-01T12:00:00').getTime()) };
+  const days = ['2026-11-02', '2026-11-04', '2026-11-06', '2026-11-09', '2026-11-11', '2026-11-13'];   // пн ср пт две недели подряд
+  const st = habitStats(h, logs(h, days), '2026-11-14');
+  assert.equal(st.streak, 6); assert.equal(st.longest, 6); assert.equal(st.scheduledToday, false, 'суббота — выходной привычки');
+  assert.equal(st.missedYesterday, false); assert.equal(st.needsRecovery, false);
+  assert.equal(habitStats(every, logs(every, days), '2026-11-14').streak, 1, 'у ежедневной привычки те же отметки дают серию 1');
+  // регулярность считается по плановым дням: за 30 дней их 13 (пн, ср, пт), отмечено 6
+  assert.equal(st.hits, 6); assert.equal(st.span, 13); assert.ok(Math.abs(st.consistency - 6 / 13) < 1e-9);
+  assert.equal(habitStats(every, logs(every, days), '2026-11-14').span, 30, 'у ежедневной привычки в знаменателе все 30 дней');
+  // «не пропусти второй раз» — только по плановым дням
+  const missFri = habitStats(h, logs(h, days.slice(0, 5)), '2026-11-14');                       // пятница 13-го пропущена, сегодня суббота
+  assert.equal(missFri.missedYesterday, true); assert.equal(missFri.neverMissTwice, false, 'сегодня выходной: повторить пропуск нельзя');
+  assert.equal(habitStats(h, logs(h, days.slice(0, 5)), '2026-11-16').neverMissTwice, true, 'в понедельник последний плановый день (пт) пропущен');
+  assert.equal(habitStats(h, logs(h, days.slice(0, 5)), '2026-11-13').neverMissTwice, false, 'пятница: последний плановый день (ср) отмечен, чт вне расписания');
+  assert.equal(habitStats(h, logs(h, [...days.slice(0, 5), '2026-11-13']), '2026-11-16').neverMissTwice, false);
+  // перерыв по плану: последняя отметка в пн 9-го; в чт 12-го пропущена только среда
+  const brk = habitStats(h, logs(h, days.slice(0, 4)), '2026-11-12');
+  assert.equal(brk.gapDays, 1); assert.equal(brk.needsRecovery, false);
+  const long = habitStats(h, logs(h, days.slice(0, 3)), '2026-11-18');                           // после пт 6-го пропущены пн, ср, пт... сегодня ср
+  assert.equal(long.needsRecovery, true); assert.equal(long.scheduledToday, true);
+  assert.equal(habitStats(h, logs(h, days.slice(0, 3)), '2026-11-17').needsRecovery, false, 'вторник: сегодня не по плану, возвращаться рано');
+  // календарь: дни вне расписания помечены
+  const cal = habitCalendar(h, [], '2026-11-14', 7);
+  assert.deepEqual(cal.map(d => [d.date.slice(8), d.off]), [['08', true], ['09', false], ['10', true], ['11', false], ['12', true], ['13', false], ['14', true]]);
+});
+
+test('расписание привычки учитывают напоминания, план дня, итоги недели и связь с настроением', () => {
+  const h = mwf(), start = new Date('2026-10-01T12:00:00').getTime();
+  // напоминания: только по плановым дням (сб 14-го + 14 дней: пн 16, ср 18, пт 20, пн 23, ср 25, пт 27)
+  const now = new Date('2026-11-14T08:00:00').getTime();
+  const rem = planReminders([h], now, { habitHour: 20 }).filter(r => r.id >= HABIT_ID_BASE && r.id < HABIT_ID_BASE + 100).map(r => r.id - HABIT_ID_BASE);
+  assert.deepEqual(rem, [2, 4, 6, 9, 11, 13]);
+  const daily = makeHabit({ name: 'Каждый день' }, start);
+  assert.equal(planReminders([daily], now, { habitHour: 20 }).filter(r => r.id >= HABIT_ID_BASE && r.id < HABIT_ID_BASE + 100).length, 14, 'ежедневная — как раньше');
+  // план дня: привычка в плане только в плановый день
+  assert.ok(!planDay([h], '2026-11-14', { nowMinutes: 480 }).items.some(i => i.kind === 'habit'));
+  assert.ok(planDay([h], '2026-11-16', { nowMinutes: 480 }).items.some(i => i.kind === 'habit' && /Зарядка/.test(i.text)));
+  // итоги недели: знаменатель — плановые дни (пн 9, ср 11, пт 13), отмечены два
+  const wk = weekReview([h, ...logs(h, ['2026-11-09', '2026-11-13'])], '2026-11-14').habits[0];
+  assert.deepEqual([wk.hits, wk.of], [2, 3]);
+  const wd = weekReview([daily, ...logs(daily, ['2026-11-09', '2026-11-13'])], '2026-11-14').habits[0];
+  assert.deepEqual([wd.hits, wd.of], [2, 7]);
+  // связь с настроением: непланируемые дни без отметки не считаются «днями без привычки»
+  const evs = [];
+  for (let i = 0; i < 70; i++) { const d = addDays('2026-11-14', -i); evs.push(makeCheckin('e', d, { mood: ['2026-11-09', '2026-11-11', '2026-11-13'].includes(d) || [1, 3, 5].includes(new Date(`${d}T12:00:00`).getDay()) ? 5 : 2 }, '', 1000 + i)); }
+  const loggedDays = Array.from({ length: 70 }, (_, i) => addDays('2026-11-14', -i)).filter(d => [1, 3, 5].includes(new Date(`${d}T12:00:00`).getDay()));
+  const hm = mwf(), sched = [hm, ...evs, ...logs(hm, loggedDays)], every = [daily, ...evs, ...logs(daily, loggedDays)];
+  assert.equal(sched.filter(e => e.type === 'habit_log').length, loggedDays.length); assert.ok(loggedDays.length >= 25);
+  assert.deepEqual(habitMoodLinks(sched, '2026-11-14'), [], 'все плановые дни отмечены: сравнивать не с чем');
+  const dl = habitMoodLinks(every, '2026-11-14');
+  assert.equal(dl.length, 1); assert.ok(dl[0].diff > 2.9);
 });

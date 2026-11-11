@@ -1,11 +1,21 @@
 import { el, toast } from './ui.js';
 import { todayStr } from './events.js';
-import { HABIT_TEMPLATES, makeHabit, updateHabit, archiveHabit, makeHabitLog, habitStats, habitCalendar, activeHabits, logsOf, habitReview, reviewDue } from './habits.js';
+import { HABIT_TEMPLATES, makeHabit, updateHabit, archiveHabit, makeHabitLog, habitStats, habitCalendar, activeHabits, logsOf, habitReview, reviewDue, WEEK_ORDER, DAY_NAMES, daysText } from './habits.js';
 import { getPref, setPref } from './prefs.js';
 import { activeSick } from './sick.js';
 import * as store from './store.js';
 
 const pct = x => Math.round(x * 100) + '%';
+
+// Выбор дней недели для привычки: все отмечены — значит каждый день.
+function daysPicker(selected = []) {
+  const all = !selected.length;
+  const boxes = WEEK_ORDER.map(d => el('input', { type: 'checkbox', class: 'hday-box', dataset: { day: String(d) }, checked: all || selected.includes(d), 'aria-label': DAY_NAMES[d] }));
+  const node = el('div', { class: 'hdays' }, el('span', { class: 'rating-label', textContent: 'Дни недели' }),
+    el('div', { class: 'row wrap' }, ...WEEK_ORDER.map((d, i) => el('label', { class: 'check-label hday' }, boxes[i], ` ${DAY_NAMES[d]}`))),
+    el('p', { class: 'muted', textContent: 'Если отметить не все дни, в остальные дни пропуск не считается и серию не рвёт.' }));
+  return { node, get: () => boxes.filter(b => b.checked).map(b => Number(b.dataset.day)), reset: () => boxes.forEach(b => { b.checked = true; }) };
+}
 
 export function createHabitsView() {
   let events = [];
@@ -26,17 +36,20 @@ export function createHabitsView() {
   const minimum = el('input', { id: 'habit-min', type: 'text', placeholder: 'Версия на 2 минуты: «открыть редактор»', maxLength: 200, autocomplete: 'off' });
   const identity = el('input', { id: 'habit-identity', type: 'text', placeholder: 'Кем я становлюсь: «я человек, который двигается каждый день»', maxLength: 120, autocomplete: 'off' });
   const plan = el('input', { id: 'habit-plan', type: 'text', placeholder: 'Если помешает: «если нет времени, то хотя бы 5 минут»', maxLength: 200, autocomplete: 'off' });
+  const formDays = daysPicker();
   const full = el('input', { id: 'habit-full', type: 'text', placeholder: 'Полная версия: «20 минут практики»', maxLength: 200, autocomplete: 'off' });
   const templates = el('div', { id: 'habit-templates', class: 'chips' }, ...HABIT_TEMPLATES.map(t =>
     el('button', { type: 'button', class: 'chip tpl', textContent: t.name, onclick: () => { name.value = t.name; anchor.value = t.anchor; minimum.value = t.minimum; full.value = t.full; name.focus(); } })));
-  const form = el('form', { id: 'habit-form', class: 'form-stack' }, el('span', { class: 'muted', textContent: 'Быстрый старт — выбери заготовку и поправь под себя:' }), templates, name, anchor, minimum, full, identity, plan,
+  const form = el('form', { id: 'habit-form', class: 'form-stack' }, el('span', { class: 'muted', textContent: 'Быстрый старт — выбери заготовку и поправь под себя:' }), templates, name, anchor, minimum, full, identity, plan, formDays.node,
     el('button', { type: 'submit', class: 'primary', textContent: 'Добавить привычку' }));
   const addBox = el('details', { id: 'habit-add', class: 'card habit-add' }, el('summary', { textContent: '＋ Новая привычка' }), form);
   form.onsubmit = async e => {
     e.preventDefault();
     try {
-      await store.save(makeHabit({ name: name.value, anchor: anchor.value, minimum: minimum.value, full: full.value, identity: identity.value, plan: plan.value }));
-      name.value = anchor.value = minimum.value = full.value = identity.value = plan.value = '';
+      const days = formDays.get();
+      if (!days.length) throw new Error('Выбери хотя бы один день недели');
+      await store.save(makeHabit({ name: name.value, anchor: anchor.value, minimum: minimum.value, full: full.value, identity: identity.value, plan: plan.value, days }));
+      name.value = anchor.value = minimum.value = full.value = identity.value = plan.value = ''; formDays.reset();
       addBox.open = false;
     } catch (err) { toast('Не удалось добавить: ' + err.message); }
   };
@@ -76,13 +89,14 @@ export function createHabitsView() {
     const f = el('input', { type: 'text', value: p.full, maxLength: 200, placeholder: 'Полная версия' });
     const idn = el('input', { type: 'text', value: p.identity ?? '', maxLength: 120, placeholder: 'Кем я становлюсь', class: 'edit-identity' });
     const pl = el('input', { type: 'text', value: p.plan ?? '', maxLength: 200, placeholder: 'Если помешает, то…', class: 'edit-plan' });
-    const f2 = el('form', { class: 'card form-stack editing', dataset: { id: h.id } }, n, a, m, f, idn, pl,
+    const dp = daysPicker(p.days ?? []);
+    const f2 = el('form', { class: 'card form-stack editing', dataset: { id: h.id } }, n, a, m, f, idn, pl, dp.node,
       el('div', { class: 'row' },
         el('button', { type: 'submit', class: 'primary save', textContent: 'Сохранить' }),
         el('button', { type: 'button', class: 'cancel', textContent: 'Отмена', onclick: () => stopEdit() })));
     f2.onsubmit = async e => {
       e.preventDefault();
-      try { await store.save(updateHabit(h, { name: n.value, anchor: a.value, minimum: m.value, full: f.value, identity: idn.value, plan: pl.value })); stopEdit(); }
+      try { await store.save(updateHabit(h, { name: n.value, anchor: a.value, minimum: m.value, full: f.value, identity: idn.value, plan: pl.value, days: (() => { const d = dp.get(); if (!d.length) throw new Error('Выбери хотя бы один день недели'); return d; })() })); stopEdit(); }
       catch (err) { toast('Не удалось сохранить: ' + err.message); }
     };
     queueMicrotask(() => n.focus());
@@ -100,17 +114,19 @@ export function createHabitsView() {
     c.append(el('div', { class: 'h-head' }, el('strong', { class: 'h-name', textContent: p.name }),
       p.anchor ? el('span', { class: 'muted', textContent: ' · после: ' + p.anchor }) : null));
     if (p.identity) c.append(el('div', { class: 'muted h-identity', textContent: `Я — ${p.identity.replace(/^я\s+/i, '')}` }));
+    if (p.days?.length) c.append(el('div', { class: 'muted h-days', textContent: `Дни: ${daysText(p.days)}` }));
+    if (!archived && !st.scheduledToday && !st.doneToday) c.append(el('div', { class: 'muted h-off', textContent: 'Сегодня по расписанию выходной: отметка не обязательна, серия не прервётся.' }));
     if (p.plan) c.append(el('div', { class: 'muted h-plan', textContent: `Если помешает: ${p.plan.replace(/^если\s+(помешает\s*[:,—-]?\s*)?/i, '')}` }));
     if (!archived) {
       const fullBtn = el('button', { type: 'button', class: 'h-full' + (st.level === 'full' ? ' on' : ''), textContent: (st.level === 'full' ? '✓ ' : '') + (p.full ? `Сделал: ${p.full}` : 'Сделал полностью'), onclick: () => mark(h, st, 'full') });
       const minBtn = el('button', { type: 'button', class: 'h-min' + (st.level === 'min' ? ' on' : ''), textContent: (st.level === 'min' ? '✓ ' : '') + (p.minimum ? `Минимум: ${p.minimum}` : 'Сделал минимум (2 минуты)'), onclick: () => mark(h, st, 'min') });
       c.append(el('div', { class: 'h-actions' }, heavyDay ? null : fullBtn, minBtn));
-      if (st.neverMissTwice) c.append(el('p', { class: 'warn', textContent: 'Вчера пропуск — это нормально. Не пропусти второй раз: достаточно минимума.' }));
+      if (st.neverMissTwice) c.append(el('p', { class: 'warn', textContent: (p.days?.length ? 'Прошлое занятие по плану пропущено' : 'Вчера пропуск') + ' — это нормально. Не пропусти второй раз: достаточно минимума.' }));
       else if (st.needsRecovery) c.append(el('p', { class: 'warn', textContent: `Перерыв ${st.gapDays} дн. Начинать с нуля не нужно — вернись с минимума.` }));
     }
     c.append(el('div', { class: 'h-stats muted', textContent: `Серия: ${st.streak} · Лучшая: ${st.longest} · Регулярность за 30 дн.: ${pct(st.consistency)} (${st.hits} из ${st.span})` }));
     const cal = el('div', { class: 'h-cal', 'aria-label': 'Последние 4 недели' }, ...habitCalendar(h, events, today, 28).map(d =>
-      el('span', { class: `dot ${d.level || ''}${d.before ? ' before' : ''}${d.today ? ' today' : ''}`, title: d.date })));
+      el('span', { class: `dot ${d.level || ''}${d.before ? ' before' : ''}${d.today ? ' today' : ''}${d.off ? ' off' : ''}`, title: d.date })));
     c.append(cal);
     const more = el('details', { class: 'more' }, el('summary', { textContent: 'Ещё' }),
       el('div', { class: 'row' },

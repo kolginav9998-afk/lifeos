@@ -7,7 +7,7 @@
 // Тексты дневника, заметок, мыслей, решений и подобное в выгрузку не входят, деньги тоже.
 export const REGISTRY = {
   task: { label: 'Задача', group: 'Дела', module: 'events.js', privacy: 'text', analytics: true, fields: 'text, due, repeat, priority, done, doneAt' },
-  habit: { label: 'Привычка', group: 'Привычки', module: 'habits.js', privacy: 'text', analytics: true, fields: 'name, anchor, minimum, full, identity, plan, startDate, archived' },
+  habit: { label: 'Привычка', group: 'Привычки', module: 'habits.js', privacy: 'text', analytics: true, fields: 'name, anchor, minimum, full, identity, plan, days, startDate, archived' },
   habit_log: { label: 'Отметка привычки', group: 'Привычки', module: 'habits.js', privacy: 'numbers', analytics: true, fields: 'habitId, date, level (full|min)' },
   expense: { label: 'Расход', group: 'Деньги', module: 'money.js', privacy: 'money', analytics: false, fields: 'amountMinor, currency, category, note, date' },
   income: { label: 'Доход', group: 'Деньги', module: 'money.js', privacy: 'money', analytics: false, fields: 'amountMinor, currency, category, note, date' },

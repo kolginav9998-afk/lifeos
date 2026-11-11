@@ -130,6 +130,39 @@ await tab(page, 'tests');
 await until(page, () => document.querySelector('.test-row[data-test="reaction"] svg .spark-band'));
 assert.ok(!/null|undefined/.test(await page.locator('#view-insights').evaluate(n => n.textContent)));
 
+
+// ---------- привычки по дням недели ----------
+await tab(page, 'habits');
+await page.locator('#habit-add').evaluate(d => { d.open = true; });
+assert.equal(await page.locator('#habit-form .hday-box:checked').count(), 7, 'по умолчанию отмечены все дни');
+await page.fill('#habit-name', 'Йога');
+for (const d of [0, 2, 4, 6]) await page.uncheck(`#habit-form .hday-box[data-day="${d}"]`);
+assert.equal(await page.locator('#habit-form .hday-box:checked').count(), 3);
+await page.click('#habit-form button[type=submit]');
+await until(page, () => document.querySelector('.habit .h-days'));
+assert.equal(await text('.habit .h-days'), 'Дни: пн, ср, пт');
+assert.equal(await page.locator('#habit-form .hday-box:checked').count(), 7, 'форма вернулась к «каждый день»');
+const schedToday = await page.evaluate(async () => { const ev = await import('./events.js'), h = await import('./habits.js'), st = await import('./store.js'); return h.isScheduled(st.state.events.find(e => e.type === 'habit'), ev.todayStr()); });
+assert.equal(await page.locator('.habit .h-off').count(), schedToday ? 0 : 1, 'в выходной день привычки видна пометка');
+if (!schedToday) assert.match(await text('.habit .h-off'), /Сегодня по расписанию выходной/);
+assert.equal(await page.locator('.habit .h-cal .dot.off').count() > 0, true, 'в календаре дни вне расписания приглушены');
+// правка расписания
+await page.click('.habit .more summary'); await page.click('.habit .more .edit');
+await until(page, () => document.querySelector('form.editing .hday-box'));
+assert.deepEqual(await page.locator('form.editing .hday-box:checked').evaluateAll(b => b.map(x => x.dataset.day).sort()), ['1', '3', '5']);
+for (const d of [1, 3, 5]) await page.uncheck(`form.editing .hday-box[data-day="${d}"]`);
+await page.click('form.editing .save'); await toast(/Выбери хотя бы один день недели/);
+for (const d of [2, 4]) await page.check(`form.editing .hday-box[data-day="${d}"]`);
+await page.click('form.editing .save');
+await until(page, () => document.querySelector('.habit .h-days') && /вт, чт/.test(document.querySelector('.habit .h-days').textContent));
+assert.deepEqual((await evs('habit'))[0].payload.days, [2, 4]);
+// пустое имя не мешает: добавление без дней
+await page.locator('#habit-add').evaluate(d => { d.open = true; });
+await page.fill('#habit-name', 'Без дней');
+for (let d = 0; d < 7; d++) await page.uncheck(`#habit-form .hday-box[data-day="${d}"]`);
+await clearToast(); await page.click('#habit-form button[type=submit]'); await toast(/Выбери хотя бы один день недели/);
+assert.equal((await evs('habit')).length, 1, 'привычка без дней не создаётся');
+
 assert.deepEqual(errors, [], 'нет ошибок в консоли:\n' + errors.join('\n'));
 await t.close();
 console.log('E2E R3.10 OK');

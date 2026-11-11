@@ -23,7 +23,7 @@ export function planDay(events, today, { nowMinutes = 9 * 60, start = 9 * 60, en
   if (!isSick(events, today)) {
     const load = todayLoad(events, today), n = load.due + load.fresh;
     if (n > 0) put(`Повторение карточек (${Math.min(n, 15)})`, 10, 'learn');
-    const pending = activeHabits(events, today).filter(x => !x.st.doneToday);
+    const pending = activeHabits(events, today).filter(x => !x.st.doneToday && x.st.scheduledToday);
     if (pending.length) put(`Привычки, минимум: ${pending.slice(0, 3).map(x => x.h.payload.name).join(', ')}`, 10, 'habit');
   }
   return { items, dropped };

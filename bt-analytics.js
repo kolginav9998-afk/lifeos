@@ -7,7 +7,7 @@ import { dailyTable } from './diary.js';
 import { addDays, todayStr } from './events.js';
 import { sickDays } from './sick.js';
 import { dayMood } from './diary.js';
-import { activeHabits, logsOf } from './habits.js';
+import { activeHabits, logsOf, isScheduled } from './habits.js';
 
 export const MIN_BASELINE = 5;        // сколько прежних результатов нужно, чтобы считать «норму»
 export const BASELINE_WINDOW = 30;    // норма считается по последним N результатам
@@ -368,7 +368,7 @@ export function habitMoodLinks(events, today, { days = 60, minPerGroup = 8, perm
     const logged = new Set(logsOf(events, h.id).map(l => l.payload.date)), a = [], b = [];
     for (let i = 0; i < days; i++) {
       const d = addDays(today, -i);
-      if (d < h.payload.startDate || sick.has(d)) continue;
+      if (d < h.payload.startDate || sick.has(d) || (!logged.has(d) && !isScheduled(h, d))) continue;      // день вне расписания без отметки — не «пропуск»
       const m = dayMood(events, d);
       if (!Number.isFinite(m)) continue;
       (logged.has(d) ? a : b).push(m);

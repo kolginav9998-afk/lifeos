@@ -375,3 +375,5 @@ html.amounts-hidden .amount{letter-spacing:.1em}
 .cmp-row .cmp-label{flex:1}
 .cmp-arrow.good{color:var(--ok)}.cmp-arrow.bad{color:var(--warn)}.cmp-arrow.same{color:var(--muted)}
 .factor-row{padding:6px 0;border-top:1px solid var(--line)}
+.hdays{margin:4px 0}.hday{margin-right:2px}.h-days,.h-off{font-size:.85rem}
+.h-cal .dot.off{opacity:.35}

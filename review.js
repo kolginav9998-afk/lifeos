@@ -1,6 +1,6 @@
 // Недельный обзор: что сделано, как с привычками, куда ушли деньги. Только факты из твоих данных.
 import { addDays, todayStr } from './events.js';
-import { activeHabits } from './habits.js';
+import { activeHabits, isScheduled } from './habits.js';
 import { spentBetween, sumBetween } from './money.js';
 import { logsOf } from './habits.js';
 import { checkinOf, dayMood } from './diary.js';
@@ -26,8 +26,10 @@ export function weekReview(events, today) {
   const habits = activeHabits(events, today).map(({ h }) => {
     const logs = logsOf(events, h.id).filter(l => l.payload.date >= from && l.payload.date <= today);
     const start = h.payload.startDate;
-    const days = Math.max(1, Math.min(7, Math.round((Date.parse(today) - Date.parse(start)) / 86400000) + 1));
-    return { name: h.payload.name, hits: logs.length, of: days };
+    const span = Math.max(1, Math.min(7, Math.round((Date.parse(today) - Date.parse(start)) / 86400000) + 1));
+    let planned = 0;                                      // сколько из этих дней по расписанию привычки
+    for (let i = 0; i < span; i++) if (isScheduled(h, addDays(today, -i))) planned++;
+    return { name: h.payload.name, hits: logs.length, of: Math.max(planned, logs.length, 1) };
   });
 
   // самочувствие и развитие за те же 7 дней
