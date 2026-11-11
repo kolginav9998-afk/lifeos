@@ -31,7 +31,8 @@ jobs:
         with: { node-version: 22 }
       - name: Установить браузер для браузерных тестов
         run: |
-          npm install --no-save --no-package-lock playwright@1.63.0
+          # axe-core нужен браузерной проверке доступности (tests/e2e-a11y.mjs); версия та же, что в package.json
+          npm install --no-save --no-package-lock playwright@1.63.0 axe-core@4.14.0
           # Браузер Playwright ставится из интернета; при сбое зеркал или сети (бывает) берём Google Chrome, уже стоящий на машине.
           if ! timeout 420 npx playwright install --with-deps chromium; then
             echo "Не удалось поставить браузер Playwright: использую установленный Google Chrome"
