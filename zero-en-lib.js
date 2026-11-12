@@ -63,7 +63,7 @@ export function alphaLesson(o) {
   const lW = c => [...new Set([...near(c), ...upto.filter(x => x !== c)])].slice(0, 3).map(U);
   const note = c => LT[c][7] ? ` ${LT[c][7]}` : '';
   const [g0, g1, g2, g3] = g, last = g.at(-1);
-  const nameQ = c => choose('Как называется эта буква?', nm(c), nmW(c), { big: U(c) + c, explain: `${U(c)} называется «${nm(c)}» ${ip(c)}.${note(c)}` });
+  const nameQ = c => choose('Как называется эта буква?', nm(c), nmW(c), { big: `${U(c)} ${c}`, explain: `${U(c)} называется «${nm(c)}» ${ip(c)}.${note(c)}` });
   const earQ = c => listen(U(c), U(c), lW(c), { q: 'Какую букву ты услышал?', explain: `Услышано название: «${nm(c)}» ${ip(c)} — это буква ${U(c)}.` });
   const sndQ = c => choose('Какой звук обычно даёт эта буква?', sn(c), snW(c), { big: U(c), explain: `Основной звук буквы ${U(c)}: ${sn(c)}.${note(c)}` });
   const keyQ = c => choose(c === 'x' ? `Какая буква стоит в конце слова ${key(c)}?` : `С какой буквы начинается слово ${key(c)}?`, U(c), lW(c), { big: key(c), explain: `Слово ${key(c)} значит «${LT[c][4]}».` });
@@ -81,5 +81,29 @@ export function alphaLesson(o) {
       ...(o.extra ?? []),
       read(`Назови вслух буквы: ${g.map(U).join(' ')}. Потом повтори звуки: ${g.map(sn).join('; ')}.`),
     ],
+  };
+}
+
+// ===== Урок чтения слов. o: { id, needs, title, goal, minutes, stage, intro, sight, show, decay, body, task, words: 'cat кошка|hat шляпа', head, table, cardN, cards,
+//   ears: [[слово, неверное, неверное, опции]], means: [[слово, перевод, неверный, неверный, опции]], rhymes: [[слово, рифма, неверная, неверная, опции]],
+//   builds: [слово | [плитки]], dicts: [слово], trs: [[по-русски, слово]], pair: [[слово, перевод]] (3–6), extra: [задания], text }
+export function wordLesson(o) {
+  const W = wp(o.words);
+  const D = [
+    ...(o.ears ?? []).map(([w, a, b, opt]) => ear(w, a, b, opt)),
+    ...(o.means ?? []).map(([w, ru, a, b, opt]) => mean(w, ru, [a, b], opt)),
+    ...(o.rhymes ?? []).map(([w, r, a, b, opt]) => rhy(w, r, [a, b], opt)),
+    ...(o.builds ?? []).map(x => Array.isArray(x) ? bld(x.join(''), x) : bld(x)),
+    ...(o.dicts ?? []).map(w => dict(w)),
+    ...(o.trs ?? []).map(([ru, w]) => tr(ru, w)),
+    match('Соедини слово и перевод', o.pair ?? W.slice(0, 5)),
+    ...(o.extra ?? []),
+    read(o.text ?? `Прочитай вслух: ${W.slice(0, 8).map(p => p[0]).join(', ')}.`),
+  ];
+  return {
+    id: o.id, title: o.title, minutes: o.minutes ?? 5, stage: o.stage ?? 'Фоника', needs: o.needs, intro: o.intro ?? '', goal: o.goal,
+    ...(o.sight ? { sight: o.sight } : {}), ...(o.show ? { showcase: o.show } : {}), ...(o.decay ? { decay: o.decay } : {}),
+    body: o.body, task: o.task, words: W.map(p => p[0]), table: o.table ?? tab(o.head ?? ['Слово', 'Перевод'], o.words),
+    cards: [...W.slice(0, o.cardN ?? 8), ...(o.cards ?? [])], drills: D,
   };
 }
