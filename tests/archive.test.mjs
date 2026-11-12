@@ -14,11 +14,11 @@ test('настройки в архиве: берём только разрешё
   assert.deepEqual(cleanPrefs(good), good);
   const bad = cleanPrefs({ theme: 'розовая', autoLockMin: -5, parseDates: 'да', fontScale: 2, taskHour: 24, bedtimeMin: 1440, quietTo: -1, daysOff: [1, 1], hideAmounts: true });
   assert.deepEqual(bad, { hideAmounts: true }, 'некорректные значения отброшены');
-  assert.deepEqual(cleanPrefs({ remindersOn: true, lastBackupAt: 5, lastOpenTs: 9, clockBackFrom: 7, tab: 'money', onboardingDone: true, heavyDay: true, lastSeenVersion: 'R1', __proto__: { theme: 'dark' } }), {}, 'привязанное к устройству не переносим');
+  assert.deepEqual(cleanPrefs({ remindersOn: true, lastBackupAt: 5, lastOpenTs: 9, clockBackFrom: 7, tab: 'money', onboardingDone: true, heavyDay: true, lastSeenVersion: 'R1', tourDone: true, __proto__: { theme: 'dark' } }), {}, 'привязанное к устройству не переносим');
   assert.deepEqual(cleanPrefs(null), {}); assert.deepEqual(cleanPrefs([1, 2]), {}); assert.deepEqual(cleanPrefs('x'), {});
   assert.deepEqual(cleanPrefs({ daysOff: [0, 1, 2, 3, 4, 5, 6, 0] }), {}, 'слишком много дней');
   const copy = cleanPrefs({ daysOff: [1] }); assert.deepEqual(copy.daysOff, [1]);
-  const deviceBound = ['remindersOn', 'lastBackupAt', 'lastOpenTs', 'clockBackFrom', 'clockAsked', 'storageAsked', 'integrityAsked', 'tab', 'onboardingDone', 'heavyDay', 'lastSeenVersion', 'updateCheckedAt', 'updateNotified'];
+  const deviceBound = ['remindersOn', 'lastBackupAt', 'lastOpenTs', 'clockBackFrom', 'clockAsked', 'storageAsked', 'integrityAsked', 'tab', 'onboardingDone', 'heavyDay', 'lastSeenVersion', 'updateCheckedAt', 'updateNotified', 'tourDone'];
   assert.deepEqual(Object.keys(PREF_RULES).filter(k => deviceBound.includes(k)), [], 'в архив не попадает то, что привязано к устройству');
 });
 

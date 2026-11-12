@@ -21,7 +21,7 @@ const field = (id, props) => el('input', { id, autocomplete: 'off', ...props });
 const when = ts => (ts ? new Date(ts).toLocaleString('ru') : 'ещё не было');
 
 // gate = true — экран входа до открытия приложения: те же формы, но без профиля и настроек; у элементов свои id (gate-…), чтобы не совпадать с id экрана профиля.
-export function createAccountView({ go, onVaultChange = () => {}, gate = false, onAuthenticated = () => {}, onLoggedOut = () => {} }) {
+export function createAccountView({ go, onVaultChange = () => {}, gate = false, onAuthenticated = () => {}, onLoggedOut = () => {}, openHelp = () => {} }) {
   const ID = gate ? 'gate' : 'acc';
   const root = el('section', { id: gate ? 'view-gate' : 'view-account', class: gate ? 'view gate-view' : 'view' });
   let checked = null;             // результат проверки сервера
@@ -226,8 +226,19 @@ export function createAccountView({ go, onVaultChange = () => {}, gate = false, 
     return cards;
   }
 
+  // Подсказки на экране входа: три вопроса, на которых застревают чаще всего.
+  const gateHelp = () => el('details', { id: 'gate-help', open: !!checkError },
+    el('summary', { textContent: 'Нужна помощь?' }),
+    el('ul', { class: 'plain muted' },
+      el('li', {}, el('strong', { textContent: 'Где код установки сервера? ' }), 'Он нужен только при создании аккаунта. Его выдал тот, кто настраивал сервер. Чтобы войти в готовый аккаунт, код не нужен.'),
+      el('li', {}, el('strong', { textContent: 'Что за код восстановления? ' }), 'Длинный код из букв и цифр. Его показывают один раз при создании аккаунта. Он нужен, только если забудешь пароль: нажми «Забыл пароль» под кнопкой «Войти».'),
+      el('li', {}, el('strong', { textContent: 'Нет интернета? ' }), 'Для первого входа на этом телефоне нужна связь. Включи Wi-Fi или мобильные данные. Если появилась кнопка «Повторить», нажми её.')));
+
   // ---------- профиль ----------
-  const updateUi = createUpdateCard();
+  const updateUi = createUpdateCard({ openHelp });
+  const helpCard = () => card('Справка',
+    el('p', { class: 'muted', textContent: 'Как обновить приложение, что делать, если забыл пароль, как перенести данные на новый телефон.' }),
+    el('div', { class: 'row' }, el('button', { id: 'acc-help', type: 'button', textContent: 'Открыть справку', onclick: () => openHelp() })));
   let pfAvatar = null, pfColor = null;
   function profileSection() {
     const c = profileCard(store.state.events, account.info());
@@ -353,14 +364,14 @@ export function createAccountView({ go, onVaultChange = () => {}, gate = false, 
     if (recoveryCode) { root.replaceChildren(recoveryCard(recoveryCode, afterCode)); return; }
     if (gate) {
       if (account.isLinked()) { onAuthenticated(); return; }       // вошли или создали аккаунт: открываем приложение
-      root.replaceChildren(...gateCards());
+      root.replaceChildren(...gateCards(), ...(pendingJoin ? [] : [gateHelp()]));
       return;
     }
     if (account.isLinked()) {
       const [first, ...rest] = linkedCards();
-      root.replaceChildren(profileSection(), first, updateUi.root, ...rest);
+      root.replaceChildren(profileSection(), first, updateUi.root, helpCard(), ...rest);
     } else {
-      root.replaceChildren(profileSection(), updateUi.root, ...unlinkedCards());
+      root.replaceChildren(profileSection(), updateUi.root, helpCard(), ...unlinkedCards());
     }
   }
   render();

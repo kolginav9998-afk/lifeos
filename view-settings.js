@@ -26,7 +26,7 @@ const AUTOLOCK = [[0, 'сразу при сворачивании'], [1, 'чер
 function card(title, ...kids) { return el('section', { class: 'card settings-card' }, el('h3', { textContent: title }), ...kids); }
 function field(id, props) { return el('input', { id, autocomplete: 'off', ...props }); }
 
-export function createSettingsView({ lockNow, applyTheme, applyMode = () => {}, onVaultChange, openAccount = () => {} }) {
+export function createSettingsView({ lockNow, applyTheme, applyMode = () => {}, onVaultChange, openAccount = () => {}, openHelp = () => {} }) {
   let events = [];
   const root = el('section', { id: 'view-more', class: 'view' });
 
@@ -285,8 +285,13 @@ export function createSettingsView({ lockNow, applyTheme, applyMode = () => {}, 
     accountText.textContent = a ? `Подключён: ${a.username} · ${a.server}` : 'Не подключён. Один логин для телефона, приложения и браузера.';
   }
 
+  const helpCard = card('Справка',
+    el('p', { class: 'muted', textContent: 'Ответы на частые вопросы простыми словами: обновление, пароль, архив, новый телефон.' }),
+    el('div', { class: 'row' }, el('button', { id: 'set-help', type: 'button', textContent: 'Открыть справку', onclick: () => openHelp() })));
+
   root.append(
     accountCard,
+    helpCard,
     card('Профиль', nameForm),
     card('Защита паролем', secBox),
     card('Архив данных', archive.node,

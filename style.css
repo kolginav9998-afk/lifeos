@@ -517,3 +517,18 @@ details[open]>summary::after{transform:rotate(-135deg) translateY(-1px)}
 /* уведомление не перехватывает нажатия по тому, что под ним (кроме своей кнопки «Отменить») */
 .toast{pointer-events:none}
 .toast button{pointer-events:auto}
+
+/* ===== help ===== */
+.help-list{display:flex;flex-direction:column;gap:8px}
+.help-item{display:flex;flex-direction:column;align-items:flex-start;justify-content:flex-start;gap:2px;width:100%;height:auto;text-align:left;padding:10px 14px}
+.help-item .muted{font-weight:400}
+.help-steps{padding-left:24px}
+.help-sub{font-size:.95rem;margin:10px 0 0}
+.help-limits{border-left:3px solid var(--warn);padding-left:12px}
+.help-limits ul{margin:6px 0 0}
+.help-related{display:flex;flex-direction:column;gap:6px}
+.help-link{min-height:44px;padding:8px 4px;align-self:flex-start}
+.view .card{scroll-margin-top:72px}
+#tour{margin-bottom:12px}
+.tour-head{display:flex;align-items:center;justify-content:space-between;gap:8px}
+.tour-head .icon-btn{margin:-6px -8px -6px 0}
