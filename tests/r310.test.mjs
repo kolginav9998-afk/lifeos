@@ -288,7 +288,8 @@ test('«письмо себе на неделю» и уважение к «ум�
   assert.equal(tpl.title, 'Письмо себе на неделю');
   const text = templateText('weeklyletter', '2026-11-14');
   for (const q of ['Письмо себе: неделя с', 'Что было главным на этой неделе:', 'Чем я горжусь:', 'Что было трудным', 'Что хочу сделать иначе', 'Одно доброе слово себе:']) assert.ok(text.includes(q), q);
-  const css = fs.readFileSync(path.resolve(import.meta.dirname, '..', 'style.css'), 'utf8');
+  const rootDir = path.resolve(import.meta.dirname, '..');
+  const css = [...fs.readFileSync(path.join(rootDir, 'index.html'), 'utf8').matchAll(/href="(style[^"]*\.css)"/g)].map(m => fs.readFileSync(path.join(rootDir, m[1]), 'utf8')).join('\n');   // в порядке подключения
   assert.match(css, /@media \(prefers-reduced-motion: reduce\)\{\*,\*::before,\*::after\{animation-duration:\.01ms !important;[^}]*transition-duration:\.01ms !important;scroll-behavior:auto !important\}\}/, 'при «уменьшить движение» отключаются анимации и плавная прокрутка');
   assert.match(css, /prefers-reduced-motion: no-preference\)\{\.toast/, 'появление сообщения анимируется только если движение разрешено');
 });

@@ -7,7 +7,7 @@ set -euo pipefail
 cd "$(dirname "$0")/.."
 TARGET="${1:-web}"
 rm -rf dist && mkdir dist
-cp ./*.js index.html style.css manifest.webmanifest dist/
+cp ./*.js index.html ./style*.css manifest.webmanifest dist/
 cp -r icons dist/
 python3 - "$TARGET" <<'PY'
 import sys, os, json, hashlib

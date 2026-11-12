@@ -27,8 +27,15 @@ test('сетевых запросов нет нигде, кроме офлайн
   assert.ok(/origin\s*!==\s*location\.origin/.test(sw), 'sw.js должен пропускать чужие адреса мимо кэша');
 });
 
+test('каждая таблица стилей style*.css подключена в index.html (и только существующие)', () => {
+  const linked = [...read('index.html').matchAll(/<link rel="stylesheet" href="([^"]+)"/g)].map(m => m[1]);
+  const files = fs.readdirSync(root).filter(f => /^style.*\.css$/.test(f));
+  assert.deepEqual([...linked].sort(), [...files].sort(), 'таблицы стилей в папке и в index.html должны совпадать');
+  assert.equal(linked[0], 'style.css', 'основная таблица подключается первой, остальные её дополняют');
+});
+
 test('нет внешних адресов (http/https) в коде и разметке, кроме пространства имён SVG', () => {
-  for (const f of [...appJs, 'index.html', 'style.css', 'manifest.webmanifest']) {
+  for (const f of [...appJs, 'index.html', ...fs.readdirSync(root).filter(f => /^style.*\.css$/.test(f)), 'manifest.webmanifest']) {
     const text = read(f).replace(/\/\/.*$/gm, '');
     const urls = (text.match(/https?:\/\/[^\s'")]+/g) || []).filter(u => !u.startsWith('http://www.w3.org/2000/svg'));
     assert.deepEqual(urls, [], `${f}: внешние адреса`);

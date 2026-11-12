@@ -1,0 +1,44 @@
+/* Доступность и устойчивость вёрстки. Подключается после style-design.css. */
+/* ===== a11y ===== */
+/* Доступность и устойчивость вёрстки (R4.0). Здесь только то, что нужно для чтения с диктора, клавиатуры, мелкого экрана и крупного шрифта. */
+/* токены: текст на «зелёном» (в тёмной теме зелёный светлый, белый на нём не читается) и цвет кнопки в уведомлении (фон уведомления — --text, он меняется между темами) */
+:root{--on-ok:#fff;--toast-action:#b9adff}
+@media (prefers-color-scheme: dark){:root:not([data-theme=light]){--on-ok:#04170f;--toast-action:#4533cc}}
+:root[data-theme=dark]{--on-ok:#04170f;--toast-action:#4533cc}
+
+/* ссылка «Перейти к содержимому»: видна, только когда на ней фокус с клавиатуры; текст для диктора скрыт визуально */
+.sr-only{position:absolute;width:1px;height:1px;margin:-1px;padding:0;border:0;overflow:hidden;clip:rect(0 0 0 0);clip-path:inset(50%);white-space:nowrap}
+.skip-link{position:fixed;left:12px;top:-120px;z-index:100;padding:12px 18px;border-radius:14px;background:var(--text);color:var(--bg);font-weight:700;text-decoration:none;box-shadow:var(--shadow-lg)}
+.skip-link:focus,.skip-link:focus-visible{top:max(12px,env(safe-area-inset-top))}
+#view{scroll-margin-top:84px}
+
+/* кольцо фокуса у всего, что берёт фокус с клавиатуры (ссылки, «раскрывашки», блоки-кнопки), в обеих темах; заголовок экрана и окна получают фокус программно — без кольца */
+:focus-visible{outline:2px solid var(--accent);outline-offset:2px}
+input:focus-visible,select:focus-visible,textarea:focus-visible{outline-offset:1px}
+#title:focus,#view:focus,.overlay:focus{outline:none}
+
+/* цвета с достаточным контрастом в особых местах */
+.toast button{color:var(--toast-action)}
+.h-actions button.on{color:var(--on-ok)}
+.bp-day.full,.bp-day.full b{color:var(--on-ok)}
+.avatar,.avatar-btn{color:#050714}
+
+/* ===== устойчивость вёрстки: 320 px и шрифт 130 % ===== */
+/* шапка: на узком экране или при крупном шрифте кнопки уходят во вторую строку, а не за край */
+header.top{flex-wrap:wrap;row-gap:4px;justify-content:flex-end}
+header.top h1{flex:1 1 auto;min-width:0;overflow-wrap:anywhere}
+/* строки и сетки не шире экрана: лишнее переносится */
+.row{flex-wrap:wrap}
+.two,.grid2{grid-template-columns:repeat(auto-fit,minmax(min(100%,9.5rem),1fr))}
+.day-nav{flex-wrap:wrap}
+.day-nav input[type=date]{flex:1 1 7.5rem;min-width:0}
+.row>.pw-wrap{flex:1 1 10rem;min-width:0}
+.j-time,.j-kind{flex:none}
+.hist-row{grid-template-columns:minmax(3.6em,max-content) minmax(0,max-content) minmax(3.6em,max-content) minmax(0,1fr)}
+#app,.lock,.gate{overflow-wrap:break-word}
+.row .primary{white-space:normal}
+/* дневник: 14 точек настроения в один ряд на телефоне мельче 24 px (WCAG 2.5.8) — два ряда по 7, крупнее и удобнее для пальца */
+@media (max-width: 480px){.mood-strip{grid-template-columns:repeat(7,1fr)}.mood-dot{aspect-ratio:auto;min-height:32px}}
+/* пользовательский текст без пробелов не растягивает кнопки и строки итогов */
+.h-actions button,.chip,.result,.quiz-opt,.series-opt{overflow-wrap:anywhere}
+.cat-row{align-items:baseline}.cat-row>:first-child{min-width:0;overflow-wrap:anywhere}.cat-row>:last-child{flex:none;white-space:nowrap}

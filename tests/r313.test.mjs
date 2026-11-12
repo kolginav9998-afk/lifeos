@@ -9,7 +9,7 @@ import { APP_NAME } from '../config.js';
 
 const root = path.resolve(import.meta.dirname, '..');
 const read = f => fs.readFileSync(path.join(root, f), 'utf8');
-const css = read('style.css');
+const css = [...read('index.html').matchAll(/href="(style[^"]*\.css)"/g)].map(m => read(m[1])).join('\n');   // в порядке подключения, как в браузере
 
 // ---------- токены оформления ----------
 function tokens(block) {
