@@ -72,7 +72,7 @@ export function createTodayView({ go }) {
     const left = steps.filter(s => !s[2]).length;
     onboarding.hidden = getPref('onboardingDone') || left === 0 || !!getPref('simple');
     obList.replaceChildren(...steps.map(([id, text, done, act]) => el('li', { class: done ? 'done' : '', dataset: { step: id } },
-      el('span', { class: 'ob-mark', 'aria-hidden': 'true' }, done ? icon('check', 13) : null),
+      el('span', { class: 'ob-mark', 'aria-hidden': 'true' }, done ? icon('check', 13) : ''),
       done ? el('span', { textContent: text }) : el('button', { type: 'button', class: 'link', textContent: text, onclick: act }))));
   }
 
