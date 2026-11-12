@@ -556,3 +556,8 @@ header.top h1{flex:1 1 auto;min-width:0;overflow-wrap:anywhere}
 .hist-row{grid-template-columns:minmax(3.6em,max-content) minmax(0,max-content) minmax(3.6em,max-content) minmax(0,1fr)}
 #app,.lock,.gate{overflow-wrap:break-word}
 .row .primary{white-space:normal}
+/* дневник: 14 точек настроения в один ряд на телефоне мельче 24 px (WCAG 2.5.8) — два ряда по 7, крупнее и удобнее для пальца */
+@media (max-width: 480px){.mood-strip{grid-template-columns:repeat(7,1fr)}.mood-dot{aspect-ratio:auto;min-height:32px}}
+/* пользовательский текст без пробелов не растягивает кнопки и строки итогов */
+.h-actions button,.chip,.result,.quiz-opt,.series-opt{overflow-wrap:anywhere}
+.cat-row{align-items:baseline}.cat-row>:first-child{min-width:0;overflow-wrap:anywhere}.cat-row>:last-child{flex:none;white-space:nowrap}

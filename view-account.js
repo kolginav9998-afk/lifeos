@@ -232,7 +232,7 @@ export function createAccountView({ go, onVaultChange = () => {}, gate = false, 
   function profileSection() {
     const c = profileCard(store.state.events, account.info());
     pfAvatar = c.emoji; pfColor = c.color;
-    const avatarBtns = [el('button', { type: 'button', class: 'pf-avatar', dataset: { v: '' }, 'aria-pressed': String(!c.emoji), 'aria-label': 'Буквы имени', textContent: c.letters })]
+    const avatarBtns = [el('button', { type: 'button', class: 'pf-avatar', dataset: { v: '' }, 'aria-pressed': String(!c.emoji), 'aria-label': `Буквы имени: ${c.letters}`, textContent: c.letters })]
       .concat(AVATARS.map(a => el('button', { type: 'button', class: 'pf-avatar', dataset: { v: a }, 'aria-pressed': String(a === c.emoji), 'aria-label': `Значок ${a}`, textContent: a })));
     const swatches = Object.entries(COLORS).map(([k, hex]) => el('button', { type: 'button', class: 'pf-color', dataset: { v: k }, style: `--sw:${hex}`, 'aria-pressed': String(k === c.color), 'aria-label': `Цвет: ${COLOR_NAMES[k]}` }));
     const name = field('pf-name', { type: 'text', maxLength: 60, placeholder: 'Как к тебе обращаться', value: c.name, 'aria-label': 'Имя' });

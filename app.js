@@ -223,7 +223,7 @@ const gatePick = box => box.querySelector('h3') ?? box.querySelector('input,butt
 
 async function enterApp() {
   if (REQUIRE_ACCOUNT && !appSync.account.isLinked()) { await showGate(); return; }
-  const fromCover = $('lock').contains(document.activeElement) || $('gate').contains(document.activeElement);
+  const fromCover = !$('lock').hidden || !$('gate').hidden;                  // пароль или вход были на экране (кнопка уже заблокирована, поэтому по фокусу не определить)
   gateView = null;
   $('gate').hidden = true;
   $('lock').hidden = true;
