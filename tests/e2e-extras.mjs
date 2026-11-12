@@ -1,11 +1,11 @@
 import assert from 'node:assert/strict';
 import fs from 'node:fs';
-import { launch, tab, until } from './helpers.mjs';
+import { launch, tab, until, appReady } from './helpers.mjs';
 
 const t = await launch();
 const { page, errors } = t;
 await page.goto(t.url);
-await until(page, () => !document.getElementById('app').hidden);
+await appReady(page);
 const count = sel => page.locator(sel).count();
 const waitCount = (sel, n) => until(page, ([s, k]) => document.querySelectorAll(s).length === k, [sel, n]);
 const text = sel => page.textContent(sel);

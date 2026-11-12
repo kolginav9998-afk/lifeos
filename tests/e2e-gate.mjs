@@ -1,7 +1,7 @@
 // Вход обязателен: пока не вошёл в аккаунт, приложение не открывается. Данные на устройстве переживают регистрацию, выход и повторный вход.
 // Против настоящего сервера (Node + SQLite), сборка с включённым входом (в остальных тестах он отключён).
 import assert from 'node:assert/strict';
-import { launch, tab, until, newDevice } from './helpers.mjs';
+import { launch, tab, until, newDevice, appReady } from './helpers.mjs';
 import { createServer } from '../server/node/server.js';
 
 const PW = 'длинная-надёжная-фраза';
@@ -38,7 +38,7 @@ const code = await A.textContent('#gate-code');
 assert.match(code, /^[0-9A-Z]{4}(-[0-9A-Z]{4}){5}$/);
 assert.equal(await A.locator('#app').isHidden(), true, 'пока код восстановления не подтверждён, приложение закрыто');
 await A.check('#gate-code-ok'); await A.click('#gate-code-done');
-await until(A, () => !document.getElementById('app').hidden, null, 30000);
+await appReady(A, 30000);
 assert.equal(await A.locator('#gate').isHidden(), true);
 assert.equal(server.store.getAccount().username, 'владелец');
 
@@ -72,7 +72,7 @@ await A.reload();
 await until(A, () => !document.getElementById('lock').hidden);
 assert.equal(await A.locator('#gate').isHidden(), true, 'вход в аккаунт не просят: устройство уже привязано');
 await A.fill('#lock-input', PW); await A.click('#lock-btn');
-await until(A, () => !document.getElementById('app').hidden);
+await appReady(A);
 await until(A, () => document.getElementById('profile-btn').textContent.trim() === '🦊', null, 15000);          // профиль сохранился и подтянулся
 
 
@@ -81,7 +81,7 @@ await t.ctx.setOffline(true);
 await A.reload();
 await until(A, () => !document.getElementById('lock').hidden);
 await A.fill('#lock-input', PW); await A.click('#lock-btn');
-await until(A, () => !document.getElementById('app').hidden);
+await appReady(A);
 await t.ctx.setOffline(false);
 
 // ===== 4. Выход: снова экран входа, данные на устройстве остаются =====
@@ -95,7 +95,7 @@ await A.fill('#gate-user', 'владелец'); await A.fill('#gate-pass', 'не
 await until(A, () => /Неверное имя или пароль/.test(document.getElementById('toast').textContent));
 assert.equal(await A.locator('#app').isHidden(), true);
 await A.fill('#gate-pass', PW); await A.click('#gate-login');
-await until(A, () => !document.getElementById('app').hidden, null, 30000);
+await appReady(A, 30000);
 await until(A, () => [...document.querySelectorAll('.item .text')].some(n => n.textContent.endsWith('купить хлеб')));
 assert.equal((await A.textContent('#profile-btn')).trim(), '🦊');
 
@@ -105,7 +105,7 @@ await until(B.page, () => !document.getElementById('gate').hidden);
 assert.equal(await B.page.locator('#app').isHidden(), true);
 await until(B.page, () => document.getElementById('gate-login'));
 await B.page.fill('#gate-user', 'ВЛАДЕЛЕЦ'); await B.page.fill('#gate-pass', PW); await B.page.click('#gate-login');
-await until(B.page, () => !document.getElementById('app').hidden, null, 30000);
+await appReady(B.page, 30000);
 await until(B.page, () => [...document.querySelectorAll('.item .text')].some(n => n.textContent.endsWith('купить хлеб')), null, 20000);
 await until(B.page, () => document.getElementById('profile-btn').textContent.trim() === '🦊', null, 20000);
 

@@ -1,14 +1,14 @@
 // R3.11: бриф на день и итог дня, и другое из следующей партии.
 import assert from 'node:assert/strict';
-import { launch, tab, until } from './helpers.mjs';
+import { launch, tab, until, appReady, waitToast } from './helpers.mjs';
 
 const t = await launch({ ctxOptions: { permissions: ['clipboard-read', 'clipboard-write'] } });
 const { page, errors } = t;
 page.on('dialog', d => d.accept());
 await page.goto(t.url);
-await until(page, () => !document.getElementById('app').hidden);
+await appReady(page);
 const text = sel => page.textContent(sel);
-const toast = async re => until(page, r => new RegExp(r).test(document.getElementById('toast').textContent), re.source);
+const toast = re => waitToast(page, re);
 const clearToast = () => page.evaluate(async () => (await import('./ui.js')).clearToast());
 const evs = type => page.evaluate(async ty => (await import('./store.js')).state.events.filter(e => e.type === ty), type);
 
@@ -65,7 +65,7 @@ assert.match(await text('#review-variety'), /Пусто: /);
 await tab(page, 'today');
 assert.equal(await page.locator('#hint-tabs').count(), 0, 'пока окно одно, подсказки нет');
 const p2 = await t.ctx.newPage();
-await p2.goto(t.url); await until(p2, () => !document.getElementById('app').hidden);
+await p2.goto(t.url); await appReady(p2);
 await until(page, () => document.getElementById('hint-tabs'), null, 10000);
 assert.match(await text('#hint-tabs'), /Приложение открыто ещё в окнах: 1\. Записи из других окон подтягиваются сами/);
 // запись во втором окне появляется в первом без перезагрузки
@@ -74,7 +74,7 @@ await until(page, () => [...document.querySelectorAll('.item .text')].some(n => 
 assert.ok((await evs('task')).some(e => e.payload.text === 'Задача из второго окна'));
 await page.click('#hint-tabs .chip'); await until(page, () => !document.getElementById('hint-tabs'));
 await p2.evaluate(() => dispatchEvent(new Event('pagehide'))); await p2.close();
-await page.waitForTimeout(300);
+await until(page, async () => (await import('./tabguard.js')).tabState.others === 0);          // соседнее окно закрыто и это замечено
 
 // ---------- проверка целостности при запуске ----------
 await page.evaluate(async () => { const db = await import('./db.js'), st = await import('./store.js'), ev = await import('./events.js'); db.state.corrupt = ['a', 'b']; await st.save(ev.makeTask('Толчок для перерисовки', Date.now() + 88)); });

@@ -1,6 +1,6 @@
 // Обновление изнутри: проверка версии, кнопка «Обновить», разрешение на установку, ошибки. Нативный плагин и GitHub подменены.
 import assert from 'node:assert/strict';
-import { launch, tab, until } from './helpers.mjs';
+import { launch, tab, until, appReady } from './helpers.mjs';
 import { VERSION } from '../version.js';
 import { APK_LINK } from '../updater.js';
 
@@ -35,7 +35,7 @@ let asked = 0;
 await p.route('https://api.github.com/**', route => { asked++; route.fulfill({ status: reply.status, contentType: 'application/json', headers: { 'access-control-allow-origin': '*' }, body: JSON.stringify(reply.json ?? {}) }); });
 
 await p.goto(t.url);
-await until(p, () => !document.getElementById('app').hidden);
+await appReady(p);
 
 // ===== при запуске приложение само узнаёт о новой версии и говорит об этом один раз =====
 await until(p, () => /Доступна новая версия R3\.99/.test(document.getElementById('toast').textContent), null, 10000);

@@ -1,16 +1,15 @@
 import assert from 'node:assert/strict';
 import { VERSION } from '../version.js';
 import fs from 'node:fs';
-import { launch, tab, until, rawDisk } from './helpers.mjs';
+import { launch, tab, until, rawDisk, appReady, waitText, waitToast } from './helpers.mjs';
 
 const t = await launch();
 const { page, errors } = t;
 await page.goto(t.url);
-await until(page, () => !document.getElementById('app').hidden);
+await appReady(page);
 const count = sel => page.locator(sel).count();
 const waitCount = (sel, n) => until(page, ([s, k]) => document.querySelectorAll(s).length === k, [sel, n]);
 const text = sel => page.textContent(sel);
-const toastText = async () => { await page.waitForSelector('#toast:not([hidden])'); return text('#toast'); };
 
 // ---------- приветствие ----------
 assert.equal(await page.locator('#onboarding').isVisible(), true, 'для нового пользователя виден онбординг');
@@ -36,7 +35,7 @@ assert.match(await text('#summary'), /Привычки: 1\/1/);
 await tab(page, 'habits');
 await page.click('.h-min');                                  // повторное нажатие снимает отметку
 await until(page, () => !document.querySelector('.h-min.on'));
-assert.match(await toastText(), /Отметка снята/);
+await waitToast(page, /Отметка снята/);
 await page.click('#toast button');                           // «Вернуть»
 await until(page, () => document.querySelector('.h-min.on'));
 await page.click('.h-full');                                 // полная версия заменяет минимум
@@ -64,7 +63,7 @@ await waitCount('#habit-list .habit', 1);
 await page.click('.habit .more summary');                    // удаление с отменой
 await page.click('.habit .del-habit');
 await waitCount('.habit', 0);
-assert.match(await toastText(), /Привычка удалена/);
+await waitToast(page, /Привычка удалена/);
 await page.click('#toast button');
 await waitCount('.habit', 1);
 assert.equal(await count('.h-cal .dot.full'), 1, 'отметки вернулись вместе с привычкой');
@@ -86,7 +85,7 @@ assert.equal(await count('#cats .cat'), 2);
 assert.match(await text('#cats'), /Жильё[\s\S]*96%/);
 await page.fill('#exp-amount', 'abc');                       // неверная сумма
 await page.press('#exp-amount', 'Enter');
-assert.match(await toastText(), /Сумма: например/);
+await waitToast(page, /Сумма: например/);
 assert.equal(await count('#exp-list .item'), 2);
 await page.fill('#exp-amount', '');
 
@@ -125,7 +124,7 @@ assert.ok(csvText.includes(';2000,00;Еда;хлеб'));
 
 await page.locator('#exp-list .item', { hasText: 'Жильё' }).locator('.del').click();   // удаление с отменой
 await waitCount('#exp-list .item', 1);
-assert.match(await toastText(), /Расход удалён/);
+await waitToast(page, /Расход удалён/);
 await page.click('#toast button');
 await waitCount('#exp-list .item', 2);
 
@@ -147,7 +146,7 @@ await until(page, () => document.querySelector('.note-title')?.textContent === '
 await page.click('.note');
 await page.click('form.editing .danger');
 await waitCount('.note', 0);
-assert.match(await toastText(), /Заметка удалена/);
+await waitToast(page, /Заметка удалена/);
 await page.click('#toast button');
 await waitCount('.note', 1);
 
@@ -193,8 +192,8 @@ await page.reload();
 assert.equal(await page.evaluate(() => document.documentElement.getAttribute('data-theme')), 'dark', 'тема сохраняется');
 await page.selectOption('#theme-select', 'auto');
 assert.equal(await page.evaluate(() => document.documentElement.getAttribute('data-theme')), null);
-assert.match(await text('#stats'), /задачи|привычки/);
-assert.match(await text('#stats'), /расходы: 2/);
+await waitText(page, '#stats', /задачи|привычки/);          // после перезагрузки сводка появляется вместе с данными
+await waitText(page, '#stats', /расходы: 2/);
 assert.match(await text('#diag'), new RegExp(`Версия ${VERSION.replace('.', '\\.')}`));
 assert.match(await text('#diag'), /Запуск №\d+/);
 assert.match(await text('#diag'), /Пароль: не задан/);
@@ -205,7 +204,7 @@ await until(page, () => /тестовая ошибка/.test(document.getElement
 assert.match(await text('#diag'), /Последние ошибки:[\s\S]*ошибка: тестовая ошибка/, 'ошибки попадают в диагностику');
 
 assert.match(await text('#remind-box'), /только в приложении для Android/, 'на сайте напоминания недоступны и это объяснено');
-assert.match(await text('#stats'), /Последняя копия: ещё не делал/);
+await waitText(page, '#stats', /Последняя копия: ещё не делал/);
 await tab(page, 'today');
 assert.equal(await page.locator('#backup-chip').isVisible(), true, 'много данных и нет копии — предложение сделать копию');
 await tab(page, 'more');
@@ -238,7 +237,7 @@ assert.equal(await page.locator('#wipe-btn').isDisabled(), true);
 await page.fill('#wipe-confirm', 'стереть');
 assert.equal(await page.locator('#wipe-btn').isDisabled(), false);
 await Promise.all([page.waitForNavigation(), page.click('#wipe-btn')]);
-await until(page, () => !document.getElementById('app').hidden);
+await appReady(page);
 const disk = await rawDisk(page);
 assert.deepEqual(disk.idb, [], 'IndexedDB пуст');
 assert.ok(!disk.ls || disk.ls === '[]', 'копия в localStorage пуста');

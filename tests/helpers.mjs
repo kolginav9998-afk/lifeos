@@ -191,6 +191,15 @@ export async function eventually(read, check, timeout = 5000) {
   }
 }
 
+// Повторить действие целиком, если перерисовка экрана «съела» его на полпути (например, закрыла только что раскрытый блок). Ошибка последней попытки уходит наружу.
+export async function retry(fn, timeout = 8000) {
+  const end = Date.now() + timeout * SCALE;
+  for (;;) {
+    try { return await fn(); }
+    catch (e) { if (Date.now() >= end) throw e; await new Promise(r => setTimeout(r, 100)); }
+  }
+}
+
 // Прочитать «сырые» данные из IndexedDB и localStorage — то, что реально лежит на диске.
 export async function rawDisk(page) {
   return page.evaluate(async () => {
