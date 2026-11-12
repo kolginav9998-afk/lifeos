@@ -118,7 +118,7 @@ export default [
       'Вопросительные слова what (что), who (кто), where (где) читаются целиком. What is it? Who is he? Where is the cat? Фраза Do you like tea? пока учится целиком: Yes, I do. No, I do not.',
     ], task: 'Задай вслух пять вопросов о вещах вокруг: Is it a book? Is it big? Where is the cup? Ответь на каждый.',
     table: [['Вопрос', 'Ответ да', 'Ответ нет'], ['Is it a cat?', 'Yes, it is.', 'No, it is not.'], ['Are you sad?', 'Yes, I am.', 'No, I am not.'], ['Do you like tea?', 'Yes, I do.', 'No, I do not.']],
-    cards: [['what', 'уот: что'], ['who', 'ху: кто'], ['where', 'уэр: где'], ['Is it a cat?', 'Это кошка?'], ['No, it is not.', 'Нет, это не так']],
+    cards: [['what', 'уат: что'], ['who', 'ху: кто'], ['where', 'уэр: где'], ['Is it a cat?', 'Это кошка?'], ['No, it is not.', 'Нет, это не так']],
     drills: [
       S('Он грустный? (вопрос)', 'Is', 'he', 'sad'), S('Вы большие? (вопрос)', 'Are', 'you', 'big'), S('Что это?', 'What', 'is', 'it'), S('Где кошка?', 'Where', 'is', 'the', 'cat'),
       S('Он не грустный', 'He', 'is', 'not', 'sad'), S('Я не большой', 'I', 'am', 'not', 'big'),
@@ -135,11 +135,11 @@ export default [
     words: ['Tom', 'Ann', 'Sam', 'Max', 'name', 'hi', 'your', 'his', 'him'],
     body: [
       'Предложение начинается с заглавной буквы и заканчивается знаком: точкой (.), вопросительным (?) или восклицательным (!). Имена (Tom, Ann, Max) и слово I тоже пишутся с заглавной. Остальные слова — строчными.',
-      'Слова hi («привет»), your («твой») и his («его») читаются целиком: hi — «хай», your — «ё», his — «хиз». Знакомство: Hi! I am Tom. What is your name? My name is Ann.',
+      'Слова hi («привет»), your («твой») и his («его») читаются целиком: hi — «хай», your — «ёр», his — «хиз». Знакомство: Hi! I am Tom. What is your name? My name is Ann.',
       'Вот мини-диалог. Ann: Hi! I am Ann. What is your name? Tom: Hi, Ann! I am Tom. Ann: Is this a cat? Tom: Yes, it is. It is my cat. His name is Max. Прочитай его вслух по ролям.',
     ], task: 'Прочитай диалог из урока вслух по ролям, потом замени имена на свои и расскажи про свою кошку или собаку.',
     table: [['Знак', 'Где стоит', 'Пример'], ['.', 'в конце обычного предложения', 'My name is Tom.'], ['?', 'в конце вопроса', 'What is your name?'], ['!', 'после приветствия или сильного чувства', 'Hi!'], ['Заглавная', 'начало предложения, имена, слово I', 'I am Ann.']],
-    cards: [['hi', 'хай: привет'], ['your', 'ё: твой'], ['his', 'хиз: его'], ['What is your name?', 'Как тебя зовут?'], ['My name is Tom.', 'Меня зовут Том']],
+    cards: [['hi', 'хай: привет'], ['your', 'ёр: твой'], ['his', 'хиз: его'], ['What is your name?', 'Как тебя зовут?'], ['My name is Tom.', 'Меня зовут Том']],
     drills: [
       choose('Какое предложение написано правильно?', 'My name is Tom.', ['my name is tom.', 'My name is tom'], { explain: 'Начало предложения и имя — с заглавной буквы, в конце точка.' }),
       choose('Какой знак ставим в конце вопроса?', 'Знак вопроса: ?', ['Точка', 'Запятая']),
