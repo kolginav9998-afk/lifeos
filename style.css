@@ -527,7 +527,7 @@ details[open]>summary::after{transform:rotate(-135deg) translateY(-1px)}
 .help-limits{border-left:3px solid var(--warn);padding-left:12px}
 .help-limits ul{margin:6px 0 0}
 .help-related{display:flex;flex-direction:column;gap:6px}
-.help-link{min-height:44px;padding:8px 4px}
+.help-link{min-height:44px;padding:8px 4px;align-self:flex-start}
 .view .card{scroll-margin-top:72px}
 #tour{margin-bottom:12px}
 .tour-head{display:flex;align-items:center;justify-content:space-between;gap:8px}
