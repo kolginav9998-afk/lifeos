@@ -3,6 +3,7 @@
 import { withShowcase } from './zero-he-kit.js';
 import partA from './zero-he-a.js';
 import partB from './zero-he-b.js';
+import partC from './zero-he-c.js';
 
 export default {
   id: 'hezero', title: 'Иврит: письмо и чтение с нуля', icon: 'אב', color: '#0e7490', zero: true, lang: 'hebrew', branch: 'modern', after: 'hebrew',
@@ -33,5 +34,5 @@ export default {
     'Общие правила письма и чтения современного иврита (правила Академии языка иврита о буквах и огласовках), изложены своими словами',
     'Привычный порядок ульпанов и букварей «буквы → огласовки → слоги → слова»; все упражнения и примеры написаны заново',
   ],
-  lessons: [...partA, ...partB].map(withShowcase),
+  lessons: [...partA, ...partB, ...partC].map(withShowcase),
 };
