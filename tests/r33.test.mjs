@@ -1,3 +1,4 @@
+import { APP_NAME } from '../config.js';
 import test from 'node:test';
 import assert from 'node:assert/strict';
 import { weekReview } from '../review.js';
@@ -40,7 +41,7 @@ test('напоминания: вечерняя отметка и повторе�
   const on = planReminders([], NOW, { taskHour: -1, habitHour: -1, eveningHour: 21 });
   assert.equal(on.length, 14);
   assert.equal(on[0].id, EVENING_ID_BASE); assert.equal(on[0].at, atLocal(TODAY, 21));
-  assert.ok(on.every(x => x.title === 'Life OS' && !/\d{2}:\d{2}/.test(x.body)));
+  assert.ok(on.every(x => x.title === APP_NAME && !/\d{2}:\d{2}/.test(x.body)));
   const marked = planReminders([makeCheckin('e', TODAY, { mood: 4 }, '', NOW)], NOW, { taskHour: -1, habitHour: -1, eveningHour: 21 });
   assert.equal(marked.length, 13); assert.equal(marked[0].id, EVENING_ID_BASE + 1);
   const late = planReminders([], new Date(2026, 10, 10, 22).getTime(), { taskHour: -1, habitHour: -1, eveningHour: 21 });

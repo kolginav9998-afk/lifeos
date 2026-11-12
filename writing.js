@@ -1,4 +1,5 @@
 // Письмо: счёт слов, серия записей дневника, «свободное письмо» (текст без остановки) и книга года.
+import { APP_NAME } from './config.js';
 import { addDays } from './events.js';
 import { makeDiary, diaryOf, hashtags } from './diary.js';
 
@@ -42,7 +43,7 @@ export function yearBook(events, year, now = Date.now()) {
   const y = String(year);
   const list = diaryEntries(events).filter(e => e.payload.date.startsWith(y + '-'));
   const words = list.reduce((s, e) => s + wordCount(e.payload.text), 0);
-  const L = [`# Книга года ${y}`, '', `_Собрано из дневника Life OS. Записей: ${list.length}, слов: ${words}._`, ''];
+  const L = [`# Книга года ${y}`, '', `_Собрано из дневника «${APP_NAME}». Записей: ${list.length}, слов: ${words}._`, ''];
   if (!list.length) { L.push('_В этом году записей нет._', ''); return L.join('\n'); }
   const tagCount = new Map();
   for (const e of list) for (const t of e.payload.tags ?? hashtags(e.payload.text)) tagCount.set(t, (tagCount.get(t) || 0) + 1);

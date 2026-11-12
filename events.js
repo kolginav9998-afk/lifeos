@@ -2,6 +2,7 @@
 // Поля source/confidence/evidence есть с первого дня (контроль достоверности).
 // Даты — локальные строки 'YYYY-MM-DD' (без часовых поясов, чтобы "10-е число" было 10-м).
 
+import { APP_NAME } from './config.js';
 import { MIGRATIONS, migrateEvents } from './migrate.js';
 export const SCHEMA_VERSION = 1;
 export const REPEAT_TYPES = ['daily', 'weekly', 'monthly'];
@@ -203,10 +204,10 @@ export function parseImport(text, { schemaVersion = SCHEMA_VERSION, migrations =
   let data;
   try { data = JSON.parse(text); } catch { throw new Error('Это не JSON-файл'); }
   if (!data || data.app !== 'lifeos' || !Array.isArray(data.events)) {
-    throw new Error('Это не резервная копия Life OS');
+    throw new Error(`Это не резервная копия «${APP_NAME}»`);
   }
   const from = Number.isFinite(data.schema) ? data.schema : 1;           // у самых первых копий поля schema нет
-  if (from > schemaVersion) throw new Error('Копия сделана более новой версией Life OS. Обнови приложение и восстанови копию снова.');
+  if (from > schemaVersion) throw new Error(`Копия сделана более новой версией «${APP_NAME}». Обнови приложение и восстанови копию снова.`);
   if (data.events.length > MAX_IMPORT_EVENTS) throw new Error('Слишком много записей в файле');
   const valid = [];
   let skipped = 0;

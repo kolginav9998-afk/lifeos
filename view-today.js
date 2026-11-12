@@ -1,3 +1,4 @@
+import { APP_NAME } from './config.js';
 import { el, fill, toast, dateRu, moneyText, weekdayOf, ring } from './ui.js';
 import { makeTask, updateTask, completeTask, reopenTask, groupTasks, todayStr, addDays, dueLabel, repeatLabel, profileOf } from './events.js';
 import { parseQuick } from './quick.js';
@@ -53,7 +54,7 @@ export function createTodayView({ go }) {
 
   const obList = el('ul', { class: 'steps', id: 'ob-steps' });
   const onboarding = el('div', { id: 'onboarding', class: 'card', hidden: true },
-    el('strong', { textContent: 'Добро пожаловать в Life OS' }),
+    el('strong', { textContent: `Добро пожаловать в «${APP_NAME}»` }),
     el('p', { class: 'muted', textContent: 'Пять шагов, чтобы приложение начало работать на тебя. Данные хранятся только у тебя, шифруются на устройстве.' }),
     obList,
     el('div', { class: 'row' }, el('button', { type: 'button', textContent: 'Понятно', onclick: () => { setPref('onboardingDone', true); onboarding.hidden = true; } })));
