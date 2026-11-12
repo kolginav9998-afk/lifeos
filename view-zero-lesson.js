@@ -166,7 +166,7 @@ export function runSequence(box, items, { seed = 0, lang = 'english', label = '�
 const foreignPart = cells => { for (const c of [...cells].reverse()) { const t = speakable(c); if ((HE.test(t) || LAT.test(t)) && !CYR.test(t)) return t; } return ''; };
 function tableNode(rows) {
   const [head, ...rest] = rows;
-  const cell = (tag, c) => el(tag, tag === 'th' ? { scope: 'col' } : {}, ...rich(c));
+  const cell = (tag, c) => el(tag, { ...(tag === 'th' ? { scope: 'col' } : {}), ...textProps(c) }, ...rich(c));          // ячейка целиком на иврите читается справа налево
   const says = rest.map(foreignPart), withSay = says.some(Boolean);
   const sayCell = t => el('td', {}, t ? el('button', { type: 'button', class: 'chip zero-say', 'aria-label': `Послушать: ${t}`, onclick: () => sayText(t, HE.test(t) ? 'hebrew' : 'english') }, icon('volume', 16)) : null);
   return el('div', { class: 'zero-table-wrap', tabIndex: 0, role: 'region', 'aria-label': 'Таблица-шпаргалка' },
