@@ -1,4 +1,4 @@
-import { el, toast, dateRu, icon, moneyText } from './ui.js';
+import { el, toast, dateRu, icon, moneyText, pressable } from './ui.js';
 import { todayStr } from './events.js';
 import { makeEntry, updateExpense, summarizeMonth, shiftMonth, monthLabel, monthOf, categoriesUsed, makeBudget, budgetOf, parseAmount,
   monthTotals, balanceOfMonth, frequentEntries, KINDS, unusualExpense, unusualText } from './money.js';
@@ -41,7 +41,7 @@ export function createMoneyView({ exportCsv }) {
     try { await store.save(makeBudget(parseAmount(budgetInput.value))); budgetForm.hidden = true; budgetInput.value = ''; }
     catch (err) { toast(err.message); }
   };
-  const budgetBtn = el('button', { type: 'button', id: 'budget-btn', class: 'link', textContent: 'Бюджет', onclick: () => { budgetForm.hidden = !budgetForm.hidden; if (!budgetForm.hidden) budgetInput.focus(); } });
+  const budgetBtn = el('button', { type: 'button', id: 'budget-btn', class: 'link', textContent: 'Бюджет', 'aria-expanded': 'false', onclick: () => { budgetForm.hidden = !budgetForm.hidden; budgetBtn.setAttribute('aria-expanded', String(!budgetForm.hidden)); if (!budgetForm.hidden) budgetInput.focus(); } });
   const budgetRow = el('div', { class: 'row' }, budgetBtn);
   const cats = el('div', { id: 'cats', class: 'cats' });
   const chart = el('div', { id: 'month-chart', class: 'bars' });
@@ -54,7 +54,7 @@ export function createMoneyView({ exportCsv }) {
   category.setAttribute('list', 'exp-cats');
   const catList = el('datalist', { id: 'exp-cats' });
   const note = el('input', { id: 'exp-note', type: 'text', placeholder: 'Комментарий (необязательно)', maxLength: 200, autocomplete: 'off' });
-  const date = el('input', { id: 'exp-date', type: 'date', value: todayStr() });
+  const date = el('input', { id: 'exp-date', type: 'date', value: todayStr(), 'aria-label': 'Дата' });
   const formTitle = el('strong');
   const submit = el('button', { type: 'submit', class: 'primary' });
   const cancel = el('button', { type: 'button', class: 'cancel', textContent: 'Отмена', hidden: true, onclick: () => { stopEdit(); render(); } });
@@ -158,9 +158,9 @@ export function createMoneyView({ exportCsv }) {
 
     list.replaceChildren(...s.items.map(ev => {
       const p = ev.payload;
-      const body = el('div', { class: 'body', tabIndex: 0, role: 'button', 'aria-label': `Изменить ${K().label.toLowerCase()}`, onclick: () => startEdit(ev), onkeydown: e => { if (e.key === 'Enter') startEdit(ev); } },
+      const body = pressable(el('div', { class: 'body' },
         el('span', { class: 'text', textContent: p.category + (p.note ? ' — ' + p.note : '') }),
-        el('span', { class: 'meta', textContent: dateRu(p.date) }));
+        el('span', { class: 'meta', textContent: dateRu(p.date) })), () => startEdit(ev));
       return el('li', { class: 'item exp' }, body, el('strong', { class: 'amount' + (isExp ? '' : ' plus'), textContent: (isExp ? '' : '+') + moneyText(p.amountMinor) }),
         el('button', { class: 'del', type: 'button', textContent: '✕', 'aria-label': `Удалить ${K().label.toLowerCase()}`, onclick: () => remove(ev) }));
     }));

@@ -126,7 +126,8 @@ export function createHabitsView() {
       if (st.neverMissTwice || st.needsRecovery) c.append(el('p', { class: 'muted h-support', textContent: supportPhrase(h.id, today) }));
     }
     c.append(el('div', { class: 'h-stats muted', textContent: `Серия: ${st.streak} · Лучшая: ${st.longest} · Регулярность за 30 дн.: ${pct(st.consistency)} (${st.hits} из ${st.span})` }));
-    const cal = el('div', { class: 'h-cal', 'aria-label': 'Последние 4 недели' }, ...habitCalendar(h, events, today, 28).map(d =>
+    const days28 = habitCalendar(h, events, today, 28);
+    const cal = el('div', { class: 'h-cal', role: 'img', 'aria-label': `Последние 4 недели: полностью ${days28.filter(d => d.level === 'full').length}, минимум ${days28.filter(d => d.level === 'min').length} дн.` }, ...days28.map(d =>
       el('span', { class: `dot ${d.level || ''}${d.before ? ' before' : ''}${d.today ? ' today' : ''}${d.off ? ' off' : ''}`, title: d.date })));
     c.append(cal);
     const more = el('details', { class: 'more' }, el('summary', { textContent: 'Ещё' }),

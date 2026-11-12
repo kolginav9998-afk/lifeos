@@ -1,4 +1,4 @@
-import { el, fill, toast, dateRu, moneyText, weekdayOf, ring } from './ui.js';
+import { el, fill, toast, dateRu, moneyText, weekdayOf, ring, pressable } from './ui.js';
 import { makeTask, updateTask, completeTask, reopenTask, groupTasks, todayStr, addDays, dueLabel, repeatLabel, profileOf } from './events.js';
 import { parseQuick } from './quick.js';
 import { getPref, setPref } from './prefs.js';
@@ -86,7 +86,7 @@ export function createTodayView({ go }) {
       el('button', { type: 'button', class: 'link', 'aria-label': 'Скрыть слово дня', textContent: 'скрыть', onclick: () => { setPref('wotdHidden', today); wotd.hidden = true; } })),
       ...rows.map(w => {
         const back = el('span', { class: 'muted', hidden: true, textContent: ` — ${w.back}` });
-        const btn = el('button', { type: 'button', class: 'link wotd-show', dataset: { track: w.track }, textContent: w.front, onclick: () => { back.hidden = !back.hidden; } });
+        const btn = el('button', { type: 'button', class: 'link wotd-show', dataset: { track: w.track }, textContent: w.front, 'aria-expanded': 'false', onclick: () => { back.hidden = !back.hidden; btn.setAttribute('aria-expanded', String(!back.hidden)); } });
         return el('p', { class: 'wotd-row', dataset: { track: w.track } }, btn, back);
       }));
   }
@@ -261,7 +261,7 @@ export function createTodayView({ go }) {
   const review = el('details', { id: 'review', class: 'card' }, el('summary', { textContent: 'Итоги недели' }), reviewBody);
 
   // ----- журнал дня -----
-  const jDate = el('input', { id: 'journal-date', type: 'date', value: todayStr() });
+  const jDate = el('input', { id: 'journal-date', type: 'date', value: todayStr(), 'aria-label': 'Дата записи в журнале' });
   const jList = el('ul', { id: 'journal-list', class: 'journal' });
   const journal = el('details', { id: 'journal', class: 'card' }, el('summary', { textContent: 'Журнал дня' }),
     el('div', { class: 'row' }, jDate, el('button', { type: 'button', textContent: 'Сегодня', onclick: () => { jDate.value = todayStr(); renderJournal(); } })), jList);
@@ -360,10 +360,7 @@ export function createTodayView({ go }) {
     if (rl) meta.push(document.createTextNode((meta.length ? ' · ' : '') + '↻ ' + rl));
     const body = el('div', { class: 'body' }, el('span', { class: 'text', textContent: (p.priority === 'high' && !p.done ? '★ ' : '') + p.text }));
     if (!p.done) {
-      body.tabIndex = 0; body.setAttribute('role', 'button'); body.setAttribute('aria-label', 'Изменить: ' + p.text);
-      const edit = () => { editingId = ev.id; editorEl = null; render(); };
-      body.onclick = edit;
-      body.onkeydown = e => { if (e.key === 'Enter') edit(); };
+      pressable(body, () => { editingId = ev.id; editorEl = null; render(); });          // имя кнопки — её видимый текст (название дела и срок)
     }
     if (meta.length) body.append(el('span', { class: 'meta' }, ...meta));
     const del = el('button', { class: 'del', type: 'button', textContent: '✕', 'aria-label': 'Удалить', onclick: () => removeTask(ev) });
