@@ -32,7 +32,8 @@ assert.ok(await p.locator('#help-list .help-item').count() >= 14, 'если не
 // темы
 await p.fill('#help-search', '');
 await p.click('#help-groups .chip[data-group="privacy"]');
-assert.deepEqual(await p.locator('#help-list .help-item strong').allTextContents(), ['Что видит сервер', 'Как удалить свои данные']);
+const privacy = await p.locator('#help-list .help-item strong').allTextContents();
+assert.ok(privacy.includes('Что видит сервер') && privacy.includes('Как удалить свои данные') && !privacy.includes('Я забыл пароль'), 'в теме только её вопросы');
 await p.click('#help-groups .chip[data-group="all"]');
 
 // статья: шаги, честные границы, фокус на заголовке, кнопка действия

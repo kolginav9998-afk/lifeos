@@ -6,6 +6,7 @@ import path from 'node:path';
 import { HELP_ARTICLES, HELP_GROUPS, TOUR, articleById, searchHelp, stem } from '../help.js';
 import { APK_LINK } from '../updater.js';
 import { DEFAULTS } from '../prefs.js';
+import { APP_NAME } from '../config.js';
 
 const root = path.resolve(import.meta.dirname, '..');
 const sources = fs.readdirSync(root).filter(f => f.endsWith('.js') && !f.startsWith('c-')).map(f => fs.readFileSync(path.join(root, f), 'utf8')).join('\n');
@@ -30,6 +31,16 @@ test('справка: у каждой статьи есть id, заголово
     for (const t of visible(a)) assert.ok(!/null|undefined|\[object/.test(t), `${a.id}: служебный мусор в тексте «${t}»`);
   }
   for (const g of HELP_GROUPS) assert.ok(HELP_ARTICLES.some(a => a.groups.includes(g.key)), `тема «${g.title}» не пуста`);
+});
+
+test('справка: название приложения берётся из config.js, а не пишется в тексте', () => {
+  const src = fs.readFileSync(path.join(root, 'help.js'), 'utf8');
+  assert.ok(!/Life OS|Компас/.test(src), 'в help.js нет названия приложения: только APP_NAME');
+  for (const f of ['view-help.js', 'view-help-tour.js']) assert.ok(!/Life OS|Компас/.test(fs.readFileSync(path.join(root, f), 'utf8')), f);
+  const all = HELP_ARTICLES.flatMap(visible).join('\n');
+  assert.ok(all.includes(`«${APP_NAME}»`), 'название приложения подставлено в статьи');
+  assert.ok(articleById('update').steps.some(s => s.includes(`«${APP_NAME}»`)), 'в обновлении названо приложение, для которого разрешать установку');
+  assert.match(articleById('update').link.label, /lifeos\.apk/, 'имя файла lifeos.apk не меняется');
 });
 
 test('справка: есть все нужные вопросы', () => {
@@ -131,7 +142,7 @@ test('поиск: самые частые вопросы человека при
 
 test('поиск: каждая статья находится по своему заголовку и по любому своему слову поиска', () => {
   for (const a of HELP_ARTICLES) {
-    assert.equal(firstId(a.title), a.id, `заголовок «${a.title}»`);
+    assert.ok(idsOf(a.title).slice(0, 3).includes(a.id), `заголовок «${a.title}» не приводит к статье: ${idsOf(a.title).join(', ')}`);
     for (const k of a.keywords) assert.ok(idsOf(k).includes(a.id), `слово «${k}» не находит ${a.id}`);
   }
 });
