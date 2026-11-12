@@ -103,7 +103,9 @@ export const sylQ = (c, m, cons, marks) => {
 };
 export const bySylQ = (c, m, cons, marks) => {
   const other = marks.find(x => SOUND[x] !== SOUND[m]);
-  const wrong = uniq([syl(nearC(c, cons)[0], m), other ? syl(c, other) : syl(nearC(c, cons)[1], m), syl(nearC(c, cons)[1], m)]).filter(x => x !== syl(c, m)).slice(0, 2);
+  const near = nearC(c, cons);
+  const pairs = [[near[0], m], other ? [c, other] : [near[1], m], [near[1], m]].filter(([x, y]) => x && sylRead(x, y) !== sylRead(c, m));
+  const wrong = uniq(pairs.map(([x, y]) => syl(x, y))).filter(x => x !== syl(c, m)).slice(0, 2);
   return choose(`Какой слог читается «${sylRead(c, m)}»?`, syl(c, m), wrong, { explain: `«${sylRead(c, m)}» это ${syl(c, m)}.` });
 };
 export const typedSylQ = (c, m) => typed('Прочитай слог и впиши по-русски.', [sylRead(c, m)], { big: syl(c, m), hint: `Согласная «${CONS[c] || 'не звучит'}», гласная «${SOUND[m]}».` });

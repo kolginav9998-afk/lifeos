@@ -40,15 +40,18 @@ export const nm = c => LET[c][0];
 export const snd = c => LET[c][1];
 export const hook = c => LET[c][2];
 const uniq = a => [...new Set(a)];
-const cand = (c, known) => uniq([...LET[c][3], ...LET[c][4], ...known]).filter(x => x !== c && LET[x] && [...known].includes(x));
+// какие звуки может давать буква (для честных вариантов ответа: неверный вариант не должен быть тоже верным)
+const PH = { 'א': '_', 'ע': '_', 'ב': 'бв', 'ג': 'г', 'ד': 'д', 'ה': 'h', 'ו': 'в', 'ז': 'з', 'ח': 'х', 'ט': 'т', 'י': 'й', 'כ': 'кх', 'ל': 'л', 'מ': 'м', 'נ': 'н', 'ס': 'с', 'פ': 'пф', 'צ': 'ц', 'ק': 'к', 'ר': 'р', 'ש': 'шс', 'ת': 'т', 'ך': 'х', 'ם': 'м', 'ן': 'н', 'ף': 'ф', 'ץ': 'ц' };
+const clash = (a, b) => [...PH[a]].some(p => PH[b].includes(p));
+const cand = (c, known) => uniq([...LET[c][3], ...LET[c][4], ...[...known].reverse()]).filter(x => x !== c && LET[x] && [...known].includes(x));
 export const wrongNames = (c, known, k = 2) => uniq(cand(c, known).map(nm)).filter(x => x !== nm(c)).slice(0, k);
-export const wrongSounds = (c, known, k = 2) => uniq([...LET[c][5], ...cand(c, known).map(snd)]).filter(x => x !== snd(c) && !(c === 'ה' && x === 'молчит')).slice(0, k);   // у хей «молчит» в конце слова: не делаем это неверным вариантом
+export const wrongSounds = (c, known, k = 2) => uniq([...LET[c][5], ...cand(c, known).filter(x => !clash(c, x)).map(snd)]).filter(x => x !== snd(c) && !(c === 'ה' && x === 'молчит')).slice(0, k);   // у хей «молчит» в конце слова: не делаем это неверным вариантом
 
 // ===== Генераторы заданий по буквам
 export const nameQ = (c, known) => choose('Как называется эта буква?', nm(c), wrongNames(c, known), { big: c, explain: `${nm(c)}: ${hook(c)}.` });
 export const findQ = (c, known) => choose(`Какая буква называется «${nm(c)}»?`, c, cand(c, known).slice(0, 2), { explain: `${nm(c)}: ${hook(c)}.` });
 export const soundQ = (c, known) => choose('Какой звук у этой буквы?', snd(c), wrongSounds(c, known), { big: c, explain: `${nm(c)}: ${snd(c)}.` });
-export const bySoundQ = (c, known) => choose(`Выбери букву со звуком: ${snd(c)}`, c, cand(c, known).filter(x => snd(x) !== snd(c)).slice(0, 2), { explain: `${nm(c)}: ${snd(c)}.` });
+export const bySoundQ = (c, known) => choose(`Выбери букву со звуком: ${snd(c)}`, c, cand(c, known).filter(x => !clash(c, x)).slice(0, 2), { explain: `${nm(c)}: ${snd(c)}.` });
 export const typedQ = c => BASE[c]
   ? typed('Впиши название обычной буквы, от которой образована эта конечная форма.', [nm(BASE[c]), ...LET[BASE[c]][6]], { big: c, hint: 'Конечная форма похожа на обычную букву, но уходит под строку или закрыта.' })
   : typed('Впиши название буквы по-русски.', [nm(c), ...LET[c][6]], { big: c, hint: `Название начинается на «${nm(c)[0]}».` });

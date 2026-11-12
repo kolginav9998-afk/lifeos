@@ -7,6 +7,7 @@ import { TRACKS, validateTrack, lessonGoal } from '../academy.js';
 import { lessonIndex, graphProblems, validateZeroTrack, scopeOf, hebrewWordProblems, GRADED, checkOf } from '../zero-kit.js';
 import { W, MARKS } from '../zero-he-lex.js';
 import { SENT } from '../zero-he-c.js';
+import { WB } from '../zero-hb-lib.js';
 
 const root = path.resolve(import.meta.dirname, '..');
 const he = TRACKS.find(t => t.id === 'hezero'), hb = TRACKS.find(t => t.id === 'hebib');
@@ -160,4 +161,55 @@ test('в уроках нет слов, где конечная форма сто
       assert.ok(!/[ךםןףץ].*[א-ת]/.test(w), `${l.id}: конечная форма в середине слова ${m[0]}`);
     }
   }
+});
+
+// ---------- библейский маршрут ----------
+const MAQ = String.fromCharCode(0x5BE);
+const CANT = new RegExp('[' + String.fromCharCode(0x591) + '-' + String.fromCharCode(0x5AF) + String.fromCharCode(0x5BD) + ']', 'g');
+const bare = s => s.replace(new RegExp(MAQ, 'g'), ' ').replace(MARK_RE, '').replace(/\s+/g, ' ').trim();
+
+test('библейский иврит: число уроков, id подряд, предпосылки только до этапа niqqud современного маршрута', () => {
+  assert.ok(hb.lessons.length >= 10 && hb.lessons.length <= 16, `уроков: ${hb.lessons.length}`);
+  assert.deepEqual(idsOf(hb), hb.lessons.map((_, i) => `hb-${String(i + 1).padStart(2, '0')}`));
+  assert.deepEqual(validateTrack(hb), []);
+  assert.deepEqual(validateZeroTrack(hb, index), []);
+  assert.equal(hb.zero, true); assert.equal(hb.branch, 'biblical'); assert.equal(hb.after, 'hezero');
+  const ms = he.lessons.findIndex(l => l.milestone === 'niqqud');
+  assert.deepEqual(hb.lessons[0].needs, [he.lessons[ms].id], 'первый урок открывается после этапа niqqud');
+  for (const l of hb.lessons) for (const n of l.needs) {
+    if (n.startsWith('hz-')) assert.ok(he.lessons.findIndex(x => x.id === n) <= ms, `${l.id}: предпосылка ${n} позже этапа niqqud`);
+    else assert.ok(n.startsWith('hb-'), `${l.id}: ${n}`);
+  }
+  assert.ok(he.lessons.every(l => l.needs.every(n => n.startsWith('hz-'))), 'современный маршрут не зависит от библейского');
+});
+
+test('библейский иврит: строки Бытия 1 совпадают с текстом, знаки кантилляции убираются без следа', () => {
+  const verse = id => hb.lessons.find(l => l.id === id).cards.at(-1)[0];
+  assert.equal(bare(verse('hb-09')), 'בראשית ברא אלהים את השמים ואת הארץ');
+  assert.equal(bare(verse('hb-10')), 'ויאמר אלהים יהי אור ויהי אור');
+  assert.equal(bare(verse('hb-11')), 'וירא אלהים את האור כי טוב');
+  assert.equal(bare(verse('hb-12')), 'ויבדל אלהים בין האור ובין החשך');
+  const withMarks = hb.lessons.find(l => l.id === 'hb-03').words[0];
+  assert.ok(CANT.test(withMarks), 'в примере есть кантилляция');
+  assert.equal(withMarks.normalize('NFD').replace(CANT, '').normalize('NFC'), verse('hb-09'), 'без кантилляции это строка Бытия 1:1 из урока');
+  assert.ok(hb.lessons.some(l => /1:1/.test(l.title)) && hb.lessons.some(l => /1:3/.test(l.title)) && hb.lessons.some(l => /1:4/.test(l.title)));
+});
+
+test('словарик Бытия 1: чтение, слоги, конечные формы', () => {
+  assert.ok(Object.keys(WB).length >= 30);
+  for (const [k, [h, t, r, syl]] of Object.entries(WB)) {
+    assert.equal(h, h.normalize('NFC'), k);
+    assert.ok(readsAs(h, t), `${k}: ${h} читается /${pattern(h)}/, а в транскрипции «${t}»`);
+    assert.equal(syl.join(''), h, `${k}: слоги не собираются в слово`);
+    assert.ok(r.length > 0);
+    const letters = h.replace(MARK_RE, '');
+    assert.ok(!/[כמנפצ]$/.test(letters) && !/[ךםןףץ][א-ת]/.test(letters), `${k}: конечные формы`);
+  }
+});
+
+test('отчёт: сколько уроков, заданий, слов и килобайт', t => {
+  const rows = [he, hb].map(r => `${r.id}: уроков ${r.lessons.length}, заданий ${r.lessons.reduce((n, l) => n + l.drills.length, 0)}, слов ${new Set(r.lessons.flatMap(l => l.words ?? [])).size}, карточек ${r.lessons.reduce((n, l) => n + l.cards.length, 0)}`);
+  const kb = fs.readdirSync(root).filter(f => /^(zero-(he|hb)-.*|c-zero-(he|hb))\.js$/.test(f)).map(f => `${f} ${(fs.statSync(path.join(root, f)).size / 1024).toFixed(1)} КБ`);
+  t.diagnostic(rows.join(' | ') + ' | ' + kb.join(', '));
+  assert.ok(true);
 });
