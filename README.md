@@ -12,7 +12,7 @@
 ```bash
 python3 -m http.server 8080   # http://localhost:8080
 node --test tests/events.test.mjs          # юнит-тесты
-node tests/e2e.mjs                         # браузер, офлайн, экспорт/импорт (нужен playwright)
+node tests/e2e-tasks.mjs                   # браузер, офлайн, экспорт/импорт (нужен playwright)
 ```
 
 Инструкция: [docs/GUIDE.md](docs/GUIDE.md) · Идеи и план этапов: [docs/IDEAS.md](docs/IDEAS.md) · Типы данных: [docs/EVENTS.md](docs/EVENTS.md) · Выпуск и откат: [docs/RELEASE.md](docs/RELEASE.md) · Решения по архитектуре: [docs/ADR.md](docs/ADR.md) · Требования с числами: [docs/QUALITY.md](docs/QUALITY.md) · Глоссарий: [docs/GLOSSARY.md](docs/GLOSSARY.md) · Связи данных: [docs/ER.md](docs/ER.md) · Шаблон задачи ИИ-помощнику: [docs/AI-TASK.md](docs/AI-TASK.md) · Диаграммы состояний: [docs/STATES.md](docs/STATES.md) · Разбор выгрузки на компьютере: [docs/analysis/README.md](docs/analysis/README.md)
