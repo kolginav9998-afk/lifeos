@@ -2,6 +2,8 @@
 import { getPref } from './prefs.js';
 import { formatMoney } from './money.js';
 export const $ = id => document.getElementById(id);
+let idCounter = 0;
+export const nextId = prefix => `${prefix}-${++idCounter}`;                 // уникальный id для связей aria-labelledby (не путать с постоянными id в разметке)
 
 export function el(tag, props = {}, ...kids) {
   const n = document.createElement(tag);
@@ -57,18 +59,39 @@ export function icon(name, size = 22) {
   return s;
 }
 
-// Всплывающее сообщение; необязательная кнопка действия (например «Отменить»).
-let toastTimer = null;
+// Озвучивание для экранного диктора. Текст кладём в постоянную область #sr-live (она есть в index.html с самого начала и скрыта только визуально):
+// так его читают надёжнее, чем появившийся из скрытого блок. Пауза перед записью нужна, чтобы повтор того же текста тоже озвучился.
+let liveTimer = null, liveClearTimer = null;
+export function announce(message, { assertive = false } = {}) {
+  const live = $('sr-live');
+  if (!live || !message) return;
+  live.setAttribute('aria-live', assertive ? 'assertive' : 'polite');
+  clearTimeout(liveTimer); clearTimeout(liveClearTimer);
+  live.textContent = '';
+  liveTimer = setTimeout(() => { live.textContent = message; liveClearTimer = setTimeout(() => { live.textContent = ''; }, 10000); }, 60);
+}
+export function clearAnnouncements() { clearTimeout(liveTimer); clearTimeout(liveClearTimer); const live = $('sr-live'); if (live) live.textContent = ''; }
+
+// Всплывающее сообщение; необязательная кнопка действия (например «Отменить»). Сообщение озвучивается мягко (polite), пока оно на экране — таймер стоит, если на кнопке фокус или курсор.
+let toastTimer = null, toastMs = 5000, toastWired = false;
+const hideToast = () => { const box = $('toast'); if (box) box.hidden = true; };
 export function toast(message, { actionLabel, onAction, ms = 5000 } = {}) {
   const box = $('toast');
   if (!box) return;
+  if (!toastWired) {                                                // таймер не должен убирать кнопку «Отменить», пока человек до неё добирается
+    const pause = () => clearTimeout(toastTimer), resume = () => { clearTimeout(toastTimer); toastTimer = setTimeout(hideToast, toastMs); };
+    box.addEventListener('focusin', pause); box.addEventListener('focusout', resume); box.addEventListener('pointerenter', pause); box.addEventListener('pointerleave', resume);
+    toastWired = true;
+  }
   box.replaceChildren(el('span', { textContent: message }));
   if (actionLabel && onAction) {
     box.append(el('button', { type: 'button', textContent: actionLabel, onclick: () => { clearTimeout(toastTimer); box.hidden = true; onAction(); } }));
   }
   box.hidden = false;
+  announce(actionLabel && onAction ? `${message}. ${actionLabel}: кнопка в уведомлении.` : message);
   clearTimeout(toastTimer);
-  toastTimer = setTimeout(() => { box.hidden = true; }, ms);
+  toastMs = ms;
+  toastTimer = setTimeout(hideToast, ms);
 }
 
 // Убрать сообщение (например, при блокировке: в тексте сообщения могут быть названия дел и суммы).
@@ -83,7 +106,7 @@ export function copyText(text, okMessage = 'Скопировано') {
   };
   if (navigator.clipboard?.writeText) navigator.clipboard.writeText(text).then(done, fallback); else fallback();
 }
-export function clearToast() { clearTimeout(toastTimer); const box = $('toast'); if (box) { box.hidden = true; box.replaceChildren(); } }
+export function clearToast() { clearTimeout(toastTimer); const box = $('toast'); if (box) { box.hidden = true; box.replaceChildren(); } clearAnnouncements(); }
 
 const MONTHS_SHORT = ['янв', 'фев', 'мар', 'апр', 'мая', 'июн', 'июл', 'авг', 'сен', 'окт', 'ноя', 'дек'];
 export function dateRu(ymd) { const [, m, d] = ymd.split('-').map(Number); return `${d} ${MONTHS_SHORT[m - 1]}`; }
@@ -153,8 +176,9 @@ export function sparkline(values, { width = 140, height = 36, band = null, marks
 
 // Оценка 1–5 пятью кнопками.
 export function ratingRow(label, field, value, onChange) {
-  const wrap = el('div', { class: 'rating', dataset: { field } }, el('span', { class: 'rating-label', textContent: label }));
-  const btns = [1, 2, 3, 4, 5].map(v => el('button', { type: 'button', class: 'rate', dataset: { field, v: String(v) }, textContent: String(v), 'aria-pressed': String(value === v),
+  const lid = nextId('rl');
+  const wrap = el('div', { class: 'rating', role: 'group', 'aria-labelledby': lid, dataset: { field } }, el('span', { class: 'rating-label', id: lid, textContent: label }));
+  const btns = [1, 2, 3, 4, 5].map(v => el('button', { type: 'button', class: 'rate', dataset: { field, v: String(v) }, textContent: String(v), 'aria-label': `${v} из 5`, 'aria-pressed': String(value === v),
     onclick: () => { const next = wrap.value === v ? null : v; wrap.setValue(next); onChange(next); } }));
   wrap.value = value ?? null;
   wrap.setValue = v => { wrap.value = v; btns.forEach((b, i) => b.setAttribute('aria-pressed', String(v === i + 1))); };
@@ -165,15 +189,130 @@ export function ratingRow(label, field, value, onChange) {
 // Число кнопками «−» и «+» с единицами измерения.
 export function stepper({ label, field, value = null, min, max, step, unit, start = step }, onChange) {
   const out = el('span', { class: 'step-val', dataset: { field }, textContent: '—' });
-  const wrap = el('div', { class: 'stepper', dataset: { field } }, el('span', { class: 'rating-label', textContent: label }));
+  const lid = nextId('sl');
+  const wrap = el('div', { class: 'stepper', role: 'group', 'aria-labelledby': lid, dataset: { field } }, el('span', { class: 'rating-label', id: lid, textContent: label }));
   const fmt = v => (v === null ? '—' : `${String(v).replace('.', ',')}${unit ? ' ' + unit : ''}`);
   const set = v => { wrap.value = v === null ? null : Math.min(max, Math.max(min, Math.round(v * 100) / 100)); out.textContent = fmt(wrap.value); };
-  const bump = d => { if (wrap.value === null) set(start); else set(wrap.value + d); onChange(wrap.value); };
+  const bump = d => { if (wrap.value === null) set(start); else set(wrap.value + d); onChange(wrap.value); announce(`${label}: ${fmt(wrap.value)}`); };
   wrap.setValue = set;
   wrap.append(el('div', { class: 'step-ctl' },
-    el('button', { type: 'button', class: 'step-btn', 'aria-label': `${label}: меньше`, textContent: '−', onclick: () => { if (wrap.value === null) return; if (wrap.value <= min) { set(null); onChange(null); } else bump(-step); } }),
+    el('button', { type: 'button', class: 'step-btn', 'aria-label': `${label}: меньше`, textContent: '−', onclick: () => { if (wrap.value === null) return; if (wrap.value <= min) { set(null); onChange(null); announce(`${label}: не указано`); } else bump(-step); } }),
     out,
     el('button', { type: 'button', class: 'step-btn', 'aria-label': `${label}: больше`, textContent: '+', onclick: () => bump(step) })));
   set(value);
   return wrap;
+}
+
+// ---------- доступность: нажимаемые блоки, заголовки, фокус, окна ----------
+// Блок с несколькими строками внутри (его нельзя сделать <button>): роль «кнопка», фокус с клавиатуры, нажатие по Enter и пробелу.
+export function pressable(node, onActivate) {
+  node.tabIndex = 0; node.setAttribute('role', 'button');
+  node.onclick = onActivate;
+  node.onkeydown = e => { if (e.target === node && (e.key === 'Enter' || e.key === ' ')) { e.preventDefault(); onActivate(e); } };
+  return node;
+}
+
+// Заголовок экрана — <h1> в шапке, а заголовки карточек внутри экрана — <h3> (так они выглядят). Без промежуточного <h2> диктор считает, что уровень пропущен.
+// Вид не трогаем: выставляем aria-level так, чтобы уровни шли без пропусков; пересчёт — при каждой перерисовке.
+export function fixHeadingLevels(root, startLevel = 1) {
+  let prev = startLevel;
+  for (const h of root.querySelectorAll('h2,h3,h4,h5,h6')) {
+    if (h.closest('[hidden]')) continue;
+    const native = Number(h.tagName[1]), want = Math.min(native, prev + 1);
+    if (want !== native) h.setAttribute('aria-level', String(want)); else if (h.hasAttribute('aria-level')) h.removeAttribute('aria-level');
+    prev = want;
+  }
+}
+export function watchHeadings(root, startLevel = 1) {
+  let queued = false;
+  const run = () => { queued = false; fixHeadingLevels(root, startLevel); };
+  new MutationObserver(() => { if (!queued) { queued = true; requestAnimationFrame(run); } }).observe(root, { childList: true, subtree: true, attributes: true, attributeFilter: ['hidden'] });
+  fixHeadingLevels(root, startLevel);
+}
+
+// Перенести фокус на узел, даже если он сам не фокусируется (заголовок, главная область).
+export function focusNode(node, opts = { preventScroll: true }) {
+  if (!node) return false;
+  if (node.tabIndex < 0 && !node.hasAttribute('tabindex')) node.setAttribute('tabindex', '-1');
+  node.focus(opts);
+  return document.activeElement === node;
+}
+
+// Если содержимое блока перерисовали и фокус потерялся (нажатая кнопка исчезла), ставим его на заголовок или первое поле нового содержимого.
+export function keepFocusIn(container, pick) {
+  new MutationObserver(() => {
+    if (container.closest('[hidden]')) return;
+    const a = document.activeElement;
+    if (a && a !== document.body) return;                                    // фокус на месте (или сознательно ушёл в другое место)
+    focusNode(pick(container));
+  }).observe(container, { childList: true, subtree: true });
+}
+
+// Полноэкранные окна (.overlay[role=dialog][aria-modal=true]) открывают и закрывают экраны, выставляя атрибут hidden. Здесь одно общее поведение для всех:
+// при открытии запоминаем, откуда пришёл фокус, и закрываем остальную страницу от клавиатуры и диктора (inert); Tab ходит по кругу внутри окна;
+// Escape нажимает кнопку «Закрыть» там, где она есть (идущий таймер или прохождение так не прервать); при закрытии фокус возвращается назад.
+const TABBABLE = 'a[href],button,input,select,textarea,summary,[tabindex]';
+const tabbables = box => [...box.querySelectorAll(TABBABLE)].filter(n => !n.disabled && n.tabIndex >= 0 && n.getClientRects().length && !n.closest('[inert]') && getComputedStyle(n).visibility !== 'hidden');
+const openDialogs = [];
+let lastOutside = null;
+const isDialog = n => n instanceof Element && n.matches('[role=dialog][aria-modal=true]');
+
+function dimAround(node) {
+  const out = [];
+  for (let n = node; n.parentElement && n !== document.body; n = n.parentElement) {
+    for (const sib of n.parentElement.children) if (sib !== n && !sib.inert && sib.id !== 'toast' && sib.id !== 'sr-live') { sib.inert = true; out.push(sib); }
+  }
+  return out;
+}
+function dialogOpened(node) {
+  if (openDialogs.some(d => d.node === node)) return;
+  const opener = lastOutside && lastOutside.isConnected ? lastOutside : null;
+  openDialogs.push({ node, opener, openerId: opener?.id || '', dimmed: dimAround(node) });
+  if (!node.contains(document.activeElement)) node.focus({ preventScroll: true });
+}
+function dialogClosed(entry, restore = true) {
+  const i = openDialogs.indexOf(entry);
+  if (i >= 0) openDialogs.splice(i, 1);
+  for (const n of entry.dimmed) n.inert = false;
+  if (!restore || $('app')?.hidden) return;                                  // приложение закрыто (блокировка): возвращать фокус некуда
+  if (openDialogs.length) { openDialogs.at(-1).node.focus({ preventScroll: true }); return; }
+  const back = (entry.opener?.isConnected && entry.opener) || (entry.openerId && document.getElementById(entry.openerId)) || $('title');
+  const ok = back && !back.disabled && !back.closest('[hidden],[inert]') && focusNode(back);
+  if (!ok) focusNode($('title'));
+}
+// Приложение заперли или вышли из аккаунта: все окна считаем закрытыми и возвращаем доступность странице.
+export function releaseDialogs() { for (const d of [...openDialogs]) dialogClosed(d, false); }
+
+function onDialogKey(e) {
+  const top = openDialogs.at(-1);
+  if (!top) return;
+  const box = top.node;
+  if (e.key === 'Escape') {
+    if (e.defaultPrevented) return;
+    const closer = box.querySelector('button[id$="-close"]');
+    if (closer && !closer.disabled) { e.preventDefault(); closer.click(); }
+    return;
+  }
+  if (e.key !== 'Tab') return;
+  const items = tabbables(box);
+  if (!items.length) { e.preventDefault(); box.focus(); return; }
+  const first = items[0], last = items.at(-1), a = document.activeElement;
+  if (e.shiftKey ? (a === first || a === box || !box.contains(a)) : (a === last || !box.contains(a))) { e.preventDefault(); (e.shiftKey ? last : first).focus(); }
+}
+export function watchDialogs(root) {
+  document.addEventListener('focusin', e => { if (e.target instanceof Element && !e.target.closest('[role=dialog]')) lastOutside = e.target; });
+  document.addEventListener('keydown', e => { if (e.key === 'Tab') onDialogKey(e); }, true);       // в фазе перехвата: окно повторения гасит остальные клавиши само
+  document.addEventListener('keydown', e => { if (e.key === 'Escape') onDialogKey(e); });
+  new MutationObserver(records => {
+    for (const d of [...openDialogs]) if (!d.node.isConnected) dialogClosed(d, false);               // экраны пересобраны (блокировка): окна исчезли вместе с ними
+    for (const r of records) {
+      if (r.attributeName) {                                                                              // запись об изменении атрибута hidden
+        const n = r.target;
+        if (isDialog(n)) { if (n.hidden) { const d = openDialogs.find(o => o.node === n); if (d) dialogClosed(d); } else dialogOpened(n); }
+      } else {
+        const d = r.target.closest?.('[role=dialog]');                                                // содержимое окна заменили, а фокус был на исчезнувшей кнопке
+        if (d && openDialogs.some(o => o.node === d) && !d.contains(document.activeElement)) d.focus({ preventScroll: true });
+      }
+    }
+  }).observe(root, { subtree: true, childList: true, attributes: true, attributeFilter: ['hidden'] });
 }

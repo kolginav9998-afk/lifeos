@@ -52,7 +52,7 @@ export function createHealthView() {
   // ----- профиль здоровья -----
   const hp = { h: el('input', { id: 'hp-height', type: 'text', inputMode: 'decimal', placeholder: 'Рост, см', autocomplete: 'off' }),
     b: el('input', { id: 'hp-birth', type: 'text', inputMode: 'numeric', placeholder: 'Год рождения', autocomplete: 'off' }),
-    s: el('select', { id: 'hp-sex' }, ...[['', 'Пол не указан'], ['m', 'Мужской'], ['f', 'Женский']].map(([v, t]) => el('option', { value: v, textContent: t }))),
+    s: el('select', { id: 'hp-sex', 'aria-label': 'Пол' }, ...[['', 'Пол не указан'], ['m', 'Мужской'], ['f', 'Женский']].map(([v, t]) => el('option', { value: v, textContent: t }))),
     z: el('input', { id: 'hp-sleep', type: 'text', inputMode: 'decimal', placeholder: 'Цель сна, ч (8)', autocomplete: 'off' }),
     g: el('input', { id: 'hp-goal', type: 'text', inputMode: 'decimal', placeholder: 'Целевой вес, кг', autocomplete: 'off' }) };
   const hpSave = el('button', { id: 'hp-save', type: 'submit', textContent: 'Сохранить' });
@@ -69,13 +69,13 @@ export function createHealthView() {
   const hpBox = el('details', { id: 'hp-box', class: 'card' }, el('summary', { textContent: 'Профиль здоровья' }), hpForm);
 
   // ----- добавление замера -----
-  const kind = el('select', { id: 'ms-kind' }, ...Object.entries(MEASURES).map(([k, m]) => el('option', { value: k, textContent: m.label })));
+  const kind = el('select', { id: 'ms-kind', 'aria-label': 'Что измеряем' }, ...Object.entries(MEASURES).map(([k, m]) => el('option', { value: k, textContent: m.label })));
   const value = el('input', { id: 'ms-value', type: 'text', inputMode: 'decimal', placeholder: 'Значение', autocomplete: 'off', required: true });
   const value2 = el('input', { id: 'ms-value2', type: 'text', inputMode: 'decimal', placeholder: 'Нижнее', autocomplete: 'off', hidden: true });
   const cname = el('input', { id: 'ms-name', type: 'text', placeholder: 'Название показателя', maxLength: 40, autocomplete: 'off', hidden: true });
   const cunit = el('input', { id: 'ms-unit', type: 'text', placeholder: 'Единицы', maxLength: 20, autocomplete: 'off', hidden: true });
-  const date = el('input', { id: 'ms-date', type: 'date', value: todayStr() });
-  const time = el('input', { id: 'ms-time', type: 'time' });
+  const date = el('input', { id: 'ms-date', type: 'date', value: todayStr(), 'aria-label': 'Дата замера' });
+  const time = el('input', { id: 'ms-time', type: 'time', 'aria-label': 'Время замера (по желанию)' });
   const note = el('input', { id: 'ms-note', type: 'text', placeholder: 'Комментарий (необязательно)', maxLength: 300, autocomplete: 'off' });
   const title = el('strong', { textContent: 'Новый замер' });
   const add = el('button', { id: 'ms-add', type: 'submit', class: 'primary', textContent: 'Добавить' });
@@ -200,7 +200,7 @@ export function createHealthView() {
     }
     c.append(sparkline(main.slice(-60).map(p => p.value), { width: 260, height: 44 }));
     const rows = m.slice().reverse().slice(0, 12).map(ev => el('div', { class: 'row meas-row', dataset: { id: ev.id } },
-      el('button', { type: 'button', class: 'hist-row', onclick: () => startEdit(ev), 'aria-label': 'Изменить замер' },
+      el('button', { type: 'button', class: 'hist-row', onclick: () => startEdit(ev) },
         el('span', { textContent: dateRu(ev.payload.date) }), el('span', { class: 'muted', textContent: ev.payload.time ?? '' }), el('strong', { textContent: formatMeasure(ev.payload) }), el('span', { class: 'hist-snip', textContent: ev.payload.note ?? '' })),
       el('button', { type: 'button', class: 'del', textContent: '✕', 'aria-label': 'Удалить замер', onclick: () => remove(ev) })));
     const det = el('details', { open: openKeys.has(k.key) }, el('summary', { textContent: `Записи (${m.length})` }), ...rows);

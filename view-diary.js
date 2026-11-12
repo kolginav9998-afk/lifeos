@@ -14,7 +14,7 @@ export function createDiaryView() {
   const root = el('section', { id: 'view-diary', class: 'view' });
 
   // ----- выбор дня -----
-  const dateInput = el('input', { id: 'diary-date', type: 'date', value: date });
+  const dateInput = el('input', { id: 'diary-date', type: 'date', value: date, 'aria-label': 'Дата записи' });
   const go = d => { date = d || todayStr(); dateInput.value = date; dirty.m = dirty.e = dirty.d = false; hydrate(); renderHistory(); autoOpen(); };
   dateInput.onchange = () => go(dateInput.value);
   const nav = el('div', { class: 'day-nav' },

@@ -1,5 +1,5 @@
 import { install as installErrLog } from './errlog.js';
-import { $, el, icon, toast, clearToast } from './ui.js';
+import { $, el, icon, toast, clearToast, announce, watchDialogs, releaseDialogs, watchHeadings, focusNode, keepFocusIn } from './ui.js';
 
 installErrLog();
 import * as vault from './vault.js';
@@ -98,22 +98,25 @@ const views = {};
 let current = 'today';
 let entered = false;
 
-function go(id) {
+function go(id, { focus = false } = {}) {
   const def = DEFS.find(d => d.id === id) ?? DEFS[0];
   current = def.id;
   for (const [vid, v] of Object.entries(views)) v.root.hidden = vid !== def.id;
   const v = views[def.id];
   if (v.show) v.show(); else v.update(store.state.events);        // настройки могли измениться (например, время последней копии)
-  for (const b of $('tabs').children) b.setAttribute('aria-selected', String(b.dataset.tab === def.group));
+  for (const b of $('tabs').children) { if (b.dataset.tab === def.group) b.setAttribute('aria-current', 'page'); else b.removeAttribute('aria-current'); }
   const vis = new Set(visibleDefs().map(d => d.id));
   const siblings = DEFS.filter(d => d.group === def.group && (vis.has(d.id) || d.id === def.id));
   const sub = $('subnav');
   sub.hidden = siblings.length < 2;
-  sub.replaceChildren(...siblings.map(d => el('button', { type: 'button', dataset: { view: d.id }, 'aria-pressed': String(d.id === def.id), textContent: d.sub, onclick: () => go(d.id) })));
+  sub.replaceChildren(...siblings.map(d => el('button', { type: 'button', dataset: { view: d.id }, 'aria-current': d.id === def.id ? 'page' : false, textContent: d.sub, onclick: () => navigate(d.id) })));
   $('title').textContent = def.title;
   setPref('tab', def.id);
   window.scrollTo(0, 0);
+  if (focus) focusNode($('title'));                       // человек сам сменил экран: диктор называет новый заголовок, а Tab идёт дальше по шапке и содержимому
 }
+// Переход по действию человека (вкладка, ссылка, результат поиска): со сменой фокуса. Внутренние переходы (запуск, блокировка) идут через go() без неё.
+const navigate = id => go(id, { focus: true });
 
 // ---------- аватар в шапке: имя и цвет профиля ----------
 function paintAvatar(evs) {
@@ -127,15 +130,26 @@ function paintAvatar(evs) {
 
 // ---------- состояние синхронизации в шапке ----------
 const BADGE = { idle: ['☁ ✓', 'Всё синхронизировано'], syncing: ['☁ …', 'Синхронизация'], offline: ['☁ ✕', 'Нет связи, изменения сохранены'], error: ['☁ !', 'Ошибка синхронизации'], 'needs-login': ['☁ войти', 'Нужно войти заново'] };
+let syncProblem = '';
 appSync.onStatus(s => {
   const b = $('sync-badge');
   const info = BADGE[s.state];
   b.hidden = !info;
-  if (info) { b.textContent = info[0]; b.title = info[1]; b.dataset.state = s.state; }
+  if (info) { b.textContent = info[0]; b.title = info[1]; b.dataset.state = s.state; b.setAttribute('aria-label', `Синхронизация: ${info[1]}`); }
+  // Диктору сообщаем только о сбоях и о возвращении связи; обычные «синхронизирую…» и «готово» молчат, чтобы не мешать.
+  const problem = ['offline', 'error', 'needs-login'].includes(s.state) ? info[1] : '';
+  if (problem && problem !== syncProblem) announce(problem);
+  else if (!problem && syncProblem && s.state === 'idle') announce('Синхронизация снова работает');
+  if (problem || s.state === 'idle') syncProblem = problem;
 });
 
 // ---------- поиск ----------
-function closeSearch() { $('search-panel').hidden = true; $('search-input').value = ''; renderSearch(); }
+function setSearchOpen(open) { $('search-panel').hidden = !open; $('search-btn').setAttribute('aria-expanded', String(open)); }
+function closeSearch() {
+  const had = $('search-panel').contains(document.activeElement);
+  setSearchOpen(false); $('search-input').value = ''; renderSearch();
+  if (had) $('search-btn').focus();                       // фокус не должен пропасть вместе с закрытой панелью
+}
 function renderSearch() {
   const q = $('search-input').value;
   const box = $('search-results');
@@ -143,9 +157,9 @@ function renderSearch() {
   const res = searchEvents(store.state.events, q);
   const courses = searchAcademy(q);
   box.replaceChildren(...(res.length || courses.length
-    ? [...res.map(r => el('button', { type: 'button', class: 'result', onclick: () => { closeSearch(); go(r.tab); } },
+    ? [...res.map(r => el('button', { type: 'button', class: 'result', onclick: () => { closeSearch(); navigate(r.tab); } },
       el('span', { class: 'kind', textContent: r.kind }), el('span', { textContent: r.title }))),
-      ...courses.map(r => el('button', { type: 'button', class: 'result course', dataset: { track: r.trackId }, onclick: () => { closeSearch(); go('learn'); views.learn.open(r.trackId, r.lessonId); } },
+      ...courses.map(r => el('button', { type: 'button', class: 'result course', dataset: { track: r.trackId }, onclick: () => { closeSearch(); navigate('learn'); views.learn.open(r.trackId, r.lessonId); } },
         el('span', { class: 'kind', textContent: r.kind }), el('span', { textContent: r.title })))]
     : [el('p', { class: 'muted', textContent: 'Ничего не найдено' }),
       ...searchHelp(q, 2).map(h => el('button', { type: 'button', class: 'chip help-hit', dataset: { help: h.id }, onclick: () => { closeSearch(); openHelp(h.id); } }, `Справка: ${h.title}`))]));
@@ -174,6 +188,7 @@ function updateLockout() {
 
 function showLock() {
   appSync.stop();
+  releaseDialogs();
   $('app').hidden = true;
   $('gate').hidden = true; gateView = null;
   $('lock').hidden = false;
@@ -201,14 +216,18 @@ function updateLockButton() { $('lock-top').hidden = !vault.hasVault(); }
 let gateView = null;
 async function showGate() {
   appSync.stop();
+  releaseDialogs();
   $('app').hidden = true; $('lock').hidden = true; $('gate').hidden = false;
   document.body.classList.remove('privacy');
   clearToast(); closeSearch();
   if (gateView) return;
   try { await store.refresh(); } catch (e) { console.error(e); }              // записи этого устройства нужны входу (присоединение к аккаунту)
-  gateView = createAccountView({ go, gate: true, onVaultChange: updateLockButton, onAuthenticated: () => { gateView = null; freshSignIn = true; enterApp(); } });
+  gateView = createAccountView({ go: navigate, gate: true, onVaultChange: updateLockButton, onAuthenticated: () => { gateView = null; freshSignIn = true; enterApp(); } });
   $('gate-body').replaceChildren(gateView.root);
+  focusNode(gatePick($('gate-body')));
 }
+// Экран входа перерисовывается по шагам (проверка сервера, форма, код восстановления): фокус всегда на заголовке шага, дальше Tab идёт к полям.
+const gatePick = box => box.querySelector('h3') ?? box.querySelector('input,button');
 
 // Знакомство с приложением: один раз на устройстве, сразу после первого входа (настройка tourDone).
 let freshSignIn = false;
@@ -220,10 +239,12 @@ function startTour() {
 
 async function enterApp() {
   if (REQUIRE_ACCOUNT && !appSync.account.isLinked()) { await showGate(); return; }
+  const fromCover = !$('lock').hidden || !$('gate').hidden;                  // пароль или вход были на экране (кнопка уже заблокирована, поэтому по фокусу не определить)
   gateView = null;
   $('gate').hidden = true;
   $('lock').hidden = true;
   $('app').hidden = false;
+  if (fromCover) focusNode($('title'));                  // пароль или вход введены: фокус не должен остаться на исчезнувшем экране
   paintAvatar(store.state.events);                       // кнопка профиля сразу с буквами логина, не пустая, пока грузятся записи
   try { const n = await db.sealPending(); if (n) toast(`Дошифровано записей: ${n}`); } catch (e) { console.error(e); }
   await store.refresh();
@@ -235,7 +256,7 @@ async function enterApp() {
   if (freshSignIn) { freshSignIn = false; startTour(); }
   if (!entered) {
     entered = true; handleUrlParams();
-    autoCheckUpdate(r => toast(`Доступна новая версия ${r.latest}`, { actionLabel: 'Обновить', onAction: () => go('account'), ms: 12000 }));
+    autoCheckUpdate(r => toast(`Доступна новая версия ${r.latest}`, { actionLabel: 'Обновить', onAction: () => navigate('account'), ms: 12000 }));
   }
 }
 
@@ -303,7 +324,7 @@ document.addEventListener('keydown', e => {
   const typing = t && (/^(INPUT|TEXTAREA|SELECT)$/.test(t.tagName) || t.isContentEditable);
   if (e.key === 'Escape') { if (!$('search-panel').hidden) closeSearch(); return; }
   if (typing) return;
-  if (e.key === '/') { e.preventDefault(); $('search-panel').hidden = false; $('search-input').focus(); }
+  if (e.key === '/') { e.preventDefault(); setSearchOpen(true); $('search-input').focus(); }
   else if (e.key === 'n' || e.key === 'т') { e.preventDefault(); go('today'); views.today.focusAdd(); }
 });
 
@@ -325,7 +346,7 @@ function handleUrlParams() {
 // ---------- сборка интерфейса ----------
 // Экраны создаются заново и при блокировке: в скрытых экранах и открытых окнах не должно оставаться личных данных.
 function buildViews() {
-  const main = $('view'), ctx = { go, lockNow, applyTheme, applyMode, onVaultChange: updateLockButton, openAccount: () => go('account'), exportCsv: () => views.more.exportCsv(),
+  const main = $('view'), ctx = { go: navigate, lockNow, applyTheme, applyMode, onVaultChange: updateLockButton, openAccount: () => go('account'), exportCsv: () => views.more.exportCsv(),
     openHelp, showTour: () => { window.scrollTo(0, 0); tour.show(); },
     onLoggedOut: () => { paintAvatar(store.state.events); if (REQUIRE_ACCOUNT) showGate(); } };
   for (const d of DEFS) {
@@ -338,8 +359,8 @@ function buildViews() {
 let navReady = false;
 function buildTabs() {
   const groups = GROUPS.filter(g => visibleDefs().some(d => d.group === g.id));
-  $('tabs').replaceChildren(...groups.map(g => el('button', { type: 'button', dataset: { tab: g.id }, role: 'tab', 'aria-selected': 'false',
-    onclick: () => go(visibleDefs().find(d => d.group === g.id).id) }, icon(g.icon), el('span', { textContent: g.label }))));
+  $('tabs').replaceChildren(...groups.map(g => el('button', { type: 'button', dataset: { tab: g.id },
+    onclick: () => navigate(visibleDefs().find(d => d.group === g.id).id) }, icon(g.icon), el('span', { textContent: g.label }))));
   $('tabs').style.gridTemplateColumns = `repeat(${groups.length}, 1fr)`;
 }
 // Включили или выключили простой режим: пересобрать вкладки; если текущий экран скрыт, перейти на «Сегодня».
@@ -358,17 +379,19 @@ function build() {
   $('search-btn').append(icon('search'));
   $('lock-top').append(icon('lock'));
   $('search-btn').onclick = () => {
-    const p = $('search-panel');
-    p.hidden = !p.hidden;
-    if (!p.hidden) $('search-input').focus(); else closeSearch();
+    if ($('search-panel').hidden) { setSearchOpen(true); $('search-input').focus(); } else closeSearch();
   };
   $('search-input').oninput = renderSearch;
   $('lock-top').onclick = () => lockNow();
-  $('profile-btn').onclick = () => go('account');
+  $('profile-btn').onclick = () => navigate('account');
+  $('skip-link').onclick = e => { e.preventDefault(); focusNode($('view'), { preventScroll: false }); };       // «Перейти к содержимому» (видна при фокусе с клавиатуры)
 
   buildViews();
   navReady = true; buildTabs();
-  $('sync-badge').onclick = () => go('account');
+  $('sync-badge').onclick = () => navigate('account');
+  watchDialogs($('view'));                                // единое поведение окон: фокус внутри, Tab по кругу, Escape, возврат фокуса
+  watchHeadings($('view')); watchHeadings($('gate'));     // уровни заголовков без пропусков
+  keepFocusIn($('gate-body'), gatePick);
 
   store.onChange(evs => { for (const v of Object.values(views)) v.update(evs); renderSearch(); paintAvatar(evs); notify.resyncSoon(); });
   store.setLockedHandler(showLock);

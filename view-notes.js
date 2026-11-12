@@ -1,4 +1,4 @@
-import { el, fill, toast, dateRu } from './ui.js';
+import { el, fill, toast, dateRu, pressable } from './ui.js';
 import { todayStr } from './events.js';
 import { makeNote, updateNote, noteTitle, sortedNotes, MAX_NOTE, NOTE_TEMPLATES, templateText, noteTags, tagCloud, resolveLinks, backlinks, pastNote } from './notes.js';
 import { normalize } from './search.js';
@@ -87,13 +87,12 @@ export function createNotesView() {
     const lines = n.payload.text.split('\n');
     const title = noteTitle(n.payload.text);
     const rest = lines.slice(lines.findIndex(l => l.trim()) + 1).join('\n').trim();
-    const c = el('article', { class: 'card note', tabIndex: 0, role: 'button', 'aria-label': 'Изменить заметку: ' + title,
-      onclick: () => { editingId = n.id; editorEl = null; render(); }, onkeydown: e => { if (e.key === 'Enter') { editingId = n.id; editorEl = null; render(); } } },
+    const c = pressable(el('div', { class: 'card note' },
       el('strong', { class: 'note-title', textContent: title }),
       rest ? el('p', { class: 'note-body', textContent: rest }) : null,
       noteTags(n.payload.text).length ? el('div', { class: 'tags' }, ...noteTags(n.payload.text).map(t => el('span', { class: 'tag', textContent: '#' + t }))) : null,
       (() => { const l = resolveLinks(events, n).length, b = backlinks(events, n).length; return l || b ? el('span', { class: 'meta muted', textContent: `${l ? `ссылок: ${l}` : ''}${l && b ? ' · ' : ''}${b ? `упоминаний: ${b}` : ''}` }) : null; })(),
-      el('span', { class: 'meta muted', textContent: dateRu(todayStr(n.payload.editedAt || n.ts)) }));
+      el('span', { class: 'meta muted', textContent: dateRu(todayStr(n.payload.editedAt || n.ts)) })), () => { editingId = n.id; editorEl = null; render(); });
     return c;
   }
 
