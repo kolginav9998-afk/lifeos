@@ -192,7 +192,7 @@ for (const n of ['README.txt', 'daily.csv', 'test_runs.csv', 'test_metrics.csv',
 const [dl2] = await Promise.all([page.waitForEvent('download'), page.click('#ins-excel')]);
 assert.match(fs.readFileSync(await dl2.path(), 'utf8'), /^﻿date;runs;composite/);
 await page.click('#ins-copy');
-assert.match(await page.evaluate(() => navigator.clipboard.readText()), /Life OS[\s\S]*sleepHours/);
+assert.match(await page.evaluate(() => navigator.clipboard.readText()), /Компас[\s\S]*sleepHours/);
 
 // ---------- отдельный тест: n-back («две назад»); бот нажимает только на совпадения ----------
 await page.evaluate(() => { document.getElementById('toast').hidden = true; });      // сообщение о копировании не должно перекрывать кнопки

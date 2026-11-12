@@ -1,4 +1,5 @@
 // Экран «Аналитика»: отклонения от личной нормы, подсказки, динамика, выгрузка данных.
+import { APP_NAME } from './config.js';
 import { el, toast, sparkline, dateRu } from './ui.js';
 import { todayStr, daysBetween } from './events.js';
 import * as store from './store.js';
@@ -20,7 +21,7 @@ export function aiSummary(events, now = Date.now()) {
   const rows = dailyRows(events, runs, an).slice(-30);
   const f = v => (v === null || v === undefined ? '' : String(Math.round(v * 100) / 100));
   const lines = [
-    'Ниже — мои личные данные из приложения Life OS за последние дни (без текстов дневника). Цель: найти закономерности и предложить 3 эксперимента на 2 недели.',
+    `Ниже — мои личные данные из приложения «${APP_NAME}» за последние дни (без текстов дневника). Цель: найти закономерности и предложить 3 эксперимента на 2 недели.`,
     'z — отклонение от моей же нормы в σ (плюс — лучше обычного). composite — общий результат ежедневных проверок. Не ставь диагнозов, отмечай, где данных мало.',
     '', `Прохождений проверок: ${runs.length}. Сегодня: ${todayStr(now)}.`, '',
     ['date', 'sleepHours', 'sleepQuality', 'moodMorning', 'moodEvening', 'energyEvening', 'stressEvening', 'caffeine', 'exercise', 'screen', 'composite_z'].join(','),

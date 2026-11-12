@@ -1,6 +1,7 @@
 // Различия между сайтом и Android-приложением — только здесь.
 // Всё остальное (логика, экраны, данные) — один и тот же код.
 
+import { APP_NAME } from './config.js';
 export const isNative = !!globalThis.Capacitor?.isNativePlatform?.();
 export const platformName = isNative ? 'Android-приложение' : 'сайт';
 
@@ -85,7 +86,7 @@ export async function scheduleTest(id, seconds) {
     const LN = plugin('LocalNotifications');
     const perm = await LN.requestPermissions();
     if (perm.display !== 'granted') return { ok: false, reason: 'denied' };
-    await LN.schedule({ notifications: [{ id, title: 'Life OS', body: 'Тестовое напоминание. Всё работает.', schedule: { at: new Date(Date.now() + seconds * 1000), allowWhileIdle: true } }] });
+    await LN.schedule({ notifications: [{ id, title: APP_NAME, body: 'Тестовое напоминание. Всё работает.', schedule: { at: new Date(Date.now() + seconds * 1000), allowWhileIdle: true } }] });
     return { ok: true };
   } catch (e) { return { ok: false, reason: String(e?.message || e) }; }
 }

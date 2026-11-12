@@ -1,5 +1,6 @@
 // Календарь (iCalendar, .ics): открытые задачи со сроками и повторами, списания подписок. Файл можно открыть в любом календаре.
 // Названия задач попадают в файл, поэтому делится им человек сам: приложение ничего не отправляет по сети.
+import { APP_NAME } from './config.js';
 import { addDays, isYmd } from './events.js';
 import { subsOf, nextCharge } from './planning.js';
 
@@ -24,7 +25,7 @@ export function fold(line) {
 const stamp = now => new Date(now).toISOString().replace(/[-:]/g, '').replace(/\.\d{3}Z$/, 'Z');
 
 export function tasksToIcs(events, { now = Date.now(), today } = {}) {
-  const L = ['BEGIN:VCALENDAR', 'VERSION:2.0', 'PRODID:-//Life OS//RU', 'CALSCALE:GREGORIAN', 'X-WR-CALNAME:Life OS'];
+  const L = ['BEGIN:VCALENDAR', 'VERSION:2.0', 'PRODID:-//Kompas//RU', 'CALSCALE:GREGORIAN', `X-WR-CALNAME:${APP_NAME}`];
   const ds = stamp(now);
   let n = 0;
   const open = events.filter(e => e.type === 'task' && !e.payload.done && isYmd(e.payload.due)).sort((a, b) => a.payload.due.localeCompare(b.payload.due) || a.ts - b.ts);

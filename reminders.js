@@ -1,5 +1,6 @@
 // План локальных напоминаний. Чистая функция: из данных получает список уведомлений на ближайшие дни.
 // Текст уведомлений общий, без названий задач: уведомления видны на экране блокировки и лежат вне шифрования приложения.
+import { APP_NAME } from './config.js';
 import { todayStr, addDays } from './events.js';
 import { activeHabits, isScheduled } from './habits.js';
 import { isSick } from './sick.js';
@@ -31,27 +32,27 @@ export function planReminders(events, now, { taskHour = 9, habitHour = 20, eveni
         const parts = [];
         if (dueToday) parts.push(`${dueToday} ${plural(dueToday, 'задача', 'задачи', 'задач')} на сегодня`);
         if (overdue) parts.push(`просрочено: ${overdue}`);
-        out.push({ id: TASK_ID_BASE + i, at, title: 'Life OS', body: parts.join(', ') });
+        out.push({ id: TASK_ID_BASE + i, at, title: APP_NAME, body: parts.join(', ') });
       }
     }
     if (habitHour >= 0 && habits.length && !sickNow) {
       const at = atLocal(day, habitHour);
       const pending = habits.filter(h => isScheduled(h.h, day) && (i !== 0 || !h.st.doneToday)).length;
-      if (pending && at > now) out.push({ id: HABIT_ID_BASE + i, at, title: 'Life OS', body: 'Привычки на сегодня. Минимум тоже считается.' });
+      if (pending && at > now) out.push({ id: HABIT_ID_BASE + i, at, title: APP_NAME, body: 'Привычки на сегодня. Минимум тоже считается.' });
     }
     if (bedtimeMin >= 0) {
       const at = atLocal(day, Math.floor(bedtimeMin / 60), bedtimeMin % 60);
-      if (at > now) out.push({ id: BEDTIME_ID_BASE + i, at, title: 'Life OS', body: 'Пора готовиться ко сну: экран подальше, свет приглушить.' });
+      if (at > now) out.push({ id: BEDTIME_ID_BASE + i, at, title: APP_NAME, body: 'Пора готовиться ко сну: экран подальше, свет приглушить.' });
     }
     if (weeklyHour >= 0) {
       const [y, m, d] = day.split('-').map(Number);
       const at = atLocal(day, weeklyHour);
-      if (new Date(y, m - 1, d, 12).getDay() === 0 && at > now) out.push({ id: WEEKLY_ID_BASE + i, at, title: 'Life OS', body: 'Воскресенье: итоги недели и план на следующую.' });
+      if (new Date(y, m - 1, d, 12).getDay() === 0 && at > now) out.push({ id: WEEKLY_ID_BASE + i, at, title: APP_NAME, body: 'Воскресенье: итоги недели и план на следующую.' });
     }
     if (eveningHour >= 0 && !sickNow) {
       const at = atLocal(day, eveningHour);
       const marked = i === 0 && events.some(e => e.type === 'checkin' && e.payload.date === day && e.payload.slot === 'e');
-      if (!marked && at > now) out.push({ id: EVENING_ID_BASE + i, at, title: 'Life OS', body: 'Вечер: отметка дня и пара карточек на повторение.' });
+      if (!marked && at > now) out.push({ id: EVENING_ID_BASE + i, at, title: APP_NAME, body: 'Вечер: отметка дня и пара карточек на повторение.' });
     }
   }
   return out.filter(r => allowedTime(r, { quietFrom, quietTo, daysOff }));

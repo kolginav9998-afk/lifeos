@@ -1,4 +1,5 @@
 // Человеческий экспорт: Markdown с задачами, привычками, заметками и расходами.
+import { APP_NAME } from './config.js';
 import { todayStr } from './events.js';
 import { formatMoney } from './money.js';
 import { activeHabits } from './habits.js';
@@ -23,7 +24,7 @@ const esc = s => String(s).replace(/\r?\n/g, ' ');
 
 export function toMarkdown(events, now = Date.now()) {
   const today = todayStr(now);
-  const L = [`# Life OS — экспорт от ${today}`, ''];
+  const L = [`# ${APP_NAME} — экспорт от ${today}`, ''];
   const tasks = events.filter(e => e.type === 'task');
   const open = tasks.filter(t => !t.payload.done).sort((a, b) => (a.payload.due || '9999').localeCompare(b.payload.due || '9999'));
   const done = tasks.filter(t => t.payload.done);

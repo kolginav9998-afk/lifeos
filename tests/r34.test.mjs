@@ -1,3 +1,4 @@
+import { APP_NAME } from '../config.js';
 import test from 'node:test';
 import assert from 'node:assert/strict';
 import { makeFocus, focusMinutes, focusWeek, focusLeft, fmtClock, MIN_SAVE_MIN, PRESETS } from '../focus.js';
@@ -231,7 +232,7 @@ test('напоминания: подготовка ко сну (с минута�
   assert.equal(none.length, 0, 'по умолчанию выключено');
   const bed = planReminders([], now, { taskHour: -1, habitHour: -1, bedtimeMin: 22 * 60 + 30 });
   assert.equal(bed.length, 14); assert.equal(bed[0].id, BEDTIME_ID_BASE); assert.equal(bed[0].at, atLocal('2026-11-10', 22, 30));
-  assert.ok(bed.every(x => /ко сну/.test(x.body) && x.title === 'Life OS'));
+  assert.ok(bed.every(x => /ко сну/.test(x.body) && x.title === APP_NAME));
   const late = planReminders([], new Date(2026, 10, 10, 23, 0).getTime(), { taskHour: -1, habitHour: -1, bedtimeMin: 22 * 60 + 30 });
   assert.equal(late[0].id, BEDTIME_ID_BASE + 1, 'время уже прошло — сегодня не планируем');
   const week = planReminders([], now, { taskHour: -1, habitHour: -1, weeklyHour: 19 });

@@ -111,7 +111,7 @@ assert.ok((await evs(page, 'task')).some(e => e.payload.text === 'Купить �
 const zip = path.join(tmp, 'analysis.zip'); fs.writeFileSync(zip, makeZip([{ name: 'daily.csv', data: 'date\n2026-11-01\n' }], Date.now()));
 await clearToast(page); await page.setInputFiles('#import-input', zip); await toast(page, /выгрузка для анализа \(ZIP\)/);
 const junk = path.join(tmp, 'junk.json'); fs.writeFileSync(junk, '{"привет": 1}');
-await clearToast(page); await page.setInputFiles('#import-input', junk); await toast(page, /Это не резервная копия Life OS/);
+await clearToast(page); await page.setInputFiles('#import-input', junk); await toast(page, /Это не резервная копия «Компас»/);
 const broken = path.join(tmp, 'broken.json'); fs.writeFileSync(broken, '{"app":"lifeos","events":[');
 await clearToast(page); await page.setInputFiles('#import-input', broken); await toast(page, /Ошибка/);
 const future = path.join(tmp, 'future.json'); fs.writeFileSync(future, JSON.stringify({ app: 'lifeos', schema: 99, events: [] }));

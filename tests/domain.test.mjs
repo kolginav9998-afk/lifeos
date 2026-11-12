@@ -1,3 +1,4 @@
+import { APP_NAME } from '../config.js';
 import test from 'node:test';
 import assert from 'node:assert/strict';
 import { makeTask, completeTask, todayStr, parseImport, serialize, cleanEvent, makeProfile, profileOf, groupTasks, updateTask } from '../events.js';
@@ -324,7 +325,7 @@ test('напоминания: по одному на день со срокам�
   assert.equal(r[0].at, atLocal(TODAY, 9));
   assert.equal(r[0].body, '2 задачи на сегодня, просрочено: 1');
   assert.equal(r[1].body, '1 задача на сегодня');
-  assert.ok(r.every(x => !x.body.includes('секретное') && !x.body.includes('вчерашняя') && x.title === 'Life OS'), 'названий задач в уведомлениях нет');
+  assert.ok(r.every(x => !x.body.includes('секретное') && !x.body.includes('вчерашняя') && x.title === APP_NAME), 'названий задач в уведомлениях нет');
 });
 test('напоминания: время уже прошло — на сегодня не планируем; выполненные и отключение часов', () => {
   const now = at(2026, 11, 10, 10);

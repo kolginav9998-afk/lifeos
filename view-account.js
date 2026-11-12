@@ -5,7 +5,7 @@ import * as store from './store.js';
 import * as sync from './app-sync.js';
 import { account } from './app-sync.js';
 import { describeError } from './account.js';
-import { DEFAULT_SERVER } from './config.js';
+import { DEFAULT_SERVER, APP_NAME } from './config.js';
 import { encryptBackup } from './backup.js';
 import { saveTextFile } from './platform.js';
 import { getPref, setPref } from './prefs.js';
@@ -50,7 +50,7 @@ export function createAccountView({ go, onVaultChange = () => {}, gate = false, 
       el('div', { id: `${ID}-code`, class: 'code', textContent: code }),
       el('div', { class: 'row wrap' },
         el('button', { type: 'button', textContent: 'Скопировать', onclick: async () => { try { await navigator.clipboard.writeText(code); toast('Скопировано'); } catch { toast('Не удалось скопировать: выдели код вручную'); } } }),
-        el('button', { type: 'button', textContent: 'Сохранить в файл', onclick: () => saveTextFile('lifeos-recovery-code.txt', `Life OS — код восстановления\n${code}\n\nХрани отдельно от пароля.\n`, 'text/plain').catch(e => toast(e.message)) })),
+        el('button', { type: 'button', textContent: 'Сохранить в файл', onclick: () => saveTextFile('lifeos-recovery-code.txt', `${APP_NAME} — код восстановления\n${code}\n\nХрани отдельно от пароля.\n`, 'text/plain').catch(e => toast(e.message)) })),
       el('label', { class: 'check-label' }, ok, ' Я сохранил код в надёжном месте'), done);
   }
 

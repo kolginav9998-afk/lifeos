@@ -67,8 +67,8 @@ test('название: один файл config/brand.json, метки в index
   const html = read('index.html'), man = read('manifest.webmanifest');
   assert.equal((html.match(/%APP_NAME%/g) || []).length, 3, 'заголовок страницы, экран блокировки и экран входа');
   assert.match(man, /"name": "%APP_NAME%"/); assert.match(man, /"short_name": "%APP_NAME%"/);
-  assert.match(read('config.js'), /APP_NAME = \/\*APP_NAME\*\/ 'Life OS'/, 'значение по умолчанию для исходников');
-  assert.equal(APP_NAME, 'Life OS');
+  assert.match(read('config.js'), /APP_NAME = \/\*APP_NAME\*\/ 'Компас'/, 'значение по умолчанию для исходников');
+  assert.equal(APP_NAME, 'Компас');
   const y = read('.github/workflows/apk.yml'), p = read('scripts/patch-android.py');
   assert.match(y, /ANDROID_APP_NAME="\$\(node -e "console\.log\(JSON\.parse\(require\('fs'\)\.readFileSync\('config\/brand\.json'/);
   assert.match(y, /--title "\$APP_NAME \$VERSION/);

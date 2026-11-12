@@ -1,4 +1,5 @@
 // Резервные копии. Зашифрованная копия не зависит от пароля входа: пароль задаётся при сохранении.
+import { APP_NAME } from './config.js';
 import { serialize, parseImport } from './events.js';
 import * as C from './cryptoutil.js';
 import { checkPassword } from './vault.js';
@@ -29,9 +30,9 @@ export async function encryptBackup(events, password, { iterations = C.PBKDF2_IT
 
 export async function decryptBackup(text, password) {
   let d;
-  try { d = JSON.parse(text); } catch { throw new Error('Это не файл Life OS'); }
+  try { d = JSON.parse(text); } catch { throw new Error(`Это не файл «${APP_NAME}»`); }
   if (!d || d.app !== 'lifeos-enc' || d.v !== 1 || typeof d.salt !== 'string' || typeof d.iv !== 'string' || typeof d.ct !== 'string') {
-    throw new Error('Это не зашифрованная копия Life OS');
+    throw new Error(`Это не зашифрованная копия «${APP_NAME}»`);
   }
   if (!password) throw new NeedPasswordError();
   if (!Number.isInteger(d.iter) || d.iter < C.MIN_ITER || d.iter > C.MAX_ITER) throw new Error('Файл повреждён (параметры шифрования)');
@@ -49,5 +50,5 @@ export async function readBackup(text, password) {
   const kind = backupKind(text);
   if (kind === 'encrypted') return { ...(await decryptBackup(text, password)), encrypted: true };
   if (kind === 'plain') return { ...parseImport(text), encrypted: false };
-  throw new Error('Это не резервная копия Life OS');
+  throw new Error(`Это не резервная копия «${APP_NAME}»`);
 }

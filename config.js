@@ -2,6 +2,6 @@
 // Пустой адрес — приложение работает полностью локально, аккаунт подключается вручную.
 export const DEFAULT_SERVER = /*DEFAULT_SERVER*/ '';
 // Название приложения (из config/brand.json при сборке). В исходниках стоит значение по умолчанию.
-export const APP_NAME = /*APP_NAME*/ 'Life OS';
+export const APP_NAME = /*APP_NAME*/ 'Компас';
 // Нужен ли вход в аккаунт, чтобы пользоваться приложением. Значение подставляет сборка; в сборке для автотестов отключается (LIFEOS_REQUIRE_ACCOUNT=0).
 export const REQUIRE_ACCOUNT = /*REQUIRE_ACCOUNT*/ true;

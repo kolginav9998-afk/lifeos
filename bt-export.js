@@ -1,4 +1,5 @@
 // Выгрузка данных для анализа: набор CSV + JSON в одном ZIP. Тексты дневника, заметки и деньги сюда не попадают.
+import { APP_NAME } from './config.js';
 import { runsOf, TEST_BY_ID, TESTS, DOMAINS, primaryShown } from './bt-core.js';
 import { analyzeRuns, dailyRows } from './bt-analytics.js';
 import { makeZip } from './zip.js';
@@ -92,7 +93,7 @@ export function buildTables(events) {
   return { T, runs, an };
 }
 
-export const README = `Выгрузка для анализа — Life OS
+export const README = `Выгрузка для анализа — ${APP_NAME}
 ================================
 
 Что внутри (все файлы — таблицы CSV в UTF-8, разделитель — запятая, десятичный — точка):
