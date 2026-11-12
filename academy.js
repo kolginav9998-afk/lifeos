@@ -302,12 +302,18 @@ export function wordOfDay(date, trackId) {
 
 // Поиск по содержимому курсов: уроки (название, текст, задание) и слова/термины колод. Без индексов: данных немного.
 const nrm = x => String(x ?? '').normalize('NFKC').toLowerCase().replace(/ё/g, 'е');
-export function searchAcademy(query, limit = 12) {
+// Курсы «с нуля» (zero: true) открываются по ступеням, поэтому поиск не раскрывает их содержимое: только названия уроков из набора openZero
+// (id открытых уроков, его считает curriculum.js: openLessonIds). Без набора таких уроков в результатах нет.
+export function searchAcademy(query, limit = 12, openZero = null) {
   const tokens = nrm(query).split(/\s+/).filter(Boolean);
   if (!tokens.length || tokens.join('').length < 2) return [];
   const lessons = [], words = [];
   for (const t of TRACKS) {
     for (const l of t.lessons) {
+      if (t.zero) {
+        if (openZero?.has(l.id) && tokens.every(k => nrm(l.title).includes(k))) lessons.push({ kind: 'Урок', title: `${l.title} · ${t.title}`, trackId: t.id, lessonId: l.id, score: 0, zero: true });
+        continue;
+      }
       const title = nrm(l.title), hay = nrm([l.title, ...l.body, l.task].join(' '));
       if (tokens.every(k => hay.includes(k))) lessons.push({ kind: 'Урок', title: `${l.title} · ${t.title}`, trackId: t.id, lessonId: l.id, score: tokens.every(k => title.includes(k)) ? 0 : 1 });
     }
