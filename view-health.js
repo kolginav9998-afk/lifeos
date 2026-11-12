@@ -1,4 +1,4 @@
-import { el, fill, toast, dateRu, sparkline } from './ui.js';
+import { el, fill, toast, dateRu, sparkline, icon, emptyState } from './ui.js';
 import { createHealthExtras } from './view-health-extra.js';
 import { sleepReasons } from './diary.js';
 import { todayStr } from './events.js';
@@ -113,7 +113,8 @@ export function createHealthView() {
   }
 
   const list = el('div', { id: 'health-list' });
-  const empty = el('p', { class: 'muted', hidden: true, textContent: 'Замеров пока нет. Добавь первый выше.' });
+  const empty = emptyState({ art: 'heart', title: 'Замеров пока нет', text: 'Добавь первый: вес, давление или своё: график появится сам.', action: { label: 'Добавить замер', icon: 'plus', onClick: () => value.focus() } });
+  empty.hidden = true;
   const csv = el('button', { id: 'health-csv', type: 'button', textContent: 'Скачать замеры (CSV)', onclick: () => saveTextFile(`health-${todayStr()}.csv`, measuresToCsv(store.state.events), 'text/csv').catch(e => toast(e.message)) });
   const breathHost = el('div', { id: 'breath-host', class: 'overlay', hidden: true, tabIndex: -1, role: 'dialog', 'aria-modal': 'true', 'aria-label': 'Дыхание' });
   const breathCard = el('div', { class: 'card tight row' }, el('span', { class: 'grow', textContent: 'Дыхание 4–6: успокоиться за пару минут' }),
@@ -165,7 +166,7 @@ export function createHealthView() {
       return el('div', { class: `med${p.active ? '' : ' off'}`, dataset: { id: m.id } },
         el('label', { class: 'check-label grow' }, cb, el('span', { textContent: ` ${p.name}${p.dose ? ' · ' + p.dose : ''} · ${WHEN[p.when]}` })),
         el('button', { type: 'button', class: 'chip med-toggle', textContent: p.active ? 'Пауза' : 'Возобновить', onclick: () => store.save({ ...m, payload: { ...p, active: !p.active } }) }),
-        el('button', { type: 'button', class: 'chip danger', 'aria-label': `Удалить: ${p.name}`, textContent: '✕', onclick: async () => { const old = await store.removeMany([m.id, ...events.filter(e => e.type === 'medlog' && e.payload.medId === m.id).map(e => e.id)]); toast('Удалено', { actionLabel: 'Вернуть', onAction: () => store.saveMany(old) }); } }));
+        el('button', { type: 'button', class: 'chip danger', 'aria-label': `Удалить: ${p.name}`, onclick: async () => { const old = await store.removeMany([m.id, ...events.filter(e => e.type === 'medlog' && e.payload.medId === m.id).map(e => e.id)]); toast('Удалено', { actionLabel: 'Вернуть', onAction: () => store.saveMany(old) }); } }, icon('x', 16)));
     });
     medsCard.replaceChildren(el('strong', { textContent: 'Лекарства и добавки' }), el('p', { class: 'muted', textContent: MEDS_NOTE }),
       ...(rows.length ? rows : [el('p', { class: 'muted', textContent: 'Список пуст. Добавь то, что принимаешь регулярно, — будет удобно отмечать и показывать врачу.' })]),
@@ -202,7 +203,7 @@ export function createHealthView() {
     const rows = m.slice().reverse().slice(0, 12).map(ev => el('div', { class: 'row meas-row', dataset: { id: ev.id } },
       el('button', { type: 'button', class: 'hist-row', onclick: () => startEdit(ev) },
         el('span', { textContent: dateRu(ev.payload.date) }), el('span', { class: 'muted', textContent: ev.payload.time ?? '' }), el('strong', { textContent: formatMeasure(ev.payload) }), el('span', { class: 'hist-snip', textContent: ev.payload.note ?? '' })),
-      el('button', { type: 'button', class: 'del', textContent: '✕', 'aria-label': 'Удалить замер', onclick: () => remove(ev) })));
+      el('button', { type: 'button', class: 'del', 'aria-label': 'Удалить замер', onclick: () => remove(ev) }, icon('x', 16))));
     const det = el('details', { open: openKeys.has(k.key) }, el('summary', { textContent: `Записи (${m.length})` }), ...rows);
     det.addEventListener('toggle', () => { if (det.open) openKeys.add(k.key); else openKeys.delete(k.key); });
     c.append(det);

@@ -1,5 +1,5 @@
 // Экран «Учёба»: курсы (уроки + наставник), повторение карточек, свои карточки.
-import { el, fill, toast } from './ui.js';
+import { el, fill, toast, icon } from './ui.js';
 import { todayStr } from './events.js';
 import * as store from './store.js';
 import { TRACKS, trackById, trackProgress, doneLessons, makeLessonDone, lessonEventId, makeSrsEvent, makeUserCard, userCards, sessionQueue, todayLoad, studyDates, MY_TRACK,
@@ -206,7 +206,7 @@ export function createLearnView() {
     });
     const sources = el('details', { class: 'card' }, el('summary', { textContent: 'Источники и опора' }), el('ul', { class: 'plain' }, ...t.sources.map(s => el('li', { textContent: s }))));
     mount(
-      el('button', { type: 'button', id: 'learn-back', class: 'link', textContent: '‹ Все курсы', onclick: () => go({ name: 'home' }) }),
+      el('button', { type: 'button', id: 'learn-back', class: 'link back-link', onclick: () => go({ name: 'home' }) }, icon('chevL', 18), 'Все курсы'),
       el('div', { class: 'card' },
         el('div', { class: 'row' }, el('span', { class: 'track-ic', style: `background:${t.color}`, textContent: t.icon, 'aria-hidden': 'true' }), el('h3', { textContent: t.title })),
         el('p', { textContent: t.intro }),
@@ -246,7 +246,7 @@ export function createLearnView() {
     };
     const list = userCards(events);
     mount(
-      el('button', { type: 'button', id: 'learn-back', class: 'link', textContent: '‹ Все курсы', onclick: () => go({ name: 'home' }) }),
+      el('button', { type: 'button', id: 'learn-back', class: 'link back-link', onclick: () => go({ name: 'home' }) }, icon('chevL', 18), 'Все курсы'),
       el('div', { class: 'card' }, el('h3', { textContent: 'Свои карточки' }),
         el('p', { class: 'muted', textContent: 'Всё, что хочешь запомнить: слова, формулы, определения, даты. Они попадут в общее повторение.' }),
         el('form', { class: 'form-stack', onsubmit: e => { e.preventDefault(); add(); } }, q, a, hint, el('button', { type: 'submit', id: 'my-add', class: 'primary', textContent: 'Добавить' }), err)),
@@ -293,8 +293,8 @@ export function createLearnView() {
     const interval = q => { const nb = q === 'again' ? 0 : q === 'hard' ? Math.max(1, item.state?.box ?? 0) : Math.min(INTERVALS.length - 1, (item.state?.box ?? 0) + 1); return q === 'again' ? 'сегодня' : q === 'hard' ? `через ${Math.max(1, Math.floor(INTERVALS[nb] / 2))} дн.` : `через ${INTERVALS[nb]} дн.`; };
     const face0 = cardFace(c, item.state, s.today);
     const fs = canSpeak() && (c.track === 'english' || c.track === 'hebrew') ? foreignSide(c, c.track) : null;
-    const speakBtn = fs && (s.shown || (fs.side === 'q' && !face0.reversed)) ? el('button', { type: 'button', id: 'sess-speak', class: 'chip', 'aria-label': 'Произнести', textContent: '🔊',
-      onclick: () => { if (!speak(fs.text, c.track, () => toast('На телефоне нет голоса для этого языка. Установи голосовой движок в настройках телефона.'))) toast('Озвучка недоступна на этом устройстве'); } }) : null;
+    const speakBtn = fs && (s.shown || (fs.side === 'q' && !face0.reversed)) ? el('button', { type: 'button', id: 'sess-speak', class: 'chip', 'aria-label': 'Произнести',
+      onclick: () => { if (!speak(fs.text, c.track, () => toast('На телефоне нет голоса для этого языка. Установи голосовой движок в настройках телефона.'))) toast('Озвучка недоступна на этом устройстве'); } }, icon('volume', 20)) : null;
     const face = el('div', { class: 'flash', id: 'sess-card' },
       el('span', { class: 'muted', textContent: (s.exam ? `Экзамен · ${tr?.title ?? ''}` : `${tr?.title ?? ''}${item.state ? '' : ' · новая'}`) + (face0.reversed ? ' · обратное направление' : '') }),
       el('p', { class: 'flash-q', id: 'sess-q', textContent: face0.front }), speakBtn,

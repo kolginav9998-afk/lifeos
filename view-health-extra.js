@@ -1,5 +1,5 @@
 // Дополнения к экрану «Здоровье»: режим болезни, протокол давления, календарь профилактики, данные на экстренный случай.
-import { el, fill, toast, dateRu } from './ui.js';
+import { el, fill, toast, dateRu, icon } from './ui.js';
 import { todayStr, daysBetween } from './events.js';
 import * as store from './store.js';
 import { activeSick, startSick, endSick, MAX_SICK_DAYS } from './sick.js';
@@ -72,7 +72,7 @@ export function createHealthExtras() {
         el('div', { class: 'row wrap' },
           el('button', { type: 'button', class: 'chip chk-today', textContent: 'Был сегодня', onclick: async () => { await store.save(markCheckup(ev, todayStr())); toast('Отмечено'); } }),
           el('label', { class: 'muted' }, 'или дата: ', el('input', { type: 'date', class: 'chk-date', value: ev.payload.last || '', max: todayStr(), 'aria-label': 'Дата последнего раза', onchange: async e => { const v = e.target.value; if (v && v <= todayStr()) { await store.save(markCheckup(ev, v)); toast('Дата сохранена'); } } })),
-          el('button', { type: 'button', class: 'chip danger', 'aria-label': `Удалить: ${ev.payload.name}`, textContent: '✕', onclick: async () => { const old = await store.remove(ev.id); toast('Удалено', old ? { actionLabel: 'Вернуть', onAction: () => store.save(old) } : {}); } })));
+          el('button', { type: 'button', class: 'chip danger', 'aria-label': `Удалить: ${ev.payload.name}`, onclick: async () => { const old = await store.remove(ev.id); toast('Удалено', old ? { actionLabel: 'Вернуть', onAction: () => store.save(old) } : {}); } }, icon('x', 16))));
     });
     fill(chkCard, el('strong', { textContent: 'Профилактика' }), el('p', { class: 'muted', textContent: CHECKUP_NOTE }),
       ...(rows.length ? rows : [el('p', { class: 'muted', textContent: 'Пока пусто. Добавь плановые проверки, чтобы не забывать о них.' })]), chkBox);

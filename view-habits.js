@@ -1,4 +1,4 @@
-import { el, toast } from './ui.js';
+import { el, toast, icon, ring, emptyState } from './ui.js';
 import { todayStr } from './events.js';
 import { HABIT_TEMPLATES, makeHabit, updateHabit, archiveHabit, makeHabitLog, habitStats, habitCalendar, activeHabits, logsOf, habitReview, reviewDue, WEEK_ORDER, DAY_NAMES, daysText, supportPhrase } from './habits.js';
 import { getPref, setPref } from './prefs.js';
@@ -42,7 +42,7 @@ export function createHabitsView() {
     el('button', { type: 'button', class: 'chip tpl', textContent: t.name, onclick: () => { name.value = t.name; anchor.value = t.anchor; minimum.value = t.minimum; full.value = t.full; name.focus(); } })));
   const form = el('form', { id: 'habit-form', class: 'form-stack' }, el('span', { class: 'muted', textContent: 'Быстрый старт — выбери заготовку и поправь под себя:' }), templates, name, anchor, minimum, full, identity, plan, formDays.node,
     el('button', { type: 'submit', class: 'primary', textContent: 'Добавить привычку' }));
-  const addBox = el('details', { id: 'habit-add', class: 'card habit-add' }, el('summary', { textContent: '＋ Новая привычка' }), form);
+  const addBox = el('details', { id: 'habit-add', class: 'card habit-add' }, el('summary', { class: 'add-sum' }, icon('plus', 18), 'Новая привычка'), form);
   form.onsubmit = async e => {
     e.preventDefault();
     try {
@@ -56,7 +56,8 @@ export function createHabitsView() {
 
   const reviewBox = el('details', { id: 'habit-review', class: 'card', hidden: true });
   const list = el('div', { id: 'habit-list' });
-  const empty = el('p', { class: 'muted', hidden: true, textContent: 'Привычек пока нет. Начни с одной маленькой.' });
+  const empty = emptyState({ art: 'habits', title: 'Привычек пока нет', text: 'Начни с одной маленькой: серия растёт, когда не пропускаешь второй раз подряд.', action: { label: 'Создать привычку', icon: 'plus', onClick: () => { addBox.open = true; name.focus(); } } });
+  empty.hidden = true;
   const archivedList = el('div', { id: 'habit-archive' });
   const archivedBlock = el('details', { hidden: true }, el('summary', { textContent: 'В архиве' }), archivedList);
   root.append(intro, sickNote, addBox, heavyRow, reviewBox, list, empty, archivedBlock);
@@ -111,8 +112,11 @@ export function createHabitsView() {
     const p = h.payload;
     const heavyDay = !!getPref('heavyDay');
     const c = el('article', { class: 'card habit' + (st.doneToday ? ' is-done' : ''), dataset: { id: h.id } });
-    c.append(el('div', { class: 'h-head' }, el('strong', { class: 'h-name', textContent: p.name }),
-      p.anchor ? el('span', { class: 'muted', textContent: ' · после: ' + p.anchor }) : null));
+    c.append(el('div', { class: 'h-top' },
+      ring(st.consistency, { size: 50, stroke: 5, label: pct(st.consistency), name: 'Регулярность за 30 дней' }),
+      el('div', { class: 'h-head' }, el('strong', { class: 'h-name', textContent: p.name }),
+        p.anchor ? el('span', { class: 'muted', textContent: ' · после: ' + p.anchor }) : null),
+      el('span', { class: 'streak' + (st.streak >= 3 ? ' hot' : ''), title: `Серия: ${st.streak}`, 'aria-label': `Серия: ${st.streak}` }, icon('flame', 15), String(st.streak))));
     if (p.identity) c.append(el('div', { class: 'muted h-identity', textContent: `Я — ${p.identity.replace(/^я\s+/i, '')}` }));
     if (p.days?.length) c.append(el('div', { class: 'muted h-days', textContent: `Дни: ${daysText(p.days)}` }));
     if (!archived && !st.scheduledToday && !st.doneToday) c.append(el('div', { class: 'muted h-off', textContent: 'Сегодня по расписанию выходной: отметка не обязательна, серия не прервётся.' }));

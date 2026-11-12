@@ -67,6 +67,8 @@ const GROUPS = [
   { id: 'money', label: 'Деньги', icon: 'money' },
   { id: 'more', label: 'Ещё', icon: 'more' },
 ];
+// Режимы оформления (--mode-accent в style.css): у учёбы, денег, аналитики и безопасности свой акцент, у остальных — основной.
+const MODE_OF = { learn: 'learn', tests: 'learn', skills: 'learn', zero: 'learn', diction: 'learn', money: 'finance', insights: 'analytics', okr: 'analytics', plans: 'analytics', reflect: 'analytics', account: 'security', more: 'security', help: 'security' };
 const FOCUS_TAB = { task: 'today', habit: 'habits', expense: 'money', note: 'notes', diary: 'diary', measure: 'health' };
 
 // Простой режим: меньше вкладок и экранов, только самое нужное. Остальные экраны по-прежнему открываются из чипов и поиска.
@@ -101,6 +103,7 @@ let entered = false;
 function go(id, { focus = false } = {}) {
   const def = DEFS.find(d => d.id === id) ?? DEFS[0];
   current = def.id;
+  $('app').dataset.mode = MODE_OF[def.id] || 'memory';
   for (const [vid, v] of Object.entries(views)) v.root.hidden = vid !== def.id;
   const v = views[def.id];
   if (v.show) v.show(); else v.update(store.state.events);        // настройки могли измениться (например, время последней копии)

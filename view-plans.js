@@ -1,5 +1,5 @@
 // Экран «Планы»: прогноз месяца, лимиты по категориям, копилки и подписки.
-import { el, toast, dateRu, moneyText } from './ui.js';
+import { el, toast, dateRu, moneyText, icon } from './ui.js';
 import { todayStr } from './events.js';
 import * as store from './store.js';
 import { parseAmount, categoriesUsed, monthLabel, monthOf } from './money.js';
@@ -69,7 +69,7 @@ export function createPlansView() {
     const rows = st.map(x => el('div', { class: 'lim-row', dataset: { cat: x.category, status: x.status } },
       el('div', { class: 'row' }, el('strong', { class: 'grow', textContent: x.category }),
         el('span', { class: x.status === 'over' ? 'warn' : 'muted', textContent: x.limit ? `${moneyText(x.spent)} из ${moneyText(x.limit)}` : moneyText(x.spent) }),
-        x.limit ? el('button', { type: 'button', class: 'chip', 'aria-label': `Убрать лимит: ${x.category}`, textContent: '✕', onclick: async () => { const old = await store.remove(limitId(x.category)); toast('Лимит убран', old ? { actionLabel: 'Вернуть', onAction: () => store.save(old) } : {}); } }) : null),
+        x.limit ? el('button', { type: 'button', class: 'chip', 'aria-label': `Убрать лимит: ${x.category}`, onclick: async () => { const old = await store.remove(limitId(x.category)); toast('Лимит убран', old ? { actionLabel: 'Вернуть', onAction: () => store.save(old) } : {}); } }, icon('x', 16)) : null),
       x.limit ? bar(x.ratio, x.status === 'over' ? 'over' : x.status === 'warn' ? 'warn' : '') : null,
       x.limit ? el('span', { class: 'muted', textContent: x.left >= 0 ? `осталось ${moneyText(x.left)} (${pct(x.ratio)})` : `превышен на ${moneyText(-x.left)}` }) : null));
     return el('div', { class: 'card', id: 'plan-limits' }, el('h3', { textContent: `Лимиты по категориям · ${monthLabel(ym)}` }),

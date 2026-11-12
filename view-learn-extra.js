@@ -1,5 +1,5 @@
 // «Учёба»: дневник практики. Минуты по курсам за неделю (уроки, карточки, говорение) и недельные цели.
-import { el, toast } from './ui.js';
+import { el, toast, icon } from './ui.js';
 import * as store from './store.js';
 import { TRACKS } from './academy.js';
 import { practiceWeek, makeLearnGoal, goalId, GOAL_MIN, GOAL_MAX, CARD_SECONDS } from './practice.js';
@@ -11,7 +11,7 @@ export function practiceCard(events, today) {
   const w = practiceWeek(events, today);
   const rows = w.rows.map(r => el('div', { class: 'prac-row', dataset: { track: r.track } },
     el('div', { class: 'row' }, el('strong', { class: 'grow', textContent: r.title }), el('span', { class: 'prac-sum', textContent: r.goal ? `${r.total} из ${r.goal} мин` : `${r.total} мин` }),
-      r.goal ? el('button', { type: 'button', class: 'chip goal-del', 'aria-label': `Убрать цель: ${r.title}`, textContent: '✕', onclick: async () => { const old = await store.remove(goalId(r.track)); toast('Цель убрана', old ? { actionLabel: 'Вернуть', onAction: () => store.save(old) } : {}); } }) : null),
+      r.goal ? el('button', { type: 'button', class: 'chip goal-del', 'aria-label': `Убрать цель: ${r.title}`, onclick: async () => { const old = await store.remove(goalId(r.track)); toast('Цель убрана', old ? { actionLabel: 'Вернуть', onAction: () => store.save(old) } : {}); } }, icon('x', 16)) : null),
     r.goal ? bar(Math.min(r.total, r.goal), r.goal) : null,
     el('span', { class: 'muted', textContent: parts(r) || 'пока без занятий' }),
     r.goal && r.left === 0 ? el('span', { class: 'prac-done', textContent: 'Цель недели выполнена ✓' }) : null));

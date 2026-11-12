@@ -1,5 +1,5 @@
 // Экран «Тренировки»: идущая тренировка (подходы пишутся сразу), история, личные рекорды, недельная цель по силовым.
-import { el, toast, dateRu } from './ui.js';
+import { el, toast, dateRu, icon } from './ui.js';
 import { todayStr } from './events.js';
 import * as store from './store.js';
 import { TEMPLATES, WEEKLY_STRENGTH_GOAL, startWorkout, addExercise, addSet, removeSet, finishWorkout, activeWorkout, doneWorkouts, strengthDays, setsOf, volumeOf, suggestion, lastSets, personalRecords, newRecords } from './workouts.js';
@@ -47,7 +47,7 @@ export function createWorkoutsView() {
     };
     const rows = ex.sets.map((s, j) => el('li', { class: 'wk-set' },
       el('span', { class: 'grow', textContent: `${j + 1}. ${ex.kind === 'time' ? `${s.sec} с` : ex.kind === 'cardio' ? `${f1((s.sec || 0) / 60)} мин` : `${s.reps} повт.${s.kg ? ` × ${f1(s.kg)} кг` : ''}`}` }),
-      el('button', { type: 'button', class: 'chip', 'aria-label': `Удалить подход ${j + 1}`, textContent: '✕', onclick: () => save(removeSet(w, i, j)) })));
+      el('button', { type: 'button', class: 'chip', 'aria-label': `Удалить подход ${j + 1}`, onclick: () => save(removeSet(w, i, j)) }, icon('x', 16))));
     const target = ex.target ? `Цель: ${ex.target[0]}–${ex.target[1]} ${ex.kind === 'time' ? 'с' : 'повт.'}${ex.plan ? `, подходов: ${ex.plan}` : ''}` : '';
     return el('div', { class: 'card wk-ex', dataset: { ex: String(i) } },
       el('strong', { textContent: ex.name }), target ? el('div', { class: 'muted', textContent: target }) : null,

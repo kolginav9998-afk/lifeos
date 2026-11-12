@@ -1,5 +1,5 @@
 // Экран «Рефлексия»: вечерний обзор, итоги недели, журнал решений, копилка радостей и «что меня заряжает».
-import { el, fill, toast, dateRu } from './ui.js';
+import { el, fill, toast, dateRu, icon } from './ui.js';
 import { todayStr, addDays } from './events.js';
 import { makePark, finishPark, parkedLater, parkedDue } from './parked.js';
 import * as store from './store.js';
@@ -41,7 +41,7 @@ export function createReflectView() {
       ...due.map(e => el('div', { class: 'row park-row due', dataset: { id: e.id } }, el('span', { class: 'grow', textContent: e.payload.text }),
         el('button', { type: 'button', class: 'chip park-done', textContent: 'Разобрал', onclick: () => store.save(finishPark(e)) }))),
       ...later.map(e => el('div', { class: 'row park-row', dataset: { id: e.id } }, el('span', { class: 'muted', textContent: dateRu(e.payload.forDate) }), el('span', { class: 'grow', textContent: e.payload.text }),
-        el('button', { type: 'button', class: 'chip danger', 'aria-label': 'Удалить', textContent: '✕', onclick: async () => { const old = await store.remove(e.id); toast('Удалено', old ? { actionLabel: 'Вернуть', onAction: () => store.save(old) } : {}); } }))));
+        el('button', { type: 'button', class: 'chip danger', 'aria-label': 'Удалить', onclick: async () => { const old = await store.remove(e.id); toast('Удалено', old ? { actionLabel: 'Вернуть', onAction: () => store.save(old) } : {}); } }, icon('x', 16)))));
   }
 
   // ----- вечерний обзор -----
@@ -149,7 +149,7 @@ export function createReflectView() {
     fill(joyCard, el('strong', { textContent: 'Копилка радостей' }),
       el('p', { class: 'muted', textContent: 'Записывай маленькие хорошие моменты. В трудный день их можно перечитать.' }), joyForm, joyErr, rnd, joyPick,
       ...list.slice(0, 5).map(j => el('div', { class: 'row joy-row', dataset: { id: j.id } }, el('span', { class: 'muted', textContent: dateRu(j.payload.date) }), el('span', { class: 'grow', textContent: j.payload.text }),
-        el('button', { type: 'button', class: 'chip danger', 'aria-label': 'Удалить', textContent: '✕', onclick: async () => { const old = await store.remove(j.id); toast('Удалено', old ? { actionLabel: 'Вернуть', onAction: () => store.save(old) } : {}); } }))),
+        el('button', { type: 'button', class: 'chip danger', 'aria-label': 'Удалить', onclick: async () => { const old = await store.remove(j.id); toast('Удалено', old ? { actionLabel: 'Вернуть', onAction: () => store.save(old) } : {}); } }, icon('x', 16)))),
       list.length > 5 ? el('p', { class: 'muted', textContent: `…и ещё ${list.length - 5} в копилке` }) : null);
   }
 

@@ -1,5 +1,5 @@
 import { APP_NAME } from './config.js';
-import { el, fill, toast, dateRu, moneyText, weekdayOf, ring, pressable } from './ui.js';
+import { el, fill, toast, dateRu, moneyText, weekdayOf, ring, pressable, icon, emptyState } from './ui.js';
 import { makeTask, updateTask, completeTask, reopenTask, groupTasks, todayStr, addDays, dueLabel, repeatLabel, profileOf } from './events.js';
 import { parseQuick } from './quick.js';
 import { getPref, setPref } from './prefs.js';
@@ -31,6 +31,9 @@ import { heroOf } from './daycards.js';
 import * as vault from './vault.js';
 import * as store from './store.js';
 
+// Значки для чипов под кольцом дел: по началу текста (чипы с готовым значком, например «🎂», не трогаем).
+const CHIP_ICONS = [[/^Привычки/, 'flame'], [/^Потрачено/, 'money'], [/^Повторение/, 'book'], [/^Отметка/, 'diary'], [/^Проверка/, 'tests'], [/^Тяжёлый/, 'zap'], [/^Новые навыки/, 'star'], [/^Цели/, 'target'],
+  [/^Написать/, 'users'], [/^Профилактика/, 'shield'], [/^Решения/, 'flag'], [/^Фокус/, 'clock'], [/^Силовые/, 'dumbbell'], [/^Эксперимент/, 'zap'], [/^Сделай резервную/, 'download']];
 const REPEAT_OPTS = [['', 'не повторять'], ['daily', 'каждый день'], ['weekly', 'каждую неделю'], ['monthly', 'каждый месяц']];
 const repeatSelect = (cls, value = '') => {
   const s = el('select', { class: cls }, ...REPEAT_OPTS.map(([v, t]) => el('option', { value: v, textContent: t })));
@@ -70,7 +73,7 @@ export function createTodayView({ go }) {
     const left = steps.filter(s => !s[2]).length;
     onboarding.hidden = getPref('onboardingDone') || left === 0 || !!getPref('simple');
     obList.replaceChildren(...steps.map(([id, text, done, act]) => el('li', { class: done ? 'done' : '', dataset: { step: id } },
-      el('span', { class: 'ob-mark', textContent: done ? '✓' : '○', 'aria-hidden': 'true' }),
+      el('span', { class: 'ob-mark', 'aria-hidden': 'true' }, done ? icon('check', 13) : ''),
       done ? el('span', { textContent: text }) : el('button', { type: 'button', class: 'link', textContent: text, onclick: act }))));
   }
 
@@ -190,7 +193,7 @@ export function createTodayView({ go }) {
 
   // ----- форма добавления -----
   const input = el('input', { id: 'add-input', type: 'text', placeholder: 'Задача, расход или замер…', enterKeyHint: 'done', maxLength: 500, required: true, autocomplete: 'off' });
-  const addBtn = el('button', { type: 'submit', 'aria-label': 'Добавить', textContent: '+' });
+  const addBtn = el('button', { type: 'submit', 'aria-label': 'Добавить' }, icon('plus', 24));
   const due = el('input', { id: 'add-due', type: 'date' });
   const rep = repeatSelect('', ''); rep.id = 'add-repeat';
   const high = el('input', { id: 'add-high', type: 'checkbox' });
@@ -286,7 +289,8 @@ export function createTodayView({ go }) {
   const minimum = el('div', { id: 'minimum', class: 'card', hidden: true }, el('div', { class: 'mini-head' }, el('h3', { textContent: 'Минимум на сегодня' }),
     el('button', { type: 'button', id: 'heavy-off', class: 'chip', textContent: 'Выйти из режима', onclick: () => { setPref('heavyDay', false); render(); } })),
     el('p', { class: 'muted', textContent: 'Тяжёлый день: только самое важное. Три дела, остальное подождёт. Привычки — в минимальной версии.' }), minList);
-  const empty = el('p', { id: 'empty', class: 'muted', hidden: true, textContent: 'Пока пусто. Добавь первую задачу.' });
+  const empty = emptyState({ id: 'empty', art: 'tasks', title: 'Пока пусто', text: 'Добавь первую задачу: она появится здесь, а кольцо выше начнёт заполняться.', action: { label: 'Добавить задачу', icon: 'plus', onClick: () => input.focus() } });
+  empty.hidden = true;
   const doneList = el('ul', { id: 'done-list', class: 'list' });
   const doneCount = el('span', { id: 'done-count', textContent: '0' });
   const clearDone = el('button', { type: 'button', id: 'clear-done', textContent: 'Очистить сделанные' });
@@ -343,7 +347,7 @@ export function createTodayView({ go }) {
     }
     const lab = dueLabel(p.due, today);
     const li = el('li', { class: 'item' + (p.done ? ' done' : '') + (lab.cls === 'overdue' && !p.done ? ' is-overdue' : '') });
-    const check = el('button', { class: 'check', type: 'button', textContent: p.done ? '✓' : '', 'aria-label': p.done ? 'Вернуть в работу' : 'Отметить сделанным' });
+    const check = el('button', { class: 'check', type: 'button', 'aria-label': p.done ? 'Вернуть в работу' : 'Отметить сделанным' }, p.done ? icon('check', 16) : null);
     check.onclick = async () => {
       if (!p.done) {
         const { updated, next } = completeTask(ev);
@@ -364,7 +368,7 @@ export function createTodayView({ go }) {
       pressable(body, () => { editingId = ev.id; editorEl = null; render(); });          // имя кнопки — её видимый текст (название дела и срок)
     }
     if (meta.length) body.append(el('span', { class: 'meta' }, ...meta));
-    const del = el('button', { class: 'del', type: 'button', textContent: '✕', 'aria-label': 'Удалить', onclick: () => removeTask(ev) });
+    const del = el('button', { class: 'del', type: 'button', 'aria-label': 'Удалить', onclick: () => removeTask(ev) }, icon('x', 18));
     li.append(check, body, del);
     return li;
   }
@@ -403,6 +407,7 @@ export function createTodayView({ go }) {
     if (doneWorkouts(events).length) opt.push(el('button', { type: 'button', id: 'strength-chip', class: 'chip', textContent: `Силовые: ${strengthDays(events, today)}/${WEEKLY_STRENGTH_GOAL}`, onclick: () => go('workouts') }));
     for (const e of activeExperiments(events, today)) opt.push(el('button', { type: 'button', class: 'chip exp-chip', dataset: { exp: e.id }, textContent: `Эксперимент: фаза ${phaseOf(e.payload, today)}`, onclick: () => go('insights') }));
     if (!getPref('simple')) chips.push(...opt);
+    for (const c of chips) { const m = c.tagName === 'BUTTON' && CHIP_ICONS.find(([re]) => re.test(c.textContent)); if (m) c.prepend(icon(m[1], 15)); }
     summary.replaceChildren(...chips);
   }
 
@@ -463,7 +468,7 @@ export function createTodayView({ go }) {
     dateLine.textContent = ds.charAt(0).toUpperCase() + ds.slice(1);
     const hr = heroOf(events, today);
     heroCap.textContent = hr.caption;
-    heroRing.replaceChildren(ring(hr.fraction, { label: hr.total ? `${hr.done}/${hr.total}` : '—', name: 'Дела на сегодня' }));
+    heroRing.replaceChildren(ring(hr.fraction, { size: 96, stroke: 11, label: hr.total ? `${hr.done}/${hr.total}` : '—', name: 'Дела на сегодня' }));
     renderOnboarding();
     renderWotd(today);
     const g = groupTasks(events, today);
