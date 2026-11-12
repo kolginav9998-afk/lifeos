@@ -4,6 +4,9 @@ import assert from 'node:assert/strict';
 import { choose, typed, order, lessonIndex } from '../zero-kit.js';
 import { TRACKS, searchAcademy } from '../academy.js';
 import { todayStr } from '../events.js';
+import { lessonSkillStatus, skillFromLesson } from '../skills.js';
+import { makeLessonDone } from '../academy.js';
+import { dayBrief, briefText } from '../daycards.js';
 import {
   STATUS_LABEL, INTERVAL_DAYS, DAY_MS, lessonStatus, isUnlocked, routeProgress, nextLessons, reviewDue, pickSurprise, surpriseDoneToday, makeCheck, gradeCheck,
   makeZcheckEvent, placementTarget, statusMap, openLessonIds, proofText, masteredZero, lastRouteId,
@@ -275,4 +278,30 @@ test('настоящие курсы: в пустом журнале открыт
   if (closed) assert.equal(searchAcademy(closed.title, 12, new Set([entry.id])).filter(r => r.lessonId === closed.id).length, 0);
   const bodyWord = entry.body.join(' ').split(/\s+/).find(w => /^[а-яё]{9,}$/i.test(w));
   if (bodyWord) assert.equal(searchAcademy(bodyWord, 50, new Set([entry.id])).filter(r => r.lessonId === entry.id && !entry.title.toLowerCase().includes(bodyWord.toLowerCase())).length, 0, 'текст урока в поиске не светится');
+});
+
+// ---------- навыки ----------
+test('навыки: освоенный урок «с нуля» предлагается с подтверждением «проверка 6/6, дата»', () => {
+  const track = TRACKS.find(t => t.zero), lesson = track.lessons[0], t = at(0);
+  const none = lessonSkillStatus([seen(lesson.id, t)]);
+  assert.ok(!none.ready.some(r => r.lesson.id === lesson.id), 'просмотренный урок навыком не предлагается');
+  const events = [makeLessonDone(track, lesson, todayStr(t), t), makeZcheckEvent(track, lesson, 'quiz', { n: 6, ok: 6 }, t + 1000)];
+  const r = lessonSkillStatus(events).ready.find(x => x.lesson.id === lesson.id);
+  assert.ok(r, 'освоенный урок готов к добавлению'); assert.equal(r.proof, `проверка 6/6, ${todayStr(t + 1000)}`);
+  const skill = skillFromLesson(track, lesson, events, t + 2000);
+  assert.equal(skill.payload.evidence, `проверка 6/6, ${todayStr(t + 1000)}`);
+  assert.equal(skill.id, `skill:lesson:${lesson.id}`); assert.equal(skill.payload.source, 'lesson'); assert.equal(skill.payload.ref, lesson.id);
+  assert.ok(!lessonSkillStatus([...events, skill]).ready.some(x => x.lesson.id === lesson.id), 'после добавления не предлагается снова');
+  const placed = [makeZcheckEvent(track, lesson, 'placement', { n: 5, ok: 5 }, t)];
+  assert.match(skillFromLesson(track, lesson, placed, t + 5).payload.evidence, /^входная проверка 5\/5, /, 'без записи «пройден» тоже предлагается');
+});
+
+// ---------- «Сегодня» ----------
+test('бриф дня: строка «С нуля» появляется, когда пора повторять или ждёт быстрая проверка', () => {
+  const track = TRACKS.find(t => t.zero), lesson = track.lessons[0], t = new Date(2026, 4, 10, 12).getTime();
+  assert.doesNotMatch(briefText(dayBrief([], todayStr(t))), /С нуля/);
+  const events = [makeLessonDone(track, lesson, todayStr(t), t), makeZcheckEvent(track, lesson, 'quiz', { n: 6, ok: 6 }, t)];
+  assert.match(briefText(dayBrief(events, todayStr(t + 2 * DAY_MS))), /С нуля: есть быстрая проверка/, 'через два дня: освоено больше суток назад, повторять рано');
+  assert.match(briefText(dayBrief(events, todayStr(t + 4 * DAY_MS))), /С нуля: пора повторить уроков: 1; есть быстрая проверка/);
+  assert.doesNotMatch(briefText(dayBrief(events, todayStr(t))), /С нуля/, 'в день проверки ничего не ждёт');
 });

@@ -4,6 +4,7 @@ import { addDays, todayStr } from './events.js';
 import { rankTasks } from './planday.js';
 import { activeHabits } from './habits.js';
 import { todayLoad } from './academy.js';
+import { reviewDue, pickSurprise } from './curriculum.js';
 import { upcomingBirthdays, dueContacts } from './people.js';
 import { checkupsDue } from './prevent.js';
 import { decisionsDue, intentionOf } from './reflect.js';
@@ -17,6 +18,10 @@ import { dayMood } from './diary.js';
 
 const plural = (n, one, few, many) => { const a = Math.abs(n) % 100, b = a % 10; return a > 10 && a < 20 ? many : b > 1 && b < 5 ? few : b === 1 ? one : many; };
 const f1 = v => String(Math.round(v * 10) / 10).replace('.', ',');
+
+// Курсы «с нуля»: сколько уроков пора повторить и ждёт ли быстрая проверка (считается на конец указанного дня).
+const endOfDay = ymd => { const [y, m, d] = ymd.split('-').map(Number); return new Date(y, m - 1, d, 23, 59, 59).getTime(); };
+const zeroToday = (events, today) => { const t = endOfDay(today); return { due: reviewDue(events, t).length, quick: !!pickSurprise(events, t, 1) }; };
 
 // ---------- бриф на день ----------
 export function dayBrief(events, today, { tasks = 3 } = {}) {
@@ -32,6 +37,7 @@ export function dayBrief(events, today, { tasks = 3 } = {}) {
     tasksTotal: ranked.length,
     habits: sick ? [] : habits,
     cards: { due: load.due, fresh: load.fresh },
+    zero: zeroToday(events, today),
     meds,
     birthdays: upcomingBirthdays(events, today, 1).map(b => ({ name: b.person.payload.name, inDays: b.inDays })),
     contacts: dueContacts(events, today).slice(0, 3).map(c => c.person.payload.name),
@@ -48,6 +54,7 @@ export function briefText(b) {
   else L.push('Открытых задач нет.');
   if (b.habits.length) L.push(`Привычки на сегодня: ${b.habits.map(h => (h.minimum ? `${h.name} (минимум: ${h.minimum})` : h.name)).join(', ')}`);
   if (b.cards.due + b.cards.fresh) L.push(`Карточки: к повторению ${b.cards.due}, новых ${b.cards.fresh}`);
+  if (b.zero?.due || b.zero?.quick) L.push(`С нуля: ${[b.zero.due && `пора повторить уроков: ${b.zero.due}`, b.zero.quick && 'есть быстрая проверка'].filter(Boolean).join('; ')}`);
   if (b.meds.length) L.push(`Лекарства и добавки: ${b.meds.map(m => `${m.name} (${WHEN[m.when] ?? m.when})`).join(', ')}`);
   if (b.birthdays.length) L.push(`День рождения: ${b.birthdays.map(x => `${x.name} (${x.inDays === 0 ? 'сегодня' : 'завтра'})`).join(', ')}`);
   if (b.contacts.length) L.push(`Давно не общались: ${b.contacts.join(', ')}`);
