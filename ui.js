@@ -306,7 +306,7 @@ export function watchDialogs(root) {
   new MutationObserver(records => {
     for (const d of [...openDialogs]) if (!d.node.isConnected) dialogClosed(d, false);               // экраны пересобраны (блокировка): окна исчезли вместе с ними
     for (const r of records) {
-      if (r.type === 'attributes') {
+      if (r.attributeName) {                                                                              // запись об изменении атрибута hidden
         const n = r.target;
         if (isDialog(n)) { if (n.hidden) { const d = openDialogs.find(o => o.node === n); if (d) dialogClosed(d); } else dialogOpened(n); }
       } else {
