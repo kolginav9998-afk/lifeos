@@ -4,8 +4,10 @@ on:
   push:
   workflow_dispatch:
 
+# Сборка идёт с правом только читать репозиторий: так вредный пакет из npm не сможет ничего записать (ни выпуск, ни код).
+# Право записи есть только у отдельной задачи publish (ниже), которая не ставит npm-пакеты.
 permissions:
-  contents: write
+  contents: read
 
 concurrency:
   group: apk-${{ github.ref }}
@@ -20,7 +22,7 @@ jobs:
         with: { node-version: 22, cache: npm }
       - uses: actions/setup-java@v4
         with: { distribution: temurin, java-version: 21 }
-      - run: npm ci
+      - run: npm ci --ignore-scripts
       - run: node --test "tests/*.test.mjs"
       - name: Собрать веб-часть (та же, что на сайте)
         run: bash scripts/build-web.sh apk
@@ -37,47 +39,104 @@ jobs:
               <color name="ic_launcher_background">#0F1115</color>
           </resources>
           XML
-      - name: "Правки Android-проекта: запрет облачного автобэкапа, постоянный ключ подписи, обновление изнутри, номер сборки"
+
+      # Личный ключ подписи: ВЫКЛЮЧЕН по умолчанию. Включается только сознательно, двумя действиями владельца:
+      # (1) четыре секрета ANDROID_KEYSTORE_BASE64, ANDROID_KEYSTORE_PASSWORD, ANDROID_KEY_ALIAS, ANDROID_KEY_PASSWORD и
+      # (2) переменная репозитория LIFEOS_USE_PRIVATE_KEY=yes. После смены ключа старое приложение нужно удалить и поставить новое
+      # (обновление поверх невозможно); подробности в docs/SECURITY.md. Пока переменной нет, шаг пропускается.
+      - name: Личный ключ подписи (по умолчанию выключен)
+        if: ${{ vars.LIFEOS_USE_PRIVATE_KEY == 'yes' }}
+        env:
+          KS_B64: ${{ secrets.ANDROID_KEYSTORE_BASE64 }}
+          KS_PASS: ${{ secrets.ANDROID_KEYSTORE_PASSWORD }}
+          KEY_ALIAS: ${{ secrets.ANDROID_KEY_ALIAS }}
+          KEY_PASS: ${{ secrets.ANDROID_KEY_PASSWORD }}
+        run: |
+          if [ -z "$KS_B64" ] || [ -z "$KS_PASS" ] || [ -z "$KEY_ALIAS" ] || [ -z "$KEY_PASS" ]; then
+            echo "::error::Включён личный ключ (LIFEOS_USE_PRIVATE_KEY=yes), но заданы не все четыре секрета"; exit 1
+          fi
+          umask 077
+          printf '%s' "$KS_B64" | base64 -d > "$RUNNER_TEMP/private.keystore"
+          {
+            echo "LIFEOS_KEYSTORE_FILE=$RUNNER_TEMP/private.keystore"
+            echo "LIFEOS_KEYSTORE_PASSWORD=$KS_PASS"
+            echo "LIFEOS_KEY_ALIAS=$KEY_ALIAS"
+            echo "LIFEOS_KEY_PASSWORD=$KEY_PASS"
+          } >> "$GITHUB_ENV"
+          echo "Подпись личным ключом включена."
+
+      - name: "Правки Android-проекта: запрет копирования данных и http, лишние разрешения, release-подпись постоянным ключом, обновление изнутри, номер сборки"
         env:
           ANDROID_VERSION_CODE: ${{ github.run_number }}
         run: |
           export ANDROID_VERSION_NAME="$(node -e "import('./version.js').then(m => console.log(m.VERSION))")"
           export ANDROID_APP_NAME="$(node -e "console.log(JSON.parse(require('fs').readFileSync('config/brand.json', 'utf8')).name)")"
           python3 scripts/patch-android.py android
-      - name: Собрать debug-APK
+      - name: Собрать release-APK (не отлаживаемый)
         working-directory: android
-        run: ./gradlew --no-daemon assembleDebug
+        run: ./gradlew --no-daemon assembleRelease
       - name: Подготовить файл и показать отпечаток подписи
         run: |
           mkdir -p out
-          cp android/app/build/outputs/apk/debug/app-debug.apk out/lifeos.apk
+          if [ ! -f android/app/build/outputs/apk/release/app-release.apk ]; then
+            echo "::error::Нет android/app/build/outputs/apk/release/app-release.apk (возможно, APK не подписан). Что лежит в папке:"
+            ls -R android/app/build/outputs/apk || true
+            exit 1
+          fi
+          cp android/app/build/outputs/apk/release/app-release.apk out/lifeos.apk
           ls -l out
           keytool -printcert -jarfile out/lifeos.apk | grep -E 'Owner|SHA256' || true
-      - name: "Проверить, что подпись — наш постоянный ключ (иначе обновление поверх не поставится)"
+      - name: "Проверить подпись: ключ тот же, что у прежних сборок (иначе обновление поверх не поставится)"
         run: |
           EXPECTED='77:BC:5B:96:55:C2:65:E4:E6:6F:64:A6:60:79:CA:31:DB:C6:CC:76:1C:DF:CE:DB:71:F6:45:C1:65:99:A4:56'
+          if [ -n "${LIFEOS_KEYSTORE_FILE:-}" ]; then
+            echo "Включён личный ключ: ожидаемый отпечаток берём из его хранилища"
+            EXPECTED=$(keytool -list -v -keystore "$LIFEOS_KEYSTORE_FILE" -storepass "$LIFEOS_KEYSTORE_PASSWORD" -alias "$LIFEOS_KEY_ALIAS" | grep 'SHA256:' | head -1 | sed 's/.*SHA256: //')
+          fi
           ACTUAL=$(keytool -printcert -jarfile out/lifeos.apk | grep 'SHA256:' | head -1 | sed 's/.*SHA256: //')
           echo "Ожидаемый отпечаток: $EXPECTED"
           echo "Фактический отпечаток: $ACTUAL"
-          test "$ACTUAL" = "$EXPECTED"
+          test -n "$EXPECTED" && test "$ACTUAL" = "$EXPECTED"
+          # Вторая проверка, если в Android SDK на машине есть apksigner: подпись целая, Android её примет.
+          SDK="${ANDROID_HOME:-${ANDROID_SDK_ROOT:-/usr/local/lib/android/sdk}}"
+          APKSIGNER="$(ls -d "$SDK"/build-tools/*/apksigner 2>/dev/null | sort -V | tail -n 1 || true)"
+          if [ -n "$APKSIGNER" ]; then "$APKSIGNER" verify --print-certs out/lifeos.apk | head -5; else echo "apksigner не найден: проверено только через keytool"; fi
+      - name: "Проверить APK: не отлаживаемый, нет облачного копирования и http, только нужные разрешения, открыто одно окно"
+        run: node scripts/check-apk.mjs out/lifeos.apk
 
       - uses: actions/upload-artifact@v4
         with:
           name: lifeos-apk
           path: out/lifeos.apk
           if-no-files-found: error
-      - name: Опубликовать как «последний APK» (прямая ссылка для телефона)
-        if: github.ref == 'refs/heads/main'
+
+  # Публикация «последнего APK» (прямая ссылка для телефона). Только из main и только после зелёной сборки.
+  publish:
+    needs: build
+    if: github.ref == 'refs/heads/main'
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with: { node-version: 22 }
+      - uses: actions/download-artifact@v4
+        with:
+          name: lifeos-apk
+          path: out
+      - name: Опубликовать как «последний APK»
         env:
           GH_TOKEN: ${{ github.token }}
         run: |
+          test -f out/lifeos.apk
           VERSION="$(node -e "import('./version.js').then(m => console.log(m.VERSION))")"
           APP_NAME="$(node -e "console.log(JSON.parse(require('fs').readFileSync('config/brand.json', 'utf8')).name)")"
           NOTES="$(node -e "import('./changelog.js').then(m => console.log(JSON.stringify(m.CHANGELOG[0].items).replaceAll('--', '-')))")"
           # Первая строка — машиночитаемые сведения для кнопки «Обновить» в приложении (см. updater.js).
           cat > release-notes.md <<EOF
           <!-- lifeos-update {"version":"$VERSION","notes":$NOTES} -->
-          Автосборка из коммита ${GITHUB_SHA::7}, версия $VERSION. Debug-подпись. Первый раз ставится вручную, дальше приложение обновляется кнопкой «Обновить» в профиле.
+          Автосборка из коммита ${GITHUB_SHA::7}, версия $VERSION. Постоянный ключ подписи из репозитория (одинаковый у всех сборок). Первый раз ставится вручную, дальше приложение обновляется кнопкой «Обновить» в профиле.
           EOF
           gh release delete latest-apk --cleanup-tag --yes || true
           gh release create latest-apk out/lifeos.apk \

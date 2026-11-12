@@ -9,11 +9,13 @@
 // Аккаунт на сервере ровно один: регистрация открыта, только пока его нет.
 
 const VERSION = 1;
-const MAX_BODY = 3 * 1024 * 1024;              // 3 МБ на запрос
+const MAX_BODY = 3 * 1024 * 1024;              // 3 МБ на запрос синхронизации
+const MAX_SMALL = 64 * 1024;                    // все остальные запросы: ключи и «мета» занимают единицы килобайт
 const MAX_BATCH = 200;                          // записей в одной отправке
 const MAX_RECORD_CT = 256 * 1024;               // размер зашифрованной записи (base64-символов)
 const MAX_META = 8192;
 const SESSION_MS = 30 * 24 * 3600 * 1000;
+const MAX_SESSION_AGE_MS = 180 * 24 * 3600 * 1000;   // предельный возраст сессии: украденный токен нельзя поддерживать бесконечно
 const PAGE_BYTES = 900 * 1024;
 const MAX_TOTAL_BYTES = 400 * 1024 * 1024;
 const DEFAULT_ORIGINS = ['https://kolginav9998-afk.github.io', 'https://localhost', 'http://localhost', 'capacitor://localhost'];
@@ -62,6 +64,7 @@ function headersFor(request, env, extra = {}) {
     'content-type': 'application/json; charset=utf-8',
     'cache-control': 'no-store',
     'x-content-type-options': 'nosniff',
+    'strict-transport-security': 'max-age=31536000; includeSubDomains',
     'referrer-policy': 'no-referrer',
     'content-security-policy': "default-src 'none'; frame-ancestors 'none'",
     ...extra,
@@ -77,13 +80,27 @@ function headersFor(request, env, extra = {}) {
   return h;
 }
 const json = (request, env, body, status = 200) => new Response(JSON.stringify(body), { status, headers: headersFor(request, env) });
+// Ответ «на краю» (до обращения к хранилищу): те же заголовки безопасности, без подробностей.
+export const edgeReply = (request, env, status, code) => json(request, env, { error: code }, status);
 
 // ---------- чтение и проверка тела ----------
-async function readJson(request) {
-  const len = Number(request.headers.get('content-length') ?? 0);
-  if (len > MAX_BODY) throw new HttpError(413, 'too_large');
-  const text = await request.text();
-  if (text.length > MAX_BODY) throw new HttpError(413, 'too_large');
+// Читаем тело потоком и останавливаемся на лимите: огромный запрос без Content-Length не должен целиком попасть в память.
+async function readJson(request, limit = MAX_SMALL) {
+  if (Number(request.headers.get('content-length') ?? 0) > limit) throw new HttpError(413, 'too_large');
+  let text = '';
+  if (request.body) {
+    const reader = request.body.getReader();
+    const dec = new TextDecoder();
+    let total = 0;
+    for (;;) {
+      const { done, value } = await reader.read();
+      if (done) break;
+      total += value.byteLength;
+      if (total > limit) { try { await reader.cancel(); } catch { /* уже закрыт */ } throw new HttpError(413, 'too_large'); }
+      text += dec.decode(value, { stream: true });
+    }
+    text += dec.decode();
+  }
   try {
     const v = JSON.parse(text);
     if (!v || typeof v !== 'object' || Array.isArray(v)) throw new Error('shape');
@@ -145,8 +162,8 @@ async function authenticate(request, store, now) {
   if (!m) throw new HttpError(401, 'unauthorized');
   const th = await sha256Hex(m[1]);
   const s = store.getSession(th);
-  if (!s || s.expires_at < now) throw new HttpError(401, 'unauthorized');
-  if (now - s.last_used > 3600 * 1000) store.touchSession(th, now, now + SESSION_MS);     // продлеваем при использовании
+  if (!s || s.expires_at < now || now - s.created_at > MAX_SESSION_AGE_MS) throw new HttpError(401, 'unauthorized');
+  if (now - s.last_used > 3600 * 1000) store.touchSession(th, now, Math.min(now + SESSION_MS, s.created_at + MAX_SESSION_AGE_MS));     // продлеваем при использовании, но не дальше предельного возраста
   return { th, account: store.getAccount() };
 }
 
@@ -157,11 +174,18 @@ async function verifyAuth(account, authKeyB64, prefix = '') {
 }
 
 // Правдоподобные «параметры» для несуществующего пользователя, чтобы нельзя было проверять, есть ли такой логин.
-async function decoyParams(store, username) {
+// По ответу нельзя понять, есть ли такой логин: форма (длина соли) и число итераций берутся у настоящего аккаунта, а сами «обманные» значения меняются
+// вместе с настоящими (после смены пароля или кода восстановления у настоящего пользователя другая соль, и у остальных тоже).
+function paramShape(acc, kind) {
+  const salt = acc ? (kind === 'rec' ? acc.rec_salt : acc.auth_salt) : null;
+  const iter = acc ? (kind === 'rec' ? acc.rec_iter : acc.auth_iter) : null;
+  return { seed: String((kind === 'rec' ? acc?.rec_salt : null) ?? acc?.auth_salt ?? ''), bytes: salt ? Math.min(32, Math.max(16, unb64(salt).length)) : 16, iter: iter || (kind === 'rec' ? 200000 : 600000) };
+}
+async function decoyParams(store, username, shape) {
   let key = store.kvGet('decoy_key');
   if (!key) { key = b64url(randomBytes(32)); store.kvSet('decoy_key', key); }
-  const mac = await hmacHex(te.encode(key), te.encode(`decoy:${username}`));
-  return { salt: btoa(String.fromCharCode(...mac.match(/../g).slice(0, 16).map(x => parseInt(x, 16)))), iter: 600000 };
+  const mac = await hmacHex(te.encode(key), te.encode(`decoy:${shape.seed}:${username}`));
+  return { salt: btoa(String.fromCharCode(...mac.match(/../g).slice(0, shape.bytes).map(x => parseInt(x, 16)))), iter: shape.iter };
 }
 
 // ---------- маршруты ----------
@@ -190,7 +214,12 @@ async function route(request, store, env, now) {
       if (!r || !checkAuthKey(r.authKey) || !isB64(r.salt, 16, 64) || !Number.isInteger(r.iter) || r.iter < 1000 || r.iter > 10_000_000) throw new HttpError(400, 'bad_recovery');
       rec = r;
     }
-    if (env.SETUP_CODE && !safeEqual(String(b.setupCode ?? ''), String(env.SETUP_CODE))) throw new HttpError(403, 'bad_setup_code');
+    if (store.getAccount()) throw new HttpError(409, 'account_exists');            // раньше проверки кода: на занятом сервере код по разнице ответов не подобрать
+    if (env.SETUP_CODE) {
+      const lockKey = clientKey(request);
+      checkLock(store, lockKey, now);                                               // подбор кода установки ограничен так же, как подбор пароля
+      if (!safeEqual(String(b.setupCode ?? ''), String(env.SETUP_CODE))) { failedAttempt(store, lockKey, now); throw new HttpError(403, 'bad_setup_code'); }
+    }
     const hashSaltBytes = randomBytes(16);
     const authHash = await hmacHex(hashSaltBytes, unb64(b.authKey));
     const recHash = rec ? await hmacHex(hashSaltBytes, unb64(rec.authKey)) : null;
@@ -209,8 +238,9 @@ async function route(request, store, env, now) {
     const b = await readJson(request);
     const username = normalizeUsername(b.username);
     const acc = store.getAccount();
+    const decoy = await decoyParams(store, username, paramShape(acc, 'auth'));      // считаем всегда: время ответа одинаково
     if (acc && acc.username === username) return json(request, env, { salt: acc.auth_salt, iter: acc.auth_iter });
-    return json(request, env, await decoyParams(store, username));
+    return json(request, env, decoy);
   }
 
   // --- вход ---
@@ -235,8 +265,9 @@ async function route(request, store, env, now) {
     const b = await readJson(request);
     const username = normalizeUsername(b.username);
     const acc = store.getAccount();
+    const decoy = await decoyParams(store, `rec:${username}`, paramShape(acc, 'rec'));
     if (acc && acc.username === username && acc.rec_salt) return json(request, env, { salt: acc.rec_salt, iter: acc.rec_iter });
-    return json(request, env, await decoyParams(store, `rec:${username}`));
+    return json(request, env, decoy);
   }
   if (path === '/v1/recover' && method === 'POST') {
     const b = await readJson(request);
@@ -247,6 +278,7 @@ async function route(request, store, env, now) {
     const acc = store.getAccount();
     let ok = false;
     if (acc && acc.username === username && acc.rec_hash) ok = await verifyAuth(acc, b.recoveryAuthKey, 'rec_');
+    else await hmacHex(randomBytes(16), unb64(b.recoveryAuthKey));                  // выравниваем время ответа, как при входе
     if (!ok) { failedAttempt(store, key, now); throw new HttpError(401, 'bad_credentials'); }
     clearAttempts(store, key);
     // короткоживущий токен только для шага 2 (смена пароля)
@@ -321,7 +353,7 @@ async function route(request, store, env, now) {
   }
 
   if (path === '/v1/sync' && method === 'POST') {
-    const b = await readJson(request);
+    const b = await readJson(request, MAX_BODY);
     if (!Array.isArray(b.records) || b.records.length > MAX_BATCH) throw new HttpError(400, 'bad_batch');
     const clean = [];
     for (const r of b.records) {

@@ -366,3 +366,115 @@ test('код восстановления остаётся рабочим пос
   assert.equal((await c.call('POST', '/v1/recover', { body: { username: 'владелец', recoveryAuthKey: recovery.authKey } })).status, 200, 'и после восстановления');
   c.close();
 });
+
+// ---------- R4.0: безопасность сервера ----------
+test('заголовки безопасности есть у любого ответа, ошибки не раскрывают внутренности', async () => {
+  const c = ctx();
+  for (const r of [await c.call('GET', '/v1/status'), await c.call('GET', '/v1/нет'), await c.call('POST', '/v1/login', { body: '{' })]) {
+    assert.match(r.headers.get('strict-transport-security'), /max-age=\d+/);
+    assert.equal(r.headers.get('x-content-type-options'), 'nosniff');
+    assert.equal(r.headers.get('referrer-policy'), 'no-referrer');
+    assert.match(r.headers.get('content-security-policy'), /default-src 'none'/);
+    assert.equal(r.headers.get('cache-control'), 'no-store');
+  }
+  const broken = { getAccount() { throw new Error('секретный-путь /var/db/lifeos.sqlite'); } };
+  const orig = console.error; console.error = () => {};
+  try {
+    const res = await handle(new Request('https://sync.test/v1/status'), broken, {}, 1);
+    assert.equal(res.status, 500);
+    const text = await res.text();
+    assert.deepEqual(JSON.parse(text), { error: 'server_error' });
+    assert.ok(!/секретный|sqlite|Error/.test(text), 'в ответе нет подробностей сбоя');
+  } finally { console.error = orig; }
+  c.close();
+});
+
+test('«обманные» параметры входа неотличимы от настоящих: длина соли, число итераций, смена вместе с настоящими', async () => {
+  const c = ctx();
+  const recovery = { authKey: authKey(), salt: b64(rnd(16)), iter: 200000 };
+  const reg = await registered(c, { authIter: 650000, recovery, meta: meta(true) });
+  const params = async (p, u) => (await c.call('POST', p, { body: { username: u } })).body;
+  const realL = await params('/v1/login/params', 'владелец'), fakeL = await params('/v1/login/params', 'чужой');
+  assert.deepEqual([realL.iter, fakeL.iter, fakeL.salt.length], [650000, 650000, realL.salt.length], 'то же число итераций и та же длина соли');
+  const realR = await params('/v1/recover/params', 'владелец'), fakeR = await params('/v1/recover/params', 'чужой');
+  assert.deepEqual([realR.iter, fakeR.iter, fakeR.salt.length], [200000, 200000, realR.salt.length], 'и для кода восстановления');
+  assert.notEqual(fakeR.salt, fakeL.salt);
+  // у настоящего пользователя после смены пароля новая соль; у «обманных» тоже: постоянство не выдаёт настоящий логин
+  const before = fakeL.salt;
+  const next = { newAuthKey: authKey(), newAuthSalt: b64(rnd(16)), newAuthIter: 650000, newMeta: meta(true) };
+  assert.equal((await c.call('POST', '/v1/password', { token: reg.token, body: { oldAuthKey: reg.body.authKey, ...next } })).status, 200);
+  const after = (await params('/v1/login/params', 'чужой')).salt;
+  assert.notEqual(after, before);
+  assert.equal((await params('/v1/login/params', 'чужой')).salt, after, 'между сменами значение постоянно');
+  assert.equal((await params('/v1/login/params', 'владелец')).salt, next.newAuthSalt);
+  c.close();
+});
+
+test('код установки: подбор ограничен паузой, на занятом сервере ответ не зависит от кода', async () => {
+  const c = ctx({ SETUP_CODE: 'секрет-123' });
+  for (let i = 0; i < 5; i++) assert.equal((await c.call('POST', '/v1/register', { body: regBody({ setupCode: 'не-тот' + i }) })).status, 403);
+  const locked = await c.call('POST', '/v1/register', { body: regBody({ setupCode: 'секрет-123' }) });
+  assert.deepEqual([locked.status, locked.body.error], [429, 'locked'], 'даже верный код ждёт');
+  c.clock.advance(2000);
+  assert.equal((await c.call('POST', '/v1/register', { body: regBody({ setupCode: 'секрет-123' }) })).status, 201);
+  const a = await c.call('POST', '/v1/register', { ip: '3.3.3.3', body: regBody({ setupCode: 'секрет-123' }) });
+  const b = await c.call('POST', '/v1/register', { ip: '3.3.3.3', body: regBody({ setupCode: 'неверный' }) });
+  assert.deepEqual([a.status, a.body, b.status, b.body], [409, { error: 'account_exists' }, 409, { error: 'account_exists' }], 'по ответу код не угадать');
+  c.close();
+});
+
+test('размеры: вход и служебные запросы до 64 КБ, синхронизация до 3 МБ; поток без Content-Length тоже обрывается', async () => {
+  const c = ctx();
+  const reg = await registered(c);
+  const bigLogin = JSON.stringify({ username: 'x'.repeat(70 * 1024), authKey: authKey() });
+  assert.equal((await c.call('POST', '/v1/login', { body: bigLogin })).status, 413);
+  assert.equal((await c.call('POST', '/v1/login/params', { body: bigLogin })).status, 413);
+  assert.equal((await c.call('POST', '/v1/recover', { body: bigLogin })).status, 413);
+  const ok = await c.call('POST', '/v1/sync', { token: reg.token, body: { records: Array.from({ length: 4 }, (_, i) => rec('big' + i, 5, { ct: Buffer.alloc(190 * 1024, 1).toString('base64') })) } });
+  assert.deepEqual([ok.status, ok.body.accepted], [200, 4], 'крупная пачка записей проходит');
+  const stream = new ReadableStream({ start(ctrl) { for (let i = 0; i < 100; i++) ctrl.enqueue(new TextEncoder().encode('x'.repeat(1024))); ctrl.close(); } });
+  const res = await handle(new Request('https://sync.test/v1/login', { method: 'POST', body: stream, duplex: 'half', headers: { 'x-forwarded-for': '1.2.3.4' } }), c.store, {}, c.clock.now());
+  assert.equal(res.status, 413, 'потоковое тело без длины остановлено на лимите');
+  c.close();
+});
+
+test('сессия живёт не дольше 180 дней, даже если ею пользуются', async () => {
+  const c = ctx();
+  const reg = await registered(c);
+  for (let day = 20; day <= 160; day += 20) {
+    c.clock.advance(20 * 24 * 3600 * 1000);
+    assert.equal((await c.call('GET', '/v1/sync?since=0', { token: reg.token })).status, 200, `день ${day}`);
+  }
+  c.clock.advance(25 * 24 * 3600 * 1000);
+  assert.equal((await c.call('GET', '/v1/sync?since=0', { token: reg.token })).status, 401, 'на 185-й день токен перестал работать');
+  assert.equal((await c.call('POST', '/v1/login', { body: { username: 'владелец', authKey: reg.body.authKey } })).status, 200, 'новый вход работает');
+  c.close();
+});
+
+test('адрес клиента для защиты от подбора: присланные клиентом заголовки подделать адрес не дают', async () => {
+  const { clientIp } = await import('../server/node/server.js');
+  const req = h => ({ headers: h, socket: { remoteAddress: '10.0.0.5' } });
+  assert.equal(clientIp(req({ 'x-forwarded-for': '6.6.6.6' }), false), '10.0.0.5');
+  assert.equal(clientIp(req({ 'x-forwarded-for': '6.6.6.6, 7.7.7.7' }), true), '7.7.7.7', 'за доверенным прокси берётся последний адрес цепочки');
+  assert.equal(clientIp(req({}), true), '10.0.0.5');
+  const { server, close } = createServer({ env: {} });
+  await new Promise(r => server.listen(0, '127.0.0.1', r));
+  assert.deepEqual([server.requestTimeout, server.headersTimeout], [30000, 15000]);
+  const base = `http://127.0.0.1:${server.address().port}`;
+  const post = (p, body, ip) => fetch(base + p, { method: 'POST', headers: { 'content-type': 'application/json', 'x-forwarded-for': ip, 'cf-connecting-ip': ip }, body: JSON.stringify(body) });
+  assert.equal((await post('/v1/register', regBody(), '1.1.1.1')).status, 201);
+  let last;
+  for (let i = 0; i < 6; i++) last = await post('/v1/login', { username: 'владелец', authKey: authKey() }, `9.9.9.${i}`);
+  assert.equal(last.status, 429, 'каждый раз «новый» адрес в заголовке, а сокет один: пауза действует');
+  close();
+});
+
+test('Cloudflare Worker: посторонние адреса отсекаются до базы, сбой объекта не показывает подробностей', async () => {
+  const { edgeReply } = await import('../server/core.js');
+  const r = edgeReply(new Request('https://x.test/', { headers: { origin: ORIGIN } }), {}, 404, 'not_found');
+  assert.deepEqual([r.status, await r.json(), r.headers.get('access-control-allow-origin'), r.headers.get('x-content-type-options')], [404, { error: 'not_found' }, ORIGIN, 'nosniff']);
+  const w = (await import('node:fs')).readFileSync(new URL('../server/cloudflare/worker.js', import.meta.url), 'utf8');
+  assert.match(w, /startsWith\('\/v1\/'\)/); assert.match(w, /catch \{[\s\S]*503/);
+  const ig = (await import('node:fs')).readFileSync(new URL('../server/cloudflare/.gitignore', import.meta.url), 'utf8');
+  assert.match(ig, /^\.wrangler\/$/m, 'локальное состояние wrangler не попадает в репозиторий');
+});

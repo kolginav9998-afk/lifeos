@@ -1,7 +1,7 @@
 // Cloudflare Worker + Durable Object (встроенный SQLite). Один объект «main» хранит единственный аккаунт и все записи.
 // Бесплатный тариф Cloudflare включает такие объекты; данные в них зашифрованы на устройствах.
 import { DurableObject } from 'cloudflare:workers';
-import { handle } from '../core.js';
+import { handle, edgeReply } from '../core.js';
 import { SqlStore } from '../sqlstore.js';
 
 export class Vault extends DurableObject {
@@ -19,7 +19,13 @@ export class Vault extends DurableObject {
 
 export default {
   async fetch(request, env) {
-    const stub = env.VAULT.get(env.VAULT.idFromName('main'));
-    return stub.fetch(request);
+    // Всё постороннее (сканеры, чужие адреса) отсекаем здесь, не будя базу: у бесплатного тарифа есть дневные лимиты на обращения к ней.
+    if (!new URL(request.url).pathname.startsWith('/v1/')) return edgeReply(request, env, 404, 'not_found');
+    try {
+      const stub = env.VAULT.get(env.VAULT.idFromName('main'));
+      return await stub.fetch(request);
+    } catch {
+      return edgeReply(request, env, 503, 'unavailable');            // без подробностей: сбой объекта не должен показывать страницу с внутренними сведениями
+    }
   },
 };

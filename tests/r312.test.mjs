@@ -3,7 +3,7 @@ import test from 'node:test';
 import assert from 'node:assert/strict';
 import fs from 'node:fs';
 import path from 'node:path';
-import { parseVersion, compareVersions, isTrustedUrl, readRelease, judge, checkApp, checkSite, shouldAutoCheck, percent, sizeText, downloadAndInstall, RELEASE_URL, APK_LINK } from '../updater.js';
+import { parseVersion, compareVersions, isTrustedUrl, isReleaseAssetUrl, readRelease, judge, checkApp, checkSite, shouldAutoCheck, percent, sizeText, downloadAndInstall, RELEASE_URL, APK_LINK, REPO, APK_ASSET, MAX_APK_BYTES } from '../updater.js';
 import { AVATARS, COLORS, initials, profileCard, checkProfileForm, saveProfileRecord } from '../profile.js';
 import { makeProfile, profileOf } from '../events.js';
 import { VERSION } from '../version.js';
@@ -203,4 +203,41 @@ test('профиль: проверка формы и сохранение не �
   assert.equal(saved.payload.heightCm, 170); assert.equal(saved.payload.birthYear, 1990, 'рост и год рождения на месте');
   assert.deepEqual([saved.payload.name, saved.payload.avatar, saved.payload.color], ['Анна К', AVATARS[3], 'blue']);
   assert.equal(profileOf([saved]).payload.accountId, health.payload.accountId, 'служебный номер не меняется');
+});
+
+// ---------- R4.0: доверие к каналу обновления ----------
+test('адрес файла обновления закреплён за нашим выпуском, а не за любым адресом на github.com', () => {
+  assert.ok(isReleaseAssetUrl(APK_LINK));
+  assert.ok(isReleaseAssetUrl(APK_LINK.replace('github.com', 'GitHub.com')), 'регистр хоста не важен');
+  for (const bad of [APK_LINK.replace(REPO, 'другой/репозиторий'), APK_LINK.replace('latest-apk', 'v1'), APK_LINK + '?x=1', APK_LINK + '#a', APK_LINK.replace('https', 'http'),
+    APK_LINK.replace('https://', 'https://user:pw@'), APK_LINK.replace('github.com', 'github.com:8443'), APK_LINK.replace('github.com', 'github.com.evil.example'),
+    `https://raw.githubusercontent.com/${REPO}/main/lifeos.apk`, 'https://objects.githubusercontent.com/x/lifeos.apk', '', null, undefined]) assert.equal(isReleaseAssetUrl(bad), false, String(bad));
+  // чужой выпуск или огромный файл в сведениях не принимаются; переходы GitHub на свои серверы файлов по-прежнему допустимы (isTrustedUrl)
+  assert.equal(readRelease(release({ assets: [{ name: 'lifeos.apk', browser_download_url: 'https://github.com/другой/репозиторий/releases/download/latest-apk/lifeos.apk' }] })), null);
+  assert.equal(readRelease(release({ assets: [{ name: 'lifeos.apk', size: MAX_APK_BYTES + 1, browser_download_url: APK_LINK }] })), null, 'слишком большой файл');
+  assert.ok(readRelease(release({ assets: [{ name: 'lifeos.apk', size: MAX_APK_BYTES, browser_download_url: APK_LINK }] })));
+  assert.ok(isTrustedUrl('https://release-assets.githubusercontent.com/github-production-release-asset/1'));
+});
+test('скачать и установить: чужой адрес на GitHub, пустая сумма или размер от плагина — установка не открывается', async () => {
+  const rel = readRelease(release());
+  await assert.rejects(downloadAndInstall({ plugin: fakePlugin(), release: { ...rel, url: 'https://github.com/другой/репозиторий/releases/download/latest-apk/lifeos.apk' } }), /не разрешён/);
+  for (const file of [{ path: '/p', size: 5673963 }, { path: '/p', sha256: 'ab'.repeat(32) }, { path: '/p', size: MAX_APK_BYTES + 1, sha256: 'ab'.repeat(32) }]) {
+    const p = fakePlugin({ download: async () => file });
+    await assert.rejects(downloadAndInstall({ plugin: p, release: rel }));
+    assert.ok(!p.calls.some(c => c.startsWith('install')), JSON.stringify(file));
+  }
+  const nosum = readRelease(release({ assets: [{ name: 'lifeos.apk', browser_download_url: APK_LINK }] }));
+  const q = fakePlugin({ download: async () => ({ path: '/p' }) });
+  assert.deepEqual(await downloadAndInstall({ plugin: q, release: nosum }), { state: 'installing' }, 'если выпуск не сообщает сумму и размер, проверять нечего');
+});
+test('нативный плагин: первый адрес закреплён за выпуском, лимиты размера и времени, сначала файл .part', () => {
+  const j = read('assets/android-java/ApkInstallerPlugin.java');
+  assert.ok(j.includes(`ASSET_PATH = "/${REPO}/releases/download/latest-apk/${APK_ASSET}"`), 'путь в Java совпадает с REPO и именем файла из updater.js');
+  assert.match(j, /firstHopOk\(cur\)/); assert.ok(!/if \(!trusted\(cur\)\)/.test(j));
+  assert.match(j, /MAX_BYTES = 150L \* 1024 \* 1024/); assert.match(j, /got > MAX_BYTES/); assert.match(j, /total > MAX_BYTES/);
+  assert.match(j, /MAX_MILLIS/); assert.match(j, /out = new File\(dir, PART\)/); assert.match(j, /out\.renameTo\(finalFile\)/);
+  assert.match(j, /getCanonicalPath\(\)\.equals\(new File\(dir, FILE\)\.getCanonicalPath\(\)\)/, 'ставится только update.apk из своей папки');
+  assert.match(j, /u\.getUserInfo\(\) != null/);
+  assert.match(j, /setInstanceFollowRedirects\(false\)/, 'переходы проверяются вручную');
+  assert.match(j, /if \(busy\)/, 'две загрузки одновременно не идут');
 });
