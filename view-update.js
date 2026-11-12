@@ -27,7 +27,7 @@ export async function autoCheckUpdate(notify) {
 }
 export const updateAvailable = () => found?.state === 'newer';
 
-export function createUpdateCard() {
+export function createUpdateCard({ openHelp = () => {} } = {}) {
   const root = el('section', { id: 'upd-card', class: 'card settings-card' });
   let st = found?.state === 'newer' ? { phase: 'newer', result: found } : { phase: 'idle' };
   let bar = null, barText = null;
@@ -68,6 +68,7 @@ export function createUpdateCard() {
     const status = (text, cls = 'muted') => kids.push(el('p', { id: 'upd-status', class: cls, role: 'status', textContent: text }));
     const checkBtn = (label = 'Проверить обновления') => el('button', { id: 'upd-check', type: 'button', textContent: label, onclick: check });
     const link = () => el('a', { id: 'upd-link', href: APK_LINK, target: '_blank', rel: 'noopener', class: 'link-out', textContent: 'Скачать файл по ссылке и установить вручную' });
+    const help = () => el('button', { id: 'upd-help', type: 'button', class: 'link help-link', textContent: 'Что делать', onclick: () => openHelp('update') });
     const notes = r => (r?.release?.notes?.length ? el('ul', { class: 'plain muted upd-notes' }, ...r.release.notes.map(t => el('li', { textContent: t }))) : null);
     let actions = [checkBtn()];
 
@@ -89,9 +90,11 @@ export function createUpdateCard() {
       actions = [checkBtn('Проверить ещё раз')];
     } else if (st.phase === 'permission') {
       status('Разреши установку из этого приложения (настройки открыты), вернись сюда и нажми «Обновить» ещё раз.', 'warn');
+      kids.push(help());
       actions = [el('button', { id: 'upd-go', type: 'button', class: 'primary', textContent: 'Обновить', onclick: runUpdate })];
     } else {
       status(st.error || 'Не получилось обновиться.', 'warn');
+      kids.push(help());
       if (isNative) kids.push(link());
       if (st.result) actions.unshift(el('button', { id: 'upd-go', type: 'button', class: 'primary', textContent: 'Попробовать ещё раз', onclick: runUpdate }));
     }

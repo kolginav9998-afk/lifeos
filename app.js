@@ -33,6 +33,9 @@ import { createTestsView } from './view-tests.js';
 import { createInsightsView } from './view-insights.js';
 import { createSettingsView } from './view-settings.js';
 import { createAccountView } from './view-account.js';
+import { createHelpView } from './view-help.js';
+import { createTour, openTarget } from './view-help-tour.js';
+import { searchHelp } from './help.js';
 import * as appSync from './app-sync.js';
 import { createTabGuard, tabState } from './tabguard.js';
 
@@ -55,6 +58,7 @@ const DEFS = [
   { id: 'plans', group: 'money', title: 'Планы', sub: 'Планы', make: () => createPlansView() },
   { id: 'more', group: 'more', title: 'Настройки', sub: 'Настройки', make: ctx => createSettingsView(ctx) },
   { id: 'account', group: 'more', title: 'Профиль', sub: 'Профиль', make: ctx => createAccountView(ctx) },
+  { id: 'help', group: 'more', title: 'Справка', sub: 'Справка', make: ctx => createHelpView(ctx) },
 ];
 const GROUPS = [
   { id: 'today', label: 'Сегодня', icon: 'tasks' },
@@ -66,7 +70,7 @@ const GROUPS = [
 const FOCUS_TAB = { task: 'today', habit: 'habits', expense: 'money', note: 'notes', diary: 'diary', measure: 'health' };
 
 // Простой режим: меньше вкладок и экранов, только самое нужное. Остальные экраны по-прежнему открываются из чипов и поиска.
-const SIMPLE_VIEWS = new Set(['today', 'habits', 'diary', 'health', 'notes', 'more', 'account']);
+const SIMPLE_VIEWS = new Set(['today', 'habits', 'diary', 'health', 'notes', 'more', 'account', 'help']);
 const visibleDefs = () => (getPref('simple') ? DEFS.filter(d => SIMPLE_VIEWS.has(d.id)) : DEFS);
 
 // ---------- тема ----------
@@ -143,8 +147,12 @@ function renderSearch() {
       el('span', { class: 'kind', textContent: r.kind }), el('span', { textContent: r.title }))),
       ...courses.map(r => el('button', { type: 'button', class: 'result course', dataset: { track: r.trackId }, onclick: () => { closeSearch(); go('learn'); views.learn.open(r.trackId, r.lessonId); } },
         el('span', { class: 'kind', textContent: r.kind }), el('span', { textContent: r.title })))]
-    : [el('p', { class: 'muted', textContent: 'Ничего не найдено' })]));
+    : [el('p', { class: 'muted', textContent: 'Ничего не найдено' }),
+      ...searchHelp(q, 2).map(h => el('button', { type: 'button', class: 'chip help-hit', dataset: { help: h.id }, onclick: () => { closeSearch(); openHelp(h.id); } }, `Справка: ${h.title}`))]));
 }
+
+// Открыть «Справку» (и сразу статью, если указан её id).
+function openHelp(id) { go('help'); if (id) views.help.open(id); }
 
 // ---------- вход и блокировка ----------
 let lockTimer = null;
@@ -198,8 +206,16 @@ async function showGate() {
   clearToast(); closeSearch();
   if (gateView) return;
   try { await store.refresh(); } catch (e) { console.error(e); }              // записи этого устройства нужны входу (присоединение к аккаунту)
-  gateView = createAccountView({ go, gate: true, onVaultChange: updateLockButton, onAuthenticated: () => { gateView = null; enterApp(); } });
+  gateView = createAccountView({ go, gate: true, onVaultChange: updateLockButton, onAuthenticated: () => { gateView = null; freshSignIn = true; enterApp(); } });
   $('gate-body').replaceChildren(gateView.root);
+}
+
+// Знакомство с приложением: один раз на устройстве, сразу после первого входа (настройка tourDone).
+let freshSignIn = false;
+function startTour() {
+  if (getPref('tourDone')) return;
+  setPref('tourDone', true);                              // отмечаем сразу: даже если закрыть приложение посреди знакомства, оно не вернётся
+  tour.show();
 }
 
 async function enterApp() {
@@ -216,6 +232,7 @@ async function enterApp() {
   appSync.start().catch(e => console.error(e));
   startTabGuard();
   paintAvatar(store.state.events);
+  if (freshSignIn) { freshSignIn = false; startTour(); }
   if (!entered) {
     entered = true; handleUrlParams();
     autoCheckUpdate(r => toast(`Доступна новая версия ${r.latest}`, { actionLabel: 'Обновить', onAction: () => go('account'), ms: 12000 }));
@@ -309,6 +326,7 @@ function handleUrlParams() {
 // Экраны создаются заново и при блокировке: в скрытых экранах и открытых окнах не должно оставаться личных данных.
 function buildViews() {
   const main = $('view'), ctx = { go, lockNow, applyTheme, applyMode, onVaultChange: updateLockButton, openAccount: () => go('account'), exportCsv: () => views.more.exportCsv(),
+    openHelp, showTour: () => { window.scrollTo(0, 0); tour.show(); },
     onLoggedOut: () => { paintAvatar(store.state.events); if (REQUIRE_ACCOUNT) showGate(); } };
   for (const d of DEFS) {
     const v = d.make(ctx);
@@ -332,7 +350,11 @@ function applyMode() {
   for (const v of Object.values(views)) v.update(store.state.events);
 }
 
+// Знакомство с приложением живёт под шапкой и остаётся на месте, пока переходишь между экранами.
+const tour = createTour({ run: act => openTarget(go, act) });
+
 function build() {
+  $('view').before(tour.root);
   $('search-btn').append(icon('search'));
   $('lock-top').append(icon('lock'));
   $('search-btn').onclick = () => {
