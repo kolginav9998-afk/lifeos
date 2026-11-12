@@ -28,15 +28,15 @@ const state = (cardId, first, hist) => ({ ...newState(cardId, first), reps: hist
 // ---------- цели уроков ----------
 test('цели уроков: у каждого урока есть цель, цели аккуратные и без лишних', () => {
   const lessonIds = new Set(TRACKS.flatMap(t => t.lessons.map(l => l.id)));
-  const missing = [...lessonIds].filter(id => !LESSON_GOALS[id]);
-  assert.deepEqual(missing, [], 'добавь цель в c-goals.js');
+  const missing = [...lessonIds].filter(id => !lessonGoal(id));
+  assert.deepEqual(missing, [], 'добавь цель в c-goals.js (у курсов с нуля: поле goal урока)');
   assert.deepEqual(Object.keys(LESSON_GOALS).filter(id => !lessonIds.has(id)), [], 'цель без урока');
-  for (const [id, g] of Object.entries(LESSON_GOALS)) {
+  for (const [id, g] of [...lessonIds].map(id => [id, lessonGoal(id)])) {
     assert.ok(g.length >= 15 && g.length <= 120, `${id}: длина ${g.length}`);
     assert.ok(!/[.!?]$/.test(g) && !g.includes('null') && g === g.trim(), `${id}: «${g}»`);
     assert.ok(!/^После урока/i.test(g), `${id}: префикс добавляет интерфейс`);
   }
-  for (const t of TRACKS) assert.equal(new Set(t.lessons.map(l => LESSON_GOALS[l.id])).size, t.lessons.length, `${t.id}: цели не повторяются`);
+  for (const t of TRACKS) assert.equal(new Set(t.lessons.map(l => lessonGoal(l.id))).size, t.lessons.length, `${t.id}: цели не повторяются`);
   assert.equal(lessonGoal('en-13'), 'заказать еду и напиток и попросить счёт по-английски'); assert.equal(lessonGoal('нет-такого'), '');
 });
 

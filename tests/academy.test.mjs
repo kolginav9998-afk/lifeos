@@ -74,7 +74,8 @@ test('сводка и серия занятий', () => {
 
 // ---------- содержимое курсов ----------
 test('курсы: каждый трек проходит проверку структуры', () => {
-  assert.equal(TRACKS.length, 8);
+  assert.equal(TRACKS.filter(t => !t.zero).length, 8);
+  assert.ok(TRACKS.filter(t => t.zero).length >= 3, 'маршруты с нуля: английский, иврит, библейский иврит');
   const ids = new Set(TRACKS.map(t => t.id));
   assert.equal(ids.size, TRACKS.length);
   for (const t of TRACKS) assert.deepEqual(validateTrack(t), [], t.id);

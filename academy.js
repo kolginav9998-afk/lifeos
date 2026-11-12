@@ -2,6 +2,9 @@
 import englishBase from './c-english.js';
 import englishWords from './c-english-words.js';
 import hebrew from './c-hebrew.js';
+import enzero from './c-zero-en.js';
+import hezero from './c-zero-he.js';
+import hebib from './c-zero-hb.js';
 import backend from './c-backend.js';
 import data from './c-data.js';
 import analyst from './c-analyst.js';
@@ -15,9 +18,10 @@ import { isSick } from './sick.js';
 import { makeRng } from './stats.js';
 
 const english = { ...englishBase, deck: [...(englishBase.deck || []), ...englishWords] };   // колода слов лежит в отдельном файле (бюджет размера файла)
-export const TRACKS = [english, hebrew, health, ai, backend, data, analyst, engineer];
+export const TRACKS = [english, hebrew, health, ai, backend, data, analyst, engineer, enzero, hezero, hebib];   // маршруты «с нуля» (zero: true) идут в конце; на экране «С нуля» их порядок свой
 export const trackById = id => TRACKS.find(t => t.id === id) || null;
-export const lessonGoal = id => LESSON_GOALS[id] ?? '';           // «после урока я смогу…»
+const OWN_GOALS = new Map(TRACKS.flatMap(t => t.lessons.filter(l => l.goal).map(l => [l.id, l.goal])));   // у курсов «с нуля» цель лежит в самом уроке
+export const lessonGoal = id => LESSON_GOALS[id] ?? OWN_GOALS.get(id) ?? '';           // «после урока я смогу…»
 export const MY_TRACK = { id: 'my', title: 'Свои карточки', icon: '★', color: '#a16207' };
 
 // Короткий стабильный хэш (FNV-1a) для идентификаторов карточек колоды: порядок слов в колоде можно менять.
