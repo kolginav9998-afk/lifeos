@@ -129,6 +129,8 @@ test('иврит: буквы и знаки только введённые; сл
     lesson('hz-01', { intro: 'א ב ַ', drills: [...filler(7), choose('Какое слово написано?', 'אַב', ['בַא', 'אַא'])] }),
   ]);
   assert.deepEqual(problems(vowels), [], 'с огласовкой — можно');
+  const shuruk = route('hebrew', [lesson('hz-01', { intro: 'ל ו \u05BC', drills: [...filler(7), choose('Какой слог написан?', 'לוּ', ['לו', 'וּל'])] })]);
+  assert.ok(!problems(shuruk).some(m => m.includes('לוּ')), 'шурук (вав с точкой) считается гласной: слог с огласовкой, а не слово без неё');
   const letterNotYet = route('hebrew', [
     lesson('hz-01', { intro: 'א', drills: [...filler(7), choose('Какая это буква?', 'א', ['ג', 'ד'])] }),
   ]);
