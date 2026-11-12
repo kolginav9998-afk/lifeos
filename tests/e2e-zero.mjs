@@ -2,12 +2,13 @@
 // входная проверка закрытого урока, быстрая проверка, иврит справа налево, отметки о внешних курсах, «Учёба» и поиск без закрытых уроков.
 // Ответы на задания берутся из данных курса в самой странице.
 import assert from 'node:assert/strict';
-import { launch, tab, until } from './helpers.mjs';
+import { launch, tab, until, root } from './helpers.mjs';
 
 import fs from 'node:fs';
+import path from 'node:path';
 // Настоящие уроки пишут другие команды и меняют каждый день: вместо c-zero-en.js и c-zero-he.js подставляем учебные маршруты из tests/fixtures (c-zero-hb.js остаётся настоящим).
 const fixture = name => fs.readFileSync(new URL(`./fixtures/${name}`, import.meta.url), 'utf8');
-const t = await launch({ ctxOptions: { serviceWorkers: 'block' } });
+const t = await launch({ ctxOptions: { serviceWorkers: 'block', bypassCSP: true } });
 const { page, errors } = t;
 await t.ctx.route('**/c-zero-en.js', r => r.fulfill({ contentType: 'text/javascript', body: fixture('zero-en.mjs') }));
 await t.ctx.route('**/c-zero-he.js', r => r.fulfill({ contentType: 'text/javascript', body: fixture('zero-he.mjs') }));
@@ -16,6 +17,21 @@ await until(page, () => !document.getElementById('app').hidden);
 const text = sel => page.textContent(sel);
 const noise = list => list.filter(x => !/Failed to load resource|Service Worker registration blocked/.test(x));
 const rxEsc = s => s.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+
+// доступность: axe-core в светлой и тёмной теме на каждом состоянии экрана; серьёзные нарушения и «исправленные» правила — ошибка
+const AXE = fs.readFileSync(path.join(root, 'node_modules/axe-core/axe.min.js'), 'utf8');
+const TAGS = ['wcag2a', 'wcag2aa', 'wcag21a', 'wcag21aa', 'wcag22aa', 'best-practice'];
+const ZERO_RULES = new Set(['heading-order', 'label', 'select-name', 'button-name', 'link-name', 'aria-required-parent', 'aria-allowed-role', 'aria-allowed-attr', 'landmark-one-main', 'region', 'landmark-unique', 'duplicate-id', 'duplicate-id-aria', 'list', 'listitem', 'scrollable-region-focusable', 'aria-hidden-focus', 'nested-interactive', 'label-content-name-mismatch']);
+const a11y = [];
+async function ax(label) {
+  if (!(await page.evaluate(() => typeof window.axe !== 'undefined'))) await page.addScriptTag({ content: AXE });
+  for (const theme of ['light', 'dark']) {
+    await page.emulateMedia({ colorScheme: theme, reducedMotion: 'reduce' }); await page.waitForTimeout(120);
+    const res = await page.evaluate(async tags => (await axe.run(document, { runOnly: { type: 'tag', values: tags }, resultTypes: ['violations'] })).violations.map(v => ({ id: v.id, impact: v.impact, nodes: v.nodes.map(n => `${n.target.join(' ')} :: ${n.html.replace(/\s+/g, ' ').slice(0, 110)}`) })), TAGS);
+    for (const v of res) if (v.impact === 'serious' || v.impact === 'critical' || ZERO_RULES.has(v.id)) a11y.push(`${theme} / ${label}: [${v.impact}] ${v.id}: ${v.nodes.slice(0, 2).join(' | ')}`);
+  }
+  await page.emulateMedia({ colorScheme: 'light', reducedMotion: 'reduce' });
+}
 
 // данные курсов из самого приложения
 const route = id => page.evaluate(async id => { const { trackById } = await import('./academy.js'); const t = trackById(id); return { id: t.id, title: t.title, lang: t.lang, lessons: t.lessons.map(l => ({ id: l.id, title: l.title, needs: l.needs ?? [], stage: l.stage, drills: l.drills, hasHe: /[֐-׿]/.test(JSON.stringify([l.body, l.table, l.words, l.showcase])) })) }; }, id);
@@ -83,6 +99,7 @@ if (lockedId) {
   assert.match(await text(`#zero-row-${lockedId}`), /Закрыто/);
 }
 assert.equal(await page.isDisabled('#zero-quick'), true, 'пока нечего проверять');
+await ax('карта маршрута');
 
 // смена маршрута
 await page.click('.zero-routes [data-route="hezero"]');
@@ -126,17 +143,21 @@ await until(page, () => !document.getElementById('zero-play').hidden);
 assert.equal(await page.getAttribute('#zero-play', 'role'), 'dialog');
 assert.equal((await text('#zero-play .zero-title')).trim(), en.lessons[0].title);
 assert.match(await text('#zero-play .zero-statusline'), /Новый/);
+await ax('страница урока');
 await page.click('#zero-practice');
+const axed = new Set();
 const drills = en.lessons[0].drills;
 for (let i = 0; i < drills.length; i++) {
   assert.match(await text('.zero-qh'), new RegExp(`Задание ${i + 1} из ${drills.length}`));
   const d = drills[i];
+  if (!axed.has(d.t)) { axed.add(d.t); await ax(`задание «${d.t}»`); }
   if (i === 0 && (d.t === 'choose' || d.t === 'listen')) {                                  // неверный ответ: разбор показывает правильный
     const wrong = d.wrong[0];
     await page.getByRole('button', { name: wrong, exact: true }).click();
     assert.equal(await page.getAttribute('.zero-fb', 'data-result'), 'wrong');
     assert.match(await text('.zero-fb'), /Неверно/);
     assert.match(await text('.zero-fb'), new RegExp(`Правильный ответ: ${rxEsc(d.right)}`));
+    await ax('разбор неверного ответа');
     await page.click('.zero-next');
     continue;
   }
@@ -154,6 +175,7 @@ const lesson0 = en.lessons[0];
 await page.click(`#zero-row-${lesson0.id}`);
 await page.click('#zero-check');
 assert.match(await text('#zero-play .zero-intro'), /Нужно верных без подсказок: \d/);
+await ax('вступление к проверке');
 await page.click('#zero-start-check');
 const n = await page.evaluate(async id => { const { makeCheck } = await import('./curriculum.js'); const { trackById } = await import('./academy.js'); return makeCheck(trackById('enzero').lessons.find(l => l.id === id), 'quiz', 1).n; }, lesson0.id);
 assert.match(await text('.zero-qh'), new RegExp(`Вопрос 1 из ${n}`));
@@ -173,6 +195,7 @@ assert.match(await text('.zero-qh'), new RegExp(`Вопрос 1 из ${n}`));
 }
 if (await page.getAttribute('#zero-result', 'data-status') !== 'mastered') assert.fail('после проверки ожидали «Освоено»');
 assert.match(await text('#zero-result .zero-newstatus'), /Освоено/);
+await ax('итог проверки');
 assert.match(await text('#zero-result'), /Результат записан/);
 const saved = await page.evaluate(async () => (await import('./store.js')).state.events.filter(e => e.type === 'zcheck').map(e => ({ id: e.id, source: e.source, confidence: e.confidence, p: e.payload, ev: e.evidence })));
 assert.equal(saved.length, 1);
@@ -193,6 +216,7 @@ if (deep) {
   assert.equal(await page.getAttribute(`#zero-row-${deep.id}`, 'data-status'), 'locked');
   await page.click(`#zero-row-${deep.id}`);
   assert.match(await text('#zero-play .zero-lockmsg'), /Урок пока закрыт/);
+  await ax('закрытый урок');
   assert.ok(await page.locator('#zero-play .zero-missing li').count() >= 1, 'список недостающих уроков');
   assert.equal(await page.locator('#zero-play .zero-p').count(), 0, 'текст закрытого урока не показан');
   // проходим входные проверки подряд, пока урок не откроется
@@ -259,6 +283,7 @@ if (heLesson) {
   await page.evaluate(() => document.querySelectorAll('details.zero-stage').forEach(d => { d.open = true; }));
   await page.click(`#zero-row-${heLesson.id}`);
   assert.ok(await page.locator('#zero-play [lang="he"][dir="rtl"]').count() >= 1, 'ивритский текст с lang="he" dir="rtl"');
+  await ax('урок иврита');
   await page.click('#zero-close');
 }
 // плитки справа налево: собираем из заданий-образцов в самой странице
@@ -282,6 +307,7 @@ await page.evaluate(() => document.getElementById('rtl-probe').remove());
 await page.click('#zero-catalog-open');
 assert.equal(await page.locator('.zero-res').count(), 20);
 assert.match(await text('#zero-cat-status'), /Найдено: 20 из 20/);
+await ax('каталог внешних курсов');
 await page.selectOption('[data-filter="subject"]', 'hebrew');
 assert.ok(await page.locator('.zero-res').count() >= 2 && await page.locator('.zero-res').count() < 20);
 await page.selectOption('[data-filter="subject"]', '');
@@ -312,6 +338,7 @@ await page.selectOption('[data-filter="lang"]', '');
 await page.click('#zero-catalog-back');
 assert.equal(await page.locator('#zero-catalog-open').isVisible(), true);
 
+assert.deepEqual(a11y, [], `доступность:\n${a11y.join('\n')}`);
 assert.deepEqual(noise(errors), [], `нет ошибок в консоли:\n${noise(errors).join('\n')}`);
 await t.close();
 console.log('E2E ZERO OK');
