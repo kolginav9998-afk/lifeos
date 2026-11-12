@@ -138,11 +138,11 @@ export const SENT = [
 ];
 const sw = i => SENT[i][0].split(' ');
 const near = (i, L) => L.filter(j => j !== i).map((j, n) => [j, sw(i).filter(w => sw(j).includes(w)).length - n * 0.01]).sort((a, b) => b[1] - a[1]).slice(0, 2).map(a => a[0]);
-const sentDrills = (L, pl2) => {
+const sentDrills = (L, pl2, fade) => {
   const big = i => (pl2 ? SENT[i][3] : SENT[i][0]);
   return [
     ...L.slice(0, 3).map(i => choose('Что значит это предложение?', SENT[i][2], near(i, L).map(j => SENT[j][2]), { big: big(i), say: SENT[i][0], lang: 'hebrew', explain: `Читается «${SENT[i][1]}»: ${SENT[i][2]}.` })),
-    ...L.slice(2, 5).map(i => choose('Как читается это предложение?', SENT[i][1], near(i, L).map(j => SENT[j][1]), { big: big(i), explain: `Читай справа налево, слово за словом: «${SENT[i][1]}».` })),
+    ...(fade ? [] : L.slice(2, 5)).map(i => choose('Как читается это предложение?', SENT[i][1], near(i, L).map(j => SENT[j][1]), { big: big(i), explain: `Читай справа налево, слово за словом: «${SENT[i][1]}».` })),
     ...L.slice(0, 2).map(i => choose(`Какое предложение значит «${SENT[i][2].replace(/\?$/, '')}»?`, big(i), near(i, L).map(big), { explain: `Читается «${SENT[i][1]}».` })),
     ...L.slice(1, 4).map(i => order('Собери предложение из слов. Первое слово ложится справа.', (pl2 ? SENT[i][3] : SENT[i][0]).split(' '), { dir: 'rtl', hint: 'Читай справа налево: первое слово самое правое.' })),
     listen(SENT[L[0]][0], big(L[0]), near(L[0], L).map(big), { lang: 'hebrew', hint: `Читается «${SENT[L[0]][1]}».`, explain: `Это «${SENT[L[0]][1]}»: ${SENT[L[0]][2]}.` }),
@@ -152,9 +152,9 @@ const sentDrills = (L, pl2) => {
 };
 const sentLesson = (id, prev, o) => ({
   id, title: o.title, minutes: 8, stage: 'Предложения', needs: [prev], intro: '', ...(o.plain ? { plain: true } : {}), decay: 1.2, goal: o.goal, body: o.body, task: o.task,
-  table: [['Предложение', ...(o.plain ? ['С огласовками'] : []), 'Читается', 'Значит'], ...o.L.map(i => [o.plain ? SENT[i][3] : SENT[i][0], ...(o.plain ? [SENT[i][0]] : []), SENT[i][1], SENT[i][2]])],
-  words: o.L.map(i => (o.plain ? SENT[i][3] : SENT[i][0])), cards: o.L.map(i => [o.plain ? SENT[i][3] : SENT[i][0], `${SENT[i][1]}: ${SENT[i][2]}`]),
-  drills: [...sentDrills(o.L, o.plain), ...(o.extra ?? [])],
+  table: [['Предложение', ...(o.plain ? ['С огласовками'] : []), ...(o.plain ? [] : ['Читается']), 'Значит'], ...o.L.map(i => [o.plain ? SENT[i][3] : SENT[i][0], ...(o.plain ? [SENT[i][0]] : [SENT[i][1]]), SENT[i][2]])],
+  words: o.L.map(i => (o.plain ? SENT[i][3] : SENT[i][0])), cards: o.L.map(i => [o.plain ? SENT[i][3] : SENT[i][0], o.fade ? SENT[i][2] : `${SENT[i][1]}: ${SENT[i][2]}`]),
+  drills: [...sentDrills(o.L, o.plain, o.fade), ...(o.extra ?? [])],
 });
 
 const sentences = [
@@ -170,7 +170,7 @@ const sentences = [
     task: 'Прочитай вслух семь предложений. Потом придумай по-русски похожее предложение и попробуй сложить его из ивритских слов, которые знаешь.',
   }),
   sentLesson('hz-31', 'hz-30', {
-    L: [7, 8, 9, 10, 11, 12], title: 'Предложения: есть, нет, я хочу',
+    L: [7, 8, 9, 10, 11, 12], fade: true, title: 'Предложения: есть, нет, я хочу',
     goal: 'читать предложения со словами «есть», «нет» и «я хочу» с огласовками',
     body: [
       'יֵשׁ («йеш») значит «есть», אֵין («эйн») «нет». יֵשׁ מַיִם: есть вода. אֵין לֶחֶם: нет хлеба.',
@@ -181,7 +181,7 @@ const sentences = [
     task: 'Прочитай вслух шесть предложений. Скажи по-ивритски, что у тебя есть дома, например «есть вода» и «нет хлеба».',
   }),
   sentLesson('hz-32', 'hz-31', {
-    L: [0, 3, 4, 6, 7, 8, 9, 10], title: 'Предложения: без огласовок', plain: true,
+    L: [0, 3, 4, 6, 7, 8, 9, 10], fade: true, title: 'Предложения: без огласовок', plain: true,
     goal: 'читать знакомые предложения без огласовок',
     body: [
       'Те же предложения, но так, как их пишут в жизни: без огласовок. Ты знаешь слова, поэтому узнаёшь их по буквам.',

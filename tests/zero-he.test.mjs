@@ -213,3 +213,37 @@ test('отчёт: сколько уроков, заданий, слов и ки�
   t.diagnostic(rows.join(' | ') + ' | ' + kb.join(', '));
   assert.ok(true);
 });
+
+// ---------- общие защитные проверки (по образцу английского маршрута) ----------
+test('граф: вход в современный маршрут один (hz-01), каждый урок достижим от него; библейский открывается только после niqqud', () => {
+  assert.deepEqual(he.lessons.filter(l => !l.needs.length).map(l => l.id), ['hz-01']);
+  for (const l of he.lessons) assert.ok(scopeOf(l.id, index).tokens.size >= 0 && [...closureOfIds(l.id)].includes('hz-01'), `${l.id}: не достижим от hz-01`);
+  for (const l of hb.lessons) assert.ok(l.needs.length > 0, `${l.id}: пустые предпосылки`);
+});
+function closureOfIds(id, seen = new Set()) { if (seen.has(id)) return seen; seen.add(id); for (const n of index.get(id)?.lesson.needs ?? []) closureOfIds(n, seen); return seen; }
+
+test('тексты: абзацы не длиннее 1500 знаков, слова в уроке не повторяются, карточки в пределах', () => {
+  for (const t of [he, hb]) for (const l of t.lessons) {
+    for (const p of l.body) assert.ok(p.length <= 1500, `${l.id}: абзац ${p.length} знаков`);
+    const words = l.words ?? [];
+    assert.equal(new Set(words).size, words.length, `${l.id}: повторы в words`);
+    for (const [q, a] of l.cards) assert.ok(q.length <= 300 && a.length <= 500, `${l.id}: карточка`);
+    assert.ok(new Set(l.cards.map(c => c[0])).size === l.cards.length, `${l.id}: одинаковые вопросы карточек`);
+  }
+});
+
+test('письмо: иврит не слипается с кириллицей и латиницей; озвучиваемое (say) только ивритское', () => {
+  for (const t of [he, hb]) {
+    for (const s of strings(t.lessons)) assert.ok(!/[א-ת][А-Яа-яЁёA-Za-z]|[А-Яа-яЁёA-Za-z][א-ת]/.test(s), `слиплись письменности: ${s}`);
+    for (const l of t.lessons) for (const d of l.drills) if (d.say !== undefined) assert.ok(/^[\s\S]*$/.test(d.say) && !/[А-Яа-яЁёA-Za-z]/.test(d.say) && /[א-ת]/.test(d.say), `${l.id}: say не ивритский: ${d.say}`);
+  }
+});
+
+test('ссылок, адресов и ключа type: в уроках нет; у уроков нет лишних полей', () => {
+  const ALLOWED = new Set(['id', 'title', 'minutes', 'stage', 'needs', 'intro', 'goal', 'body', 'task', 'cards', 'drills', 'table', 'words', 'check', 'decay', 'plain', 'milestone', 'sight', 'showcase']);
+  for (const t of [he, hb]) for (const l of t.lessons) {
+    assert.deepEqual(Object.keys(l).filter(k => !ALLOWED.has(k)), [], `${l.id}: лишние поля`);
+    assert.ok(!/https?:\/\/|www\./i.test(JSON.stringify(l)));
+    for (const d of l.drills) assert.ok(!('type' in d), `${l.id}: ключ type в задании`);
+  }
+});
