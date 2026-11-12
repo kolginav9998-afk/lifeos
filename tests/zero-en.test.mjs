@@ -113,7 +113,7 @@ test('ловушки: тихая e, слова не по правилам, не�
       const m = /([aeiou])[bcdfghjklmnpqrstvwxyz]e$/.exec(w);
       if (m && !sc.tokens.has(`${m[1]}_e`)) note(`тихая e (${m[1]}_e) ещё не введена`);
       if (IRREGULAR.includes(w0)) note('слово не по правилам: нужно в sight или showcase');
-      const f = FORBIDDEN.find(x => w.includes(x) && !sc.tokens.has(x) && !(w0 === 'read' && x === 'ead'));
+      const f = FORBIDDEN.find(x => w.includes(x) && !sc.tokens.has(x) && !(/^reads?$/.test(w0) && x === 'ead'));
       if (f) note(`сочетание «${f}» не вводится курсом`);
       if (/c[eiy]/.test(w)) note('мягкая c не вводится');
       if (/g[eiy]/.test(w) && !HARD_G.has(w0)) note('мягкая g не вводится');
