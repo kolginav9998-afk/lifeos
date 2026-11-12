@@ -69,6 +69,11 @@ test('экраны не импортируют друг друга (кроме �
 });
 
 test('файлы курсов c-*.js — чистые данные: ни от чего не зависят', () => {
-  // курсы «с нуля» (c-zero-*.js) вправе брать конструкторы заданий из чистого zero-kit.js, больше ни от чего
-  for (const f of files.filter(x => x.startsWith('c-'))) assert.deepEqual(graph.get(f).filter(d => !(f.startsWith('c-zero-') && d === 'zero-kit.js')), [], f);
+  // курсы «с нуля» (c-zero-*.js) вправе брать конструкторы заданий из чистого zero-kit.js и свои части (c-zero-he.js → zero-he-*.js, c-zero-hb.js → zero-hb-*.js), больше ни от чего
+  const own = (f, d) => { const m = f.match(/^c-zero-(\w+)\.js$/); return !!m && d.startsWith(`zero-${m[1]}-`); };
+  for (const f of files.filter(x => x.startsWith('c-'))) assert.deepEqual(graph.get(f).filter(d => !(f.startsWith('c-zero-') && (d === 'zero-kit.js' || own(f, d)))), [], f);
+});
+
+test('части курсов иврита с нуля (zero-he-*.js, zero-hb-*.js) подключают только zero-kit.js и друг друга', () => {
+  for (const f of files.filter(x => /^zero-(he|hb)-/.test(x))) assert.deepEqual(graph.get(f).filter(d => d !== 'zero-kit.js' && !/^zero-(he|hb)-/.test(d)), [], f);
 });
