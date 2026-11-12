@@ -12,6 +12,7 @@ export function describeError(e) {
   if (e instanceof vault.WrongRecoveryCodeError) return 'Неверный код восстановления';
   if (!(e instanceof ApiError)) return e?.message || String(e);
   const map = {
+    bad_kdf: 'Сервер просит слишком слабую или слишком тяжёлую защиту пароля. Пароль не отправлен: проверь адрес сервера.',
     network: 'Нет связи с сервером. Проверь интернет и адрес сервера.', timeout: 'Сервер долго не отвечает. Попробуй ещё раз.',
     bad_credentials: 'Неверное имя или пароль', locked: `Слишком много попыток. Подожди ${Math.ceil(e.retryAfterMs / 1000)} с.`,
     account_exists: 'На этом сервере аккаунт уже создан. Войди в него.', bad_setup_code: 'Неверный код установки сервера',
@@ -21,7 +22,12 @@ export function describeError(e) {
   return map[e.code] || `Ошибка сервера (${e.code})`;
 }
 
+// Число итераций выбора ключа сообщает сервер. Слишком малое ослабило бы защиту пароля (взломанный сервер мог бы подсунуть 1), слишком большое подвесило бы телефон.
+export const KDF_MIN = 100000, KDF_MAX = 5000000;
+
 export function createAccountService({ api, storage = globalThis.localStorage, now = Date.now, authIter = PBKDF2_ITER, deps = {} } = {}) {
+  const floor = Math.min(KDF_MIN, authIter);                 // в тестах своя быстрая настройка
+  const okIter = n => { if (!Number.isInteger(n) || n < floor || n > KDF_MAX) throw new ApiError(0, 'bad_kdf'); return n; };
   const KEY = 'lifeos.account.v1';
   const SESS = 'lifeos.account.sess';
   const read = k => { try { return JSON.parse(storage.getItem(k) || 'null'); } catch { return null; } };
@@ -91,7 +97,7 @@ export function createAccountService({ api, storage = globalThis.localStorage, n
       const base = normalizeServerUrl(server);
       const user = normalizeUsername(username);
       const p = await api.loginParams(base, user);
-      const authKey = await deriveAuthKey(password, unb64(p.salt), p.iter);
+      const authKey = await deriveAuthKey(password, unb64(p.salt), okIter(p.iter));
       const r = await api.login(base, { username: user, authKey });
       return { server: base, username: user, authSalt: p.salt, authIter: p.iter, token: r.token, expiresAt: r.expiresAt, meta: r.meta };
     },
@@ -155,7 +161,7 @@ export function createAccountService({ api, storage = globalThis.localStorage, n
       const base = normalizeServerUrl(server);
       const user = normalizeUsername(username);
       const p = await api.recoverParams(base, user);
-      const { authKey } = await vault.deriveRecovery(code, unb64(p.salt), p.iter);
+      const { authKey } = await vault.deriveRecovery(code, unb64(p.salt), okIter(p.iter));
       const r = await api.recover(base, { username: user, recoveryAuthKey: authKey });
       const { meta, raw } = await vault.adoptMetaWithCode(r.meta, code, newPassword);
       const na = await newAuth(newPassword);

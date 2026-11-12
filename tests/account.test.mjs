@@ -185,3 +185,19 @@ test('сервер не LifeOS: понятная ошибка', async () => {
   const svc = createAccountService({ api, storage: mem() });
   await assert.rejects(svc.checkServer('https://example.com'), e => e.code === 'not_lifeos');
 });
+
+test('вход и восстановление: число итераций от сервера вне допустимых границ отвергается до расчёта ключа', async () => {
+  const w = world(); const A = device(w); A.use();
+  await A.svc.register({ server: SERVER, username: 'владелец', password: PW });
+  const real = w.api.loginParams, realRecover = w.api.recoverParams;
+  for (const bad of [1, 1999, 5_000_001, 2000.5, '2000', null]) {
+    w.api.loginParams = async (...a) => ({ ...(await real(...a)), iter: bad });
+    w.api.recoverParams = async (...a) => ({ ...(await realRecover(...a)), iter: bad });
+    await assert.rejects(A.svc.authenticate({ server: SERVER, username: 'владелец', password: PW }), e => e instanceof ApiError && e.code === 'bad_kdf', `login iter=${bad}`);
+    await assert.rejects(A.svc.recover({ server: SERVER, username: 'владелец', code: 'AAAA-AAAA-AAAA-AAAA-AAAA-AAAA', newPassword: PW }), e => e instanceof ApiError && e.code === 'bad_kdf', `recover iter=${bad}`);
+  }
+  w.api.loginParams = real; w.api.recoverParams = realRecover;
+  assert.ok((await A.svc.authenticate({ server: SERVER, username: 'владелец', password: PW })).token, 'нормальное значение проходит');
+  assert.match(describeError(new ApiError(0, 'bad_kdf')), /слишком слабую/);
+  w.close();
+});

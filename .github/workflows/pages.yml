@@ -10,7 +10,7 @@ permissions:
   id-token: write
 
 concurrency:
-  group: pages
+  group: pages-${{ github.ref }}   # на ветку своя очередь: проверка другой ветки не должна отменять выпуск на main
   cancel-in-progress: true
 
 jobs:
