@@ -1,5 +1,5 @@
 // Иврит «с нуля»: таблица букв и генераторы заданий. Чистые данные и функции (подключает только zero-kit.js).
-// Правила: docs/CURRICULUM_ENGINE.md. Знаки огласовок пишем кодами (ַ), чтобы их было видно в исходнике.
+// Правила: docs/CURRICULUM_ENGINE.md. Знаки огласовок пишем кодами (\u05B7), чтобы их было видно в исходнике.
 import { choose, listen, typed, order, match, read, textsOfLesson } from './zero-kit.js';
 
 export const ALPHA = 'אבגדהוזחטיכלמנסעפצקרשת';
@@ -83,12 +83,12 @@ export function letterLesson(id, prev, o) {
 }
 
 // Слог ו + дагеш (шурук) тоже гласная, но проверка допуска её не видит: такие записи вносим в showcase урока, чтобы не краснел тест.
-const RUN = /[א-ת֑-ׇֽֿׁׂׅׄ]+/g;
+const RUN = /[\u05D0-\u05EA\u0591-\u05BD\u05BF\u05C1\u05C2\u05C4\u05C5\u05C7]+/g;
 export function withShowcase(l) {
   const sc = new Set(l.showcase ?? []);
   for (const t of textsOfLesson(l)) for (const m of t.matchAll(RUN)) {
     const w = m[0];
-    if ((w.match(/[א-ת]/g) ?? []).length >= 2 && !/[ְ-ׇֻ]/.test(w) && /וּ/.test(w)) sc.add(w);
+    if ((w.match(/[א-ת]/g) ?? []).length >= 2 && !/[\u05B0-\u05BB\u05C7]/.test(w) && /\u05D5\u05BC/.test(w)) sc.add(w);
   }
   return sc.size ? { ...l, showcase: [...sc] } : l;
 }
