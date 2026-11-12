@@ -1,4 +1,4 @@
-import { el, toast, dateRu, icon, moneyText } from './ui.js';
+import { el, toast, dateRu, icon, moneyText, emptyState } from './ui.js';
 import { todayStr } from './events.js';
 import { makeEntry, updateExpense, summarizeMonth, shiftMonth, monthLabel, monthOf, categoriesUsed, makeBudget, budgetOf, parseAmount,
   monthTotals, balanceOfMonth, frequentEntries, KINDS, unusualExpense, unusualText } from './money.js';
@@ -21,8 +21,8 @@ export function createMoneyView({ exportCsv }) {
   const seg = el('div', { class: 'seg-group', role: 'group', 'aria-label': 'Что показывать' }, segExp, segInc);
 
   const label = el('strong', { id: 'month-label', class: 'month-label' });
-  const prev = el('button', { type: 'button', id: 'month-prev', 'aria-label': 'Прошлый месяц', textContent: '‹', onclick: () => { ym = shiftMonth(ym, -1); render(); } });
-  const next = el('button', { type: 'button', id: 'month-next', 'aria-label': 'Следующий месяц', textContent: '›', onclick: () => { ym = shiftMonth(ym, 1); render(); } });
+  const prev = el('button', { type: 'button', id: 'month-prev', 'aria-label': 'Прошлый месяц', onclick: () => { ym = shiftMonth(ym, -1); render(); } }, icon('chevL', 20));
+  const next = el('button', { type: 'button', id: 'month-next', 'aria-label': 'Следующий месяц', onclick: () => { ym = shiftMonth(ym, 1); render(); } }, icon('chevR', 20));
   const eye = el('button', { type: 'button', id: 'hide-amounts', 'aria-label': 'Скрыть или показать суммы', title: 'Скрыть/показать суммы', onclick: () => { setPref('hideAmounts', !getPref('hideAmounts')); render(); } }, icon('eye', 20));
   const nav = el('div', { class: 'month-nav' }, prev, label, next, eye);
 
@@ -94,7 +94,8 @@ export function createMoneyView({ exportCsv }) {
   };
 
   const list = el('ul', { id: 'exp-list', class: 'list' });
-  const empty = el('p', { class: 'muted', hidden: true });
+  const empty = emptyState({ art: 'money', title: 'Пока без записей', text: 'Добавь первую трату или доход: сумма, категория и дата.', action: { label: 'Добавить', icon: 'plus', onClick: () => amount.focus() } });
+  empty.hidden = true;
   const csv = el('button', { type: 'button', id: 'csv-btn', textContent: 'Скачать CSV для Excel', onclick: () => exportCsv() });
   root.append(seg, nav, summary, form, list, empty, el('div', { class: 'row' }, csv));
 
@@ -162,10 +163,10 @@ export function createMoneyView({ exportCsv }) {
         el('span', { class: 'text', textContent: p.category + (p.note ? ' — ' + p.note : '') }),
         el('span', { class: 'meta', textContent: dateRu(p.date) }));
       return el('li', { class: 'item exp' }, body, el('strong', { class: 'amount' + (isExp ? '' : ' plus'), textContent: (isExp ? '' : '+') + moneyText(p.amountMinor) }),
-        el('button', { class: 'del', type: 'button', textContent: '✕', 'aria-label': `Удалить ${K().label.toLowerCase()}`, onclick: () => remove(ev) }));
+        el('button', { class: 'del', type: 'button', 'aria-label': `Удалить ${K().label.toLowerCase()}`, onclick: () => remove(ev) }, icon('x', 18)));
     }));
     empty.hidden = s.items.length > 0;
-    empty.textContent = isExp ? 'В этом месяце расходов нет.' : 'В этом месяце доходов нет.';
+    empty.msg.textContent = isExp ? 'В этом месяце расходов нет' : 'В этом месяце доходов нет';
     document.documentElement.classList.toggle('amounts-hidden', !!getPref('hideAmounts'));
   }
 

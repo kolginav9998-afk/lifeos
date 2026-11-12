@@ -1,5 +1,5 @@
 // Дополнения к экрану «Планы»: отсрочка покупок на сутки, долги и займы, калькулятор автоматизации.
-import { el, fill, toast, dateRu, moneyText } from './ui.js';
+import { el, fill, toast, dateRu, moneyText, icon } from './ui.js';
 import { todayStr } from './events.js';
 import * as store from './store.js';
 import { parseAmount, monthOf, monthLabel } from './money.js';
@@ -36,7 +36,7 @@ export function createPlansExtras() {
   function wishRow(w, now) {
     const st = wishState(w, now), p = w.payload;
     const head = el('div', { class: 'row' }, el('strong', { class: 'grow', textContent: p.text }), el('span', { class: 'muted', textContent: p.amountMinor ? moneyText(p.amountMinor) : '' }));
-    const del = el('button', { type: 'button', class: 'chip danger wish-del', 'aria-label': `Удалить: ${p.text}`, textContent: '✕', onclick: async () => { const old = await store.remove(w.id); toast('Удалено', old ? { actionLabel: 'Вернуть', onAction: () => store.save(old) } : {}); } });
+    const del = el('button', { type: 'button', class: 'chip danger wish-del', 'aria-label': `Удалить: ${p.text}`, onclick: async () => { const old = await store.remove(w.id); toast('Удалено', old ? { actionLabel: 'Вернуть', onAction: () => store.save(old) } : {}); } }, icon('x', 16));
     if (st === 'wait') {
       const h = hoursLeft(w, now);
       return el('div', { class: 'wish-row wait', dataset: { id: w.id, state: st } }, head, el('div', { class: 'row wrap' }, el('span', { class: 'muted grow', textContent: `Подождём ещё ${h} ${ruHours(h)}` }), del));

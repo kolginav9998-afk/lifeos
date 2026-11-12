@@ -1,4 +1,4 @@
-import { el, fill, toast, dateRu } from './ui.js';
+import { el, fill, toast, dateRu, emptyState } from './ui.js';
 import { todayStr } from './events.js';
 import { makeNote, updateNote, noteTitle, sortedNotes, MAX_NOTE, NOTE_TEMPLATES, templateText, noteTags, tagCloud, resolveLinks, backlinks, pastNote } from './notes.js';
 import { normalize } from './search.js';
@@ -31,7 +31,8 @@ export function createNotesView() {
   filter.oninput = () => render();
   const tagBar = el('div', { id: 'note-tags', class: 'chips' });
   const list = el('div', { id: 'note-list' });
-  const empty = el('p', { class: 'muted', hidden: true, textContent: 'Заметок пока нет.' });
+  const empty = emptyState({ art: 'notes', title: 'Заметок пока нет', text: 'Запиши мысль, идею или список: всё останется только у тебя.', action: { label: 'Новая заметка', icon: 'plus', onClick: () => text.focus() } });
+  empty.hidden = true;
   // случайная заметка из прошлого (старше 30 дней): можно перечитать и открыть
   let pastId = null;
   const pastBox = el('div', { id: 'note-past-box', class: 'card calm', hidden: true });
@@ -106,7 +107,7 @@ export function createNotesView() {
     tagBar.replaceChildren(...tagCloud(events).map(([t, n]) => el('button', { type: 'button', class: 'chip tag-chip', dataset: { tag: t }, textContent: `#${t} · ${n}`, onclick: () => { filter.value = filter.value === '#' + t ? '' : '#' + t; render(); } })));
     list.replaceChildren(...shown.map(card));
     empty.hidden = shown.length > 0;
-    empty.textContent = all.length && !shown.length ? 'Ничего не найдено.' : 'Заметок пока нет.';
+    empty.msg.textContent = all.length && !shown.length ? 'Ничего не найдено.' : 'Заметок пока нет';
   }
 
   return { root, update(evs) { events = evs; render(); }, focusAdd() { text.focus(); } };

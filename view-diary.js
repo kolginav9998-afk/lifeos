@@ -1,4 +1,4 @@
-import { el, fill, toast, dateRu, ratingRow, stepper } from './ui.js';
+import { el, fill, toast, dateRu, ratingRow, stepper, icon } from './ui.js';
 import { todayStr, addDays } from './events.js';
 import { makeCheckin, makeDiary, checkinOf, diaryOf, recentDays, sleepFromTimes, SLOTS, RATINGS, NUMBERS, FLAGS, hashtags, questionOfDay, onThisDay } from './diary.js';
 import { makeMeasure } from './health.js';
@@ -18,9 +18,9 @@ export function createDiaryView() {
   const go = d => { date = d || todayStr(); dateInput.value = date; dirty.m = dirty.e = dirty.d = false; hydrate(); renderHistory(); autoOpen(); };
   dateInput.onchange = () => go(dateInput.value);
   const nav = el('div', { class: 'day-nav' },
-    el('button', { type: 'button', id: 'diary-prev', 'aria-label': 'Предыдущий день', textContent: '‹', onclick: () => go(addDays(date, -1)) }),
+    el('button', { type: 'button', id: 'diary-prev', 'aria-label': 'Предыдущий день', onclick: () => go(addDays(date, -1)) }, icon('chevL', 20)),
     dateInput,
-    el('button', { type: 'button', id: 'diary-next', 'aria-label': 'Следующий день', textContent: '›', onclick: () => go(addDays(date, 1)) }),
+    el('button', { type: 'button', id: 'diary-next', 'aria-label': 'Следующий день', onclick: () => go(addDays(date, 1)) }, icon('chevR', 20)),
     el('button', { type: 'button', id: 'diary-today', textContent: 'Сегодня', onclick: () => go(todayStr()) }));
 
   // ----- утро -----
