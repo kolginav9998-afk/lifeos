@@ -564,6 +564,7 @@ header.top::after{content:"";position:absolute;left:var(--s4);right:var(--s4);bo
 .card.calm,#minimum,.insight,.okr{--c:var(--mode-accent)}
 .insight.warn,.okr.behind{--c:var(--warn)}.insight.good,.okr.done,.okr.ahead{--c:var(--ok)}.okr.overdue{--c:var(--danger)}
 .card.calm,#minimum,.insight,.okr{border:1px solid color-mix(in srgb,var(--c) 34%,var(--line));background-image:linear-gradient(color-mix(in srgb,var(--c) 10%,transparent),color-mix(in srgb,var(--c) 10%,transparent));box-shadow:var(--shadow)}
+.okr.behind,.okr.done,.okr.ahead,.okr.overdue{border-left-width:1px}
 .hero{border-radius:var(--r16);background:radial-gradient(120% 150% at 100% 0,color-mix(in srgb,var(--mode-accent) 16%,transparent),transparent 62%),var(--grad-soft),var(--card)}
 .hero .hello{font-size:var(--t20)}
 .ring-track{stroke:color-mix(in srgb,var(--text) 10%,transparent)}
@@ -585,6 +586,7 @@ button.back-link{text-decoration:none;display:inline-flex;align-items:center;gap
 #summary>*{flex:none;scroll-snap-align:start}
 input[type=text],input[type=password],input[type=search],input[type=date],input[type=number],select,textarea{border:1px solid transparent;border-radius:var(--r12)}
 select{appearance:none;-webkit-appearance:none;padding-right:38px;background-image:linear-gradient(45deg,transparent 50%,var(--muted) 50%),linear-gradient(135deg,var(--muted) 50%,transparent 50%);background-position:calc(100% - 20px) 50%,calc(100% - 15px) 50%;background-size:5px 5px;background-repeat:no-repeat}
+.opts-row select{padding-right:24px;background-position:calc(100% - 13px) 50%,calc(100% - 8px) 50%}
 input:user-invalid,textarea:user-invalid{border-color:var(--danger);box-shadow:0 0 0 3px var(--tint-danger)}
 .rating-label,.field>span,.field>label,.opts-row label{font-size:.78rem;font-weight:600;color:var(--muted);letter-spacing:.01em}
 .error:empty{min-height:0;margin:0}
@@ -593,10 +595,6 @@ input[type=checkbox]{appearance:none;-webkit-appearance:none;display:inline-grid
 input[type=checkbox]::after{content:"";width:10px;height:6px;margin-top:-2px;border-left:2.5px solid #fff;border-bottom:2.5px solid #fff;transform:rotate(-45deg) scale(0);transition:transform .16s var(--ease)}
 input[type=checkbox]:checked{background:var(--grad);border-color:transparent}
 input[type=checkbox]:checked::after{transform:rotate(-45deg) scale(1)}
-.settings-card .check-label input[type=checkbox]{width:44px;height:26px;border-radius:99px;border-width:0;background:color-mix(in srgb,var(--muted) 38%,transparent);place-content:center start;padding:3px}
-.settings-card .check-label input[type=checkbox]::after{width:20px;height:20px;margin:0;border:0;border-radius:50%;background:#fff;box-shadow:0 1px 3px rgba(0,0,0,.3);transform:none;transition:transform .18s var(--ease)}
-.settings-card .check-label input[type=checkbox]:checked{background:var(--grad)}
-.settings-card .check-label input[type=checkbox]:checked::after{transform:translateX(18px)}
 .seg-group{padding:4px;border-radius:16px}
 .seg{border-radius:12px;font-weight:600;background:transparent}
 .seg[aria-pressed=true]{background:var(--hi);box-shadow:var(--shadow-sm)}

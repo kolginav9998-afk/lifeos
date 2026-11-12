@@ -40,7 +40,7 @@
 - Чипы `.chip` (кнопка-действие со значком) и `.chip.static` (показатель с точкой цвета режима, `.danger` — просрочено); полоса чипов `#summary` прокручивается по горизонтали.
 - Кнопки: `button` (вторичная, заливка `--soft`), `.primary` (градиент), `.danger` (тонировка), `.link` (текстовая), `.icon-btn`.
 - Переключатель `.seg-group > .seg`; вторая строка разделов `.subnav`; нижняя панель `#tabs`.
-- Поля: `input`, `select` (стрелка рисуется градиентами), `textarea`; подпись `.field > span` или `.rating-label`; подсказка `.hint`; ошибка `.error` (тонированный блок, пустая не занимает места); `:user-invalid` подсвечивается. Флажок `input[type=checkbox]` — свой вид; в `.settings-card .check-label` — переключатель.
+- Поля: `input`, `select` (стрелка рисуется градиентами), `textarea`; подпись `.field > span` или `.rating-label`; подсказка `.hint`; ошибка `.error` (тонированный блок, пустая не занимает места); `:user-invalid` подсвечивается. Флажок `input[type=checkbox]` — свой вид (скруглённый квадрат с галочкой). Вид «переключатель» для настроек пробовали и убрали: с ним `page.check()` в `tests/e2e-security.mjs` обнулял поля пароля.
 - Пустое состояние: `emptyState({ art, title, text, action, id })` из `ui.js` → `.empty`, `.ill`, `.empty-t`, `.empty-p`, `.empty-a`. Иллюстрация собирается из DOM (`illustration(name)`), цвета через классы `.ill-*`. Заголовок можно менять: `box.msg.textContent`.
 - Сообщение `toast(text, { actionLabel, onAction, ms, kind })`: значок (`kind: 'error'` определяется и по началу текста), кнопка действия, полоска оставшегося времени `.toast-bar`. В `#toast` одна кнопка — действие.
 - Окна на весь экран `.overlay` (повторение карточек, проверки): `.sess-top`, `.flash`, `.grade` (`again`/`hard`/`good`), `.bt-box`, `.kp`.
