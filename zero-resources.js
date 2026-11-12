@@ -20,7 +20,15 @@ export const AVAILABILITY_LABEL = { ok: 'Адрес открывался', unkno
 export const RESOURCE_STATUSES = ['not_started', 'in_progress', 'completed', 'abandoned'];
 export const RESOURCE_STATUS_LABEL = { not_started: 'Не начат', in_progress: 'Прохожу', completed: 'Прошёл', abandoned: 'Бросил' };
 
-const r = (id, title, subject, level, lang, cost, costNote, url, format, provider, note) => ({ id, title, subject, level, lang, cost, costNote, url, format, availability: 'unknown', lastChecked: null, note, provider });
+// Результаты проверки адресов: id → ['ok', 'ГГГГ-ММ-ДД'] только для адресов, которые ответили (2xx/3xx). Блок пишет `node scripts/check-resources.mjs --write`; пусто — адрес не проверялся.
+const CHECKS = {
+  // CHECKS:begin
+  // CHECKS:end
+};
+const r = (id, title, subject, level, lang, cost, costNote, url, format, provider, note) => {
+  const [availability, lastChecked] = CHECKS[id] ?? ['unknown', null];
+  return { id, title, subject, level, lang, cost, costNote, url, format, availability, lastChecked, note, provider };
+};
 
 export const RESOURCES = [
   r('british-council', 'LearnEnglish (British Council)', 'english', 'all', 'en', 'free', 'Сайт бесплатный; платные курсы организации продаются отдельно.', 'https://learnenglish.britishcouncil.org/', 'interactive', 'British Council',

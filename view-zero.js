@@ -74,6 +74,7 @@ export function createZeroView() {
   }
   function startPractice(ref) {
     const { track, lesson } = ref, box = content();
+    if (!lesson.drills?.length) { toast('В этом уроке пока нет заданий'); return; }
     setOverlay(track.title, box);
     runSequence(box, lesson.drills, { seed: now(), lang: track.lang, label: 'Задание', onFinish: results => finishPractice(ref, box, results) });
   }
@@ -87,6 +88,7 @@ export function createZeroView() {
       el('p', { textContent: `Урок отмечен как «${STATUS_LABEL.seen.toLowerCase()}». Чтобы он стал освоенным, пройди проверку: ${chk.n} заданий, нужно ${needN} верных без подсказок.` }),
       actionRow(btn('Пройти проверку', () => startQuiz(ref), { id: 'zero-to-check', primary: true }), btn('К карте', closeOverlay))));
     announce(`Задания пройдены. Верно без подсказок: ${good} из ${graded.length}`);
+    overlay.scrollTop = 0;
     focusNode(box.querySelector('.zero-title'));
   }
 
@@ -137,9 +139,9 @@ export function createZeroView() {
       actions.push({ id: 'zero-reread', label: 'Перечитать урок', primary: true, onClick: () => openLesson(lesson.id) }, { id: 'zero-retry', label: 'Проверка ещё раз', onClick: () => startQuiz(ref) });
     }
     actions.push({ id: 'zero-to-map', label: 'К карте', primary: !actions.length, onClick: closeOverlay });
-    const lessonShown = chk.kind === 'surprise' || chk.kind === 'placement' ? lesson : lesson;
-    fill(box, resultPage({ kind: chk.kind, lesson: lessonShown, grade, pass: chk.pass, after, opened, actions, badge }));
+    fill(box, resultPage({ kind: chk.kind, lesson, grade, pass: chk.pass, after, opened, actions, badge }));
     announce(`${grade.passed ? 'Проверка пройдена' : 'Проверка не пройдена'}. Верно без подсказок: ${grade.ok} из ${grade.n}. Статус урока: ${STATUS_LABEL[after.status]}`);
+    overlay.scrollTop = 0;
     focusNode(box.querySelector('.zero-title'));
   }
   function quickCheck() {

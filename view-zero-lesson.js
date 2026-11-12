@@ -2,7 +2,7 @@
 // Дочерний блок экрана «С нуля» (view-zero.js): сам ничего не хранит, результаты отдаёт обратным вызовом. Иврит показывается справа налево (dir="rtl", lang="he").
 import { el, fill, icon, announce, focusNode, toast } from './ui.js';
 import { shuffled, gradeDrill } from './zero-kit.js';
-import { canSpeak, speak } from './speech.js';
+import { canSpeak, speak, speakable } from './speech.js';
 
 const HE = /[֐-׿]/, CYR = /[А-Яа-яЁё]/, LAT = /[A-Za-z]/;
 // Свойства lang/dir для узла, где текст целиком на иврите или английском.
@@ -155,17 +155,23 @@ export function runSequence(box, items, { seed = 0, lang = 'english', label = '�
     const title = el('h3', { class: 'zero-qh', tabIndex: -1, textContent: `${label} ${i + 1} из ${items.length}` });
     const view = drillView(items[i], { seed: seed + i * 7919, lang, last: i === items.length - 1, onAnswer: res => { results[i] = res; onAnswer(i, res); }, onNext: () => { i++; if (i < items.length) show(); else onFinish(results); } });
     fill(box, el('div', { class: 'zero-seq-head' }, title, progress(i, items.length)), view.root);
+    box.closest('.overlay')?.scrollTo?.(0, 0);
     focusNode(title);
   };
   show();
 }
 
 // ---------- страница урока: цель, текст, таблица, слова. Кнопки действий добавляет экран ----------
+// Что озвучить в строке таблицы: последняя ячейка на изучаемом языке (пример слова), перевод после тире отбрасывается.
+const foreignPart = cells => { for (const c of [...cells].reverse()) { const t = speakable(c); if ((HE.test(t) || LAT.test(t)) && !CYR.test(t)) return t; } return ''; };
 function tableNode(rows) {
   const [head, ...rest] = rows;
   const cell = (tag, c) => el(tag, tag === 'th' ? { scope: 'col' } : {}, ...rich(c));
+  const says = rest.map(foreignPart), withSay = says.some(Boolean);
+  const sayCell = t => el('td', {}, t ? el('button', { type: 'button', class: 'chip zero-say', 'aria-label': `Послушать: ${t}`, onclick: () => sayText(t, HE.test(t) ? 'hebrew' : 'english') }, icon('volume', 16)) : null);
   return el('div', { class: 'zero-table-wrap', tabIndex: 0, role: 'region', 'aria-label': 'Таблица-шпаргалка' },
-    el('table', { class: 'zero-table' }, el('thead', {}, el('tr', {}, ...head.map(c => cell('th', c)))), el('tbody', {}, ...rest.map(r => el('tr', {}, ...r.map(c => cell('td', c)))))));
+    el('table', { class: 'zero-table' }, el('thead', {}, el('tr', {}, ...head.map(c => cell('th', c)), withSay ? el('th', { scope: 'col', textContent: 'Звук' }) : null)),
+      el('tbody', {}, ...rest.map((r, i) => el('tr', {}, ...r.map(c => cell('td', c)), withSay ? sayCell(says[i]) : null)))));
 }
 const chipList = (title, words, lang) => el('div', { class: 'zero-words' }, el('strong', { textContent: title }),
   el('div', { class: 'row wrap' }, ...words.map(w => { const [word, mean] = [].concat(w); return el('span', { class: 'zero-word' }, el('span', { ...textProps(word) }, ...rich(word)), mean ? el('span', { class: 'muted', textContent: ` — ${mean}` }) : null, speakBtn(word, lang)); })));

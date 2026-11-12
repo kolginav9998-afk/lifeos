@@ -338,6 +338,39 @@ await page.selectOption('[data-filter="lang"]', '');
 await page.click('#zero-catalog-back');
 assert.equal(await page.locator('#zero-catalog-open').isVisible(), true);
 
+// ---------- 10. узкий экран 320 px и шрифт 130 %: ничего не вылезает за край ----------
+await page.setViewportSize({ width: 320, height: 640 });
+await page.evaluate(() => document.documentElement.style.setProperty('--fs', '1.3'));
+const layout = [];
+const overflow = async label => {
+  const r = await page.evaluate(() => {
+    const d = document.documentElement, o = document.getElementById('zero-play');
+    const wide = [...document.querySelectorAll('#view-zero *')].filter(n => n.getClientRects().length && !n.closest('.zero-table-wrap') && n.getBoundingClientRect().right > d.clientWidth + 1).slice(0, 3).map(n => `${n.tagName}.${n.className?.baseVal ?? n.className}`);
+    return { page: d.scrollWidth - d.clientWidth, overlay: o && !o.hidden ? o.scrollWidth - o.clientWidth : 0, wide };
+  });
+  if (r.page > 1 || r.overlay > 1 || r.wide.length) layout.push(`${label}: ${JSON.stringify(r)}`);
+};
+await page.click('#zero-catalog-back').catch(() => {});
+await page.click('.zero-routes [data-route="hezero"]');
+await page.evaluate(() => document.querySelectorAll('details.zero-stage').forEach(d => { d.open = true; }));
+await overflow('карта иврита');
+await page.click(`#zero-row-${he.lessons[0].id}`);
+await overflow('страница урока иврита');
+await page.click('#zero-practice');
+for (const [i, d] of he.lessons[0].drills.entries()) {
+  await overflow(`задание ${i + 1} (${d.t})`);
+  await answer(d);
+  if (d.t !== 'read') { await overflow(`разбор ${i + 1} (${d.t})`); await page.click('.zero-next'); }
+}
+await page.click('#zero-close');
+await page.click(`#zero-row-${he.lessons[2].id}`);
+assert.match(await text('#zero-play .zero-lockmsg'), /Урок пока закрыт/);
+await overflow('закрытый урок');
+await page.click('#zero-close');
+await page.click('#zero-catalog-open');
+await overflow('каталог');
+assert.deepEqual(layout, [], `вёрстка на 320 px и шрифте 130 %:\n${layout.join('\n')}`);
+
 assert.deepEqual(a11y, [], `доступность:\n${a11y.join('\n')}`);
 assert.deepEqual(noise(errors), [], `нет ошибок в консоли:\n${noise(errors).join('\n')}`);
 await t.close();
