@@ -29,6 +29,11 @@ import java.security.MessageDigest;
 public class ApkInstallerPlugin extends Plugin {
     private static final String DIR = "updates";
     private static final String FILE = "update.apk";
+    private static final String PART = "update.apk.part";      // качается сюда и только целиком скачанный файл переименовывается в FILE
+    /** Первый запрос только за файлом нашего выпуска; дальше GitHub сам перенаправляет на свои серверы (их проверяет trusted). */
+    private static final String ASSET_PATH = "/kolginav9998-afk/lifeos/releases/download/latest-apk/lifeos.apk";
+    private static final long MAX_BYTES = 150L * 1024 * 1024;  // настоящий файл около 7 МБ
+    private static final long MAX_MILLIS = 15L * 60 * 1000;    // общий предел времени: «капающий» сервер не держит загрузку вечно
     private volatile boolean cancelled = false;
     private volatile boolean busy = false;
 
@@ -38,9 +43,16 @@ public class ApkInstallerPlugin extends Plugin {
 
     /** Адрес можно скачивать только с GitHub и только по https. */
     static boolean trusted(URL u) {
-        if (!"https".equals(u.getProtocol())) return false;
+        if (!"https".equals(u.getProtocol()) || u.getUserInfo() != null || (u.getPort() != -1 && u.getPort() != 443)) return false;
         String h = u.getHost() == null ? "" : u.getHost().toLowerCase();
         return h.equals("github.com") || h.endsWith(".github.com") || h.equals("githubusercontent.com") || h.endsWith(".githubusercontent.com");
+    }
+
+    /** Первый адрес: только https://github.com/<наш репозиторий>/releases/download/latest-apk/lifeos.apk, без логина, порта и параметров. */
+    static boolean firstHopOk(URL u) {
+        if (!"https".equals(u.getProtocol()) || u.getUserInfo() != null || u.getQuery() != null || u.getRef() != null) return false;
+        if (u.getPort() != -1 && u.getPort() != 443) return false;
+        return "github.com".equalsIgnoreCase(u.getHost()) && ASSET_PATH.equalsIgnoreCase(u.getPath());
     }
 
     private static String hex(byte[] b) {
@@ -109,14 +121,16 @@ public class ApkInstallerPlugin extends Plugin {
             public void run() {
                 HttpURLConnection conn = null;
                 File out = null;
+                File finalFile = null;
                 try {
                     URL cur = new URL(url);
-                    if (!trusted(cur)) throw new Exception("Адрес обновления не разрешён");
+                    if (!firstHopOk(cur)) throw new Exception("Адрес обновления не разрешён");
                     File dir = new File(getContext().getCacheDir(), DIR);
                     if (!dir.exists() && !dir.mkdirs()) throw new Exception("Не удалось создать папку для загрузки");
                     File[] old = dir.listFiles();
                     if (old != null) for (File f : old) f.delete();
-                    out = new File(dir, FILE);
+                    out = new File(dir, PART);
+                    finalFile = new File(dir, FILE);
 
                     // Переходы вручную: каждый следующий адрес тоже должен быть на GitHub и по https.
                     int code = 0;
@@ -142,6 +156,8 @@ public class ApkInstallerPlugin extends Plugin {
                     if (conn == null || code != 200) throw new Exception("Сервер ответил кодом " + code);
 
                     long total = conn.getContentLength();
+                    if (total > MAX_BYTES) throw new Exception("Файл обновления слишком большой");
+                    final long started = System.currentTimeMillis();
                     MessageDigest md = MessageDigest.getInstance("SHA-256");
                     long got = 0;
                     long lastEmit = 0;
@@ -155,6 +171,8 @@ public class ApkInstallerPlugin extends Plugin {
                             os.write(buf, 0, n);
                             md.update(buf, 0, n);
                             got += n;
+                            if (got > MAX_BYTES) throw new Exception("Файл обновления слишком большой");
+                            if (System.currentTimeMillis() - started > MAX_MILLIS) throw new Exception("Загрузка идёт слишком долго");
                             long now = System.currentTimeMillis();
                             if (now - lastEmit > 250) {
                                 lastEmit = now;
@@ -166,9 +184,10 @@ public class ApkInstallerPlugin extends Plugin {
                         try { in.close(); } catch (Exception ignored) { }
                     }
                     if (total > 0 && got != total) throw new Exception("Файл скачался не полностью");
+                    if (!out.renameTo(finalFile)) throw new Exception("Не удалось сохранить файл обновления");
                     emit(got, total);
                     JSObject r = new JSObject();
-                    r.put("path", out.getAbsolutePath());
+                    r.put("path", finalFile.getAbsolutePath());
                     r.put("size", got);
                     r.put("sha256", hex(md.digest()));
                     call.resolve(r);
@@ -201,7 +220,7 @@ public class ApkInstallerPlugin extends Plugin {
         try {
             File dir = new File(getContext().getCacheDir(), DIR);
             File f = new File(path);
-            if (!f.getCanonicalPath().startsWith(dir.getCanonicalPath() + File.separator) || !f.isFile()) {
+            if (!f.getCanonicalPath().equals(new File(dir, FILE).getCanonicalPath()) || !f.isFile()) {
                 call.reject("Файл обновления не найден");
                 return;
             }
