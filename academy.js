@@ -192,7 +192,7 @@ export function comebackInfo(events, today, { minDays = 3, minDue = 8 } = {}) {
 export function nextLesson(events) {
   const done = doneLessons(events), last = new Map();
   for (const e of events) if (e.type === 'lesson' && (!last.has(e.payload.track) || last.get(e.payload.track) < e.payload.date)) last.set(e.payload.track, e.payload.date);
-  const order = [...TRACKS].sort((a, b) => (last.get(b.id) || '').localeCompare(last.get(a.id) || ''));
+  const order = TRACKS.filter(t => !t.zero).sort((a, b) => (last.get(b.id) || '').localeCompare(last.get(a.id) || ''));      // курсы «с нуля» идут по ступеням на своём экране
   for (const t of order) { const l = t.lessons.find(x => !done.has(x.id)); if (l) return { track: t, lesson: l }; }
   return null;
 }
