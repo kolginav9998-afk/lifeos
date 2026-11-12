@@ -69,6 +69,8 @@ test('экраны не импортируют друг друга (кроме �
 });
 
 test('файлы курсов c-*.js — чистые данные: ни от чего не зависят', () => {
-  // курсы «с нуля» (c-zero-*.js) вправе брать конструкторы заданий из чистого zero-kit.js, больше ни от чего
-  for (const f of files.filter(x => x.startsWith('c-'))) assert.deepEqual(graph.get(f).filter(d => !(f.startsWith('c-zero-') && d === 'zero-kit.js')), [], f);
+  // курсы «с нуля» c-zero-XX.js вправе брать конструкторы заданий из чистого zero-kit.js и свои части zero-XX-*.js; части — только zero-kit.js и друг друга
+  const zeroOk = (f, d) => d === 'zero-kit.js' || d.startsWith(`zero-${f.match(/^(?:c-zero|zero)-([a-z]+)/)?.[1]}-`);
+  for (const f of files.filter(x => x.startsWith('c-'))) assert.deepEqual(graph.get(f).filter(d => !(f.startsWith('c-zero-') && zeroOk(f, d))), [], f);
+  for (const f of files.filter(x => /^zero-[a-z]+-/.test(x))) assert.deepEqual(graph.get(f).filter(d => !zeroOk(f, d)), [], f);
 });
