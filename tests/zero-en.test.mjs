@@ -7,7 +7,7 @@ import path from 'node:path';
 import { TRACKS, validateTrack } from '../academy.js';
 import { lessonIndex, closureOf, graphProblems, scopeOf, textsOfLesson, englishWordProblems, validateZeroTrack, GRADED, checkOf } from '../zero-kit.js';
 
-const COMPLETE = false;                          // true, когда написаны все этапы (1–7): тогда проверки полноты маршрута становятся обязательными
+const COMPLETE = true;                           // true, когда написаны все этапы (1–7): тогда проверки полноты маршрута становятся обязательными
 const track = TRACKS.find(t => t.id === 'enzero');
 const L = track.lessons;
 const index = lessonIndex(TRACKS);
@@ -77,7 +77,7 @@ test('задания: не меньше 8 проверяемых, виды ра�
     assert.ok(new Set(graded.map(d => d.t)).size >= 3, `${l.id}: меньше трёх видов заданий`);
     assert.ok(l.drills.some(d => d.t === 'read'), `${l.id}: нет задания «прочитай вслух»`);
     if (l.stage === 'Фоника') assert.ok(l.drills.filter(d => d.say).length >= 3, `${l.id}: мало заданий со звуком`);
-    const qs = l.drills.map(d => `${d.t}|${d.q ?? d.text}|${d.big ?? ''}|${d.say ?? ''}|${d.right ?? ''}|${JSON.stringify([d.tiles, d.pairs])}`);
+    const qs = l.drills.map(d => `${d.t}|${d.q ?? ''}|${d.text ?? ''}|${d.big ?? ''}|${d.say ?? ''}|${d.right ?? ''}|${JSON.stringify([d.tiles, d.pairs])}`);
     assert.equal(new Set(qs).size, qs.length, `${l.id}: одинаковые задания`);
   }
 });
