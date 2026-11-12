@@ -258,8 +258,8 @@ assert.match(await text('#diag'), /Запуск: интерфейс за \d+(,\d
 assert.match(await text('#stats'), /всего записей: \d+/);
 assert.equal(await page.locator('#tabs button').count(), 5);
 await page.check('#simple-mode');
-await until(page, () => document.querySelectorAll('#tabs button').length === 3);
-assert.deepEqual(await page.locator('#tabs button span').allTextContents(), ['Сегодня', 'Дневник', 'Ещё']);
+await until(page, () => document.querySelectorAll('#tabs button').length === 4);
+assert.deepEqual(await page.locator('#tabs button span').allTextContents(), ['Сегодня', 'Дневник', 'Развитие', 'Ещё']);
 assert.equal(await text('#title'), 'Настройки', 'остаёмся на настройках');
 await page.click('#tabs button[data-tab="today"]');
 await until(page, () => !document.getElementById('view-today').hidden);
@@ -276,7 +276,7 @@ await page.click('#tabs button[data-tab="today"]');
 assert.equal(await page.locator('#focus-chip').count(), 1, 'после выключения всё вернулось');
 // выключаем простой режим, находясь на скрытом экране: приложение само уходит на «Сегодня»
 await page.click('#tabs button[data-tab="more"]'); await page.check('#simple-mode');
-await until(page, () => document.querySelectorAll('#tabs button').length === 3);
+await until(page, () => document.querySelectorAll('#tabs button').length === 4);
 await page.evaluate(async () => { document.querySelector('#search-btn').click(); });
 await page.fill('#search-input', 'сменный');
 await until(page, () => document.querySelector('.result'));

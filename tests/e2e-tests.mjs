@@ -13,7 +13,7 @@ const text = sel => page.textContent(sel);
 // ---------- меню тестов ----------
 await tab(page, 'tests');
 assert.equal(await text('#title'), 'Проверка');
-assert.deepEqual(await page.locator('#subnav button').allTextContents(), ['Учёба', 'Навыки', 'Тесты', 'Аналитика', 'Цели']);
+assert.deepEqual(await page.locator('#subnav button').allTextContents(), ['Учёба', 'С нуля', 'Навыки', 'Тесты', 'Аналитика', 'Цели']);
 assert.equal(await page.locator('.test-row').count(), 11);
 assert.match(await text('#bt-status'), /ещё не проходил/);
 
