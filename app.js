@@ -367,7 +367,7 @@ function buildTabs() {
   const groups = GROUPS.filter(g => visibleDefs().some(d => d.group === g.id));
   $('tabs').replaceChildren(...groups.map(g => el('button', { type: 'button', dataset: { tab: g.id },
     onclick: () => navigate(visibleDefs().find(d => d.group === g.id).id) }, icon(g.icon), el('span', { textContent: g.label }))));
-  $('tabs').style.gridTemplateColumns = `repeat(${groups.length}, 1fr)`;
+  $('tabs').style.gridTemplateColumns = `repeat(${groups.length}, minmax(0, 1fr))`;      // minmax(0, …): длинная подпись не раздвигает панель за край экрана
 }
 // Включили или выключили простой режим: пересобрать вкладки; если текущий экран скрыт, перейти на «Сегодня».
 function applyMode() {
