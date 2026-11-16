@@ -10,7 +10,8 @@
 // Название приложения пиши через APP_NAME («${APP_NAME}»): оно меняется при сборке.
 import { normalize } from './search.js';
 import { APK_LINK } from './updater.js';
-import { APP_NAME } from './config.js';          // название приложения берём отсюда, в текстах его не пишем
+import { APP_NAME } from './config.js';
+import { HELP_MORE } from './help-more.js';          // статьи R4.1 лежат в отдельном файле: help.js не должен перерасти предел размера файла          // название приложения берём отсюда, в текстах его не пишем
 
 const art = (id, o) => ({ id, ...o });          // id отдельно от литерала: это идентификатор статьи, а не элемента страницы
 
@@ -521,6 +522,7 @@ export const HELP_ARTICLES = [
     action: { label: 'Открыть «Меню»', go: 'menu' },
     related: ['first-steps'],
   }),
+  ...HELP_MORE,
 ];
 
 // Знакомство при первом входе (view-help-tour.js): три карточки, у каждой действие.
