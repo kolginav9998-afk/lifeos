@@ -48,3 +48,22 @@
 .rt-opts{grid-template-columns:repeat(2,1fr)}
 .rt-opts .mx-opt{min-height:112px}
 .rt-opts .mx-opt svg{max-width:120px}
+
+/* ---- блоки Корси ---- */
+.cs-board{position:relative;width:100%;max-width:min(340px,50vh);aspect-ratio:1;margin:0 auto;border:2px solid var(--line);border-radius:var(--r16);background:var(--card)}
+.cs-blk{position:absolute;padding:0;border-radius:var(--r8);border:2px solid var(--muted);background:var(--soft);min-height:0;touch-action:manipulation}
+.cs-blk:disabled{opacity:1;color:inherit}
+.cs-blk.lit{background:var(--accent);border-color:var(--text);transform:scale(1.14);box-shadow:0 0 0 4px var(--accent)}
+.cs-blk.tapped{border-color:var(--text);box-shadow:0 0 0 3px var(--accent)}
+.cs-blk:focus-visible{outline:3px solid var(--text);outline-offset:2px}
+
+/* ---- кодирование символов ---- */
+.cd-key{display:grid;grid-template-columns:repeat(9,1fr);gap:2px;border:2px solid var(--line);border-radius:var(--r12);background:var(--card);padding:6px 4px}
+.cd-cell{display:flex;flex-direction:column;align-items:center;gap:2px;min-width:0}
+.cd-g{width:100%;max-width:28px;height:auto}
+.cd-p{fill:none;stroke:var(--text);stroke-width:2.4;stroke-linecap:round;stroke-linejoin:round}
+.cd-d{font-weight:800;font-size:1.05rem;border-top:2px solid var(--line);width:100%;text-align:center;padding-top:2px}
+.cd-stim{display:grid;place-items:center;min-height:96px}
+.cd-big{width:84px;height:84px}
+.cd-big .cd-p{stroke-width:2}
+.cd-pad .kp{min-height:56px}

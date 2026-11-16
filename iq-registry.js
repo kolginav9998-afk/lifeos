@@ -12,6 +12,13 @@ export const IQ_TESTS = [
     primary: { key: 'correct', label: 'Верных ответов из 15', unit: '', better: 'higher', digits: 0 }, metrics: ITEM_METRICS },
   { id: 'rotation', title: 'Вращение фигур', domain: 'reasoning', minutes: 6, kind: 'logic', desc: 'Найди фигуру, которая получится, если повернуть образец, не отражая. 12 заданий, время не ограничено.',
     primary: { key: 'correct', label: 'Верных ответов из 12', unit: '', better: 'higher', digits: 0 }, metrics: ITEM_METRICS },
+  { id: 'corsi', title: 'Блоки Корси', domain: 'memory', minutes: 4, kind: 'span', desc: 'Блоки подсвечиваются по очереди: запомни порядок и повтори его. Длина растёт, пока не собьёшься.',
+    primary: { key: 'span', label: 'Объём (блоков)', unit: '', better: 'higher', digits: 0 }, metrics: { span: 'Объём, блоков', attempts: 'Попыток', correct: 'Верных попыток', score: 'Корси-балл (объём × верные попытки)' } },
+  { id: 'stroop40', title: 'Струп: 40 проб', domain: 'control', minutes: 3, kind: 'fast', desc: 'Назови цвет, которым написано слово, а не само слово. 40 проб, важны и точность, и скорость.',
+    primary: { key: 'interference', label: 'Помеха Струпа (против нейтрального слова)', unit: 'мс', better: 'lower', digits: 0 },
+    metrics: { n: 'Проб', correct: 'Верно', accuracy: 'Точность', meanCongruent: 'Среднее при совпадении, мс', meanNeutral: 'Среднее на нейтральных словах, мс', meanIncongruent: 'Среднее при несовпадении, мс', interference: 'Помеха, мс', facilitation: 'Выигрыш при совпадении, мс', errorsIncongruent: 'Ошибок при несовпадении', medianRT: 'Медиана верных, мс' } },
+  { id: 'coding', title: 'Кодирование символов', domain: 'speed', minutes: 2, kind: 'fast', desc: 'Каждому знаку соответствует цифра. Вводи цифры к знакам, пока идут 90 секунд.',
+    primary: { key: 'correct', label: 'Верных за 90 секунд', unit: '', better: 'higher', digits: 0 }, metrics: { n: 'Ответов', correct: 'Верно', accuracy: 'Точность', meanMs: 'Среднее время верного ответа, мс', perMinute: 'Верных в минуту' } },
 ];
 
 // Параметры шагов для запуска отдельного теста и планов.
@@ -20,6 +27,9 @@ export const IQ_STEPS = {
   seq12: { id: 'seq12', n: 12 },
   verbal: { id: 'verbal', n: 15 },
   rotation: { id: 'rotation', n: 12 },
+  corsi: { id: 'corsi', max: 9 },
+  stroop40: { id: 'stroop40', n: 40 },
+  coding: { id: 'coding', seconds: 90 },
 };
 
 // Достоверность: что считать «лишь бы пройти». Возвращает строку-причину или null.
@@ -28,6 +38,12 @@ export const IQ_VALID = {
   seq12: m => (m.n >= 6 ? null : 'мало заданий'),
   verbal: m => (m.n >= 8 ? null : 'мало заданий'),
   rotation: m => (m.n >= 6 ? null : 'мало заданий'),
+  corsi: m => (m.attempts >= 2 ? null : 'мало попыток'),
+  stroop40: m => (m.n >= 20 ? (m.accuracy >= 0.5 ? null : 'точность ниже половины') : 'мало проб'),
+  coding: m => (m.n >= 10 ? (m.accuracy >= 0.5 ? null : 'точность ниже половины') : 'мало ответов'),
 };
 
-export const IQ_PLANS = {};
+export const IQ_PLANS = {
+  logic: { id: 'logic', title: 'Проверка логики', about: 'около 25 минут', steps: [IQ_STEPS.matrices, IQ_STEPS.seq12, IQ_STEPS.verbal, IQ_STEPS.rotation] },
+  speed: { id: 'speed', title: 'Память и скорость', about: 'около 9 минут', steps: [IQ_STEPS.corsi, IQ_STEPS.stroop40, IQ_STEPS.coding] },
+};

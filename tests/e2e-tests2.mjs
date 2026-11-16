@@ -14,13 +14,13 @@ const SAVED = () => page.evaluate(async () => (await import('./store.js')).state
 // ---------- список: группы, пояснения, 320 px без горизонтальной прокрутки ----------
 const ids = await page.evaluate(async () => (await import('./bt-core.js')).TESTS.map(x => x.id));
 await waitCount(page, '.test-row', ids.length);
-for (const id of ['matrices', 'seq12', 'verbal', 'rotation']) assert.ok(ids.includes(id), `в реестре есть ${id}`);
+for (const id of ['matrices', 'seq12', 'verbal', 'rotation', 'corsi', 'stroop40', 'coding']) assert.ok(ids.includes(id), `в реестре есть ${id}`);
 assert.ok(await page.locator('.tg-title').count() >= 4, 'тесты разбиты на группы');
 assert.match(await text('[data-group="logic"]'), /Матрицы/);
 assert.match(await text('.tg-note'), /не настоящий IQ-тест/, 'честная подпись у группы «Логика»');
 await page.click('.test-row[data-test="matrices"] .what summary');
 assert.match(await text('.test-row[data-test="matrices"] .what'), /Время не ограничено/, 'пояснение «Что измеряет этот тест»');
-const noScroll = () => page.evaluate(() => document.documentElement.scrollWidth <= document.documentElement.clientWidth + 1);
+const noScroll = () => page.evaluate(() => { const r = document.getElementById('bt-run'); return document.documentElement.scrollWidth <= document.documentElement.clientWidth + 1 && (!r || r.hidden || r.scrollWidth <= r.clientWidth + 1); });
 assert.ok(await noScroll(), 'список тестов без горизонтальной прокрутки при 320 px');
 
 // ---------- общие помощники прохождения ----------
@@ -160,6 +160,141 @@ await page.click('#bt-done');
   assert.ok(m.ok && m.metrics.n === 12 && m.metrics.correct === 10, JSON.stringify(m.metrics));
   assert.equal(m.metrics.maxScore, 78); assert.equal(m.metrics.score, 78 - 2 - 6);
 }
+
+// ---------- управляемое время для тестов на скорость и память ----------
+await page.clock.install({ time: new Date() });
+const pauseClock = async () => { const now = await page.evaluate(() => Date.now()); await page.clock.pauseAt(now + 1000); };
+await pauseClock();
+const step = ms => page.clock.runFor(ms);
+const snap = () => page.evaluate(() => {
+  const q = id => document.getElementById(id), st = q('bt-stage');
+  if (q('bt-result')) return { done: true };
+  if (!st) return { none: true };
+  const lit = [...document.querySelectorAll('.cs-blk')].findIndex(b => b.classList.contains('lit'));
+  return { test: st.dataset.test, phase: st.dataset.phase, go: !!q('bt-go'), stateSkip: !!q('bt-state-skip'), lit: lit >= 0 ? lit : null,
+    ink: q('s4-word')?.dataset.ink ?? null, kind: q('s4-word')?.dataset.kind ?? null, sym: q('cd-stim')?.dataset.sym ?? null,
+    key: [...document.querySelectorAll('#cd-key .cd-cell')].map(c => Number(c.dataset.digit)) };
+});
+
+// ---------- 5. Блоки Корси: бот запоминает подсветку по DOM; длины 2–4 верно, на длине 5 дважды сбивается ----------
+await page.click('#bt-single-corsi');
+await until(page, () => !!document.getElementById('bt-state-skip')); await page.click('#bt-state-skip');
+await until(page, () => !!document.getElementById('bt-go'));
+assert.match(await text('#bt-stage'), /Блок 1 … Блок 9/, 'сказано про нумерацию блоков для диктора');
+assert.equal(await page.isChecked('#cs-voice'), false, 'озвучка блоков по умолчанию выключена');
+assert.ok(await page.locator('#bt-skip').isVisible());
+await page.click('#bt-go');
+{
+  let seen = [], wasLit = null, failsAtFive = 0, checkedUi = false;
+  for (let k = 0; k < 4000; k++) {
+    const s = await snap();
+    if (s.done) break;
+    if (s.phase === 'show') {
+      if (s.lit !== null && wasLit === null) seen.push(s.lit);
+      wasLit = s.lit;
+      if (!checkedUi && seen.length) {
+        checkedUi = true;
+        assert.equal(await page.locator('.cs-blk').count(), 9);
+        assert.equal(await page.getAttribute('.cs-blk >> nth=2', 'aria-label'), 'Блок 3', 'у блока есть имя для диктора');
+        assert.ok(await noScroll(), 'поле Корси без горизонтальной прокрутки при 320 px');
+        const bb = await page.locator('.cs-blk >> nth=0').boundingBox();
+        assert.ok(bb.width >= 40 && bb.height >= 40, `блок достаточно крупный: ${bb.width}×${bb.height}`);
+      }
+      await step(100);
+    } else if (s.phase === 'input') {
+      const order = seen.length >= 5 ? [...seen].reverse() : seen;
+      if (seen.length >= 5) failsAtFive++;
+      for (const b of order) await page.click(`.cs-blk[data-b="${b}"]`);
+      seen = []; wasLit = null;
+      await step(100);
+    } else if (s.go) { await page.click('#bt-go'); await step(50); }
+    else await step(100);
+  }
+  await finish();
+  assert.equal(failsAtFive, 2, 'на длине 5 — две неудачи подряд, тест остановился');
+}
+assert.match(await text('#bt-result .res-row[data-test="corsi"]'), /4/, 'объём 4');
+await page.click('#bt-done');
+{
+  const m = (await lastRun()).tests.corsi;
+  assert.ok(m.ok && m.metrics.span === 4 && m.metrics.attempts === 5 && m.metrics.correct === 3 && m.metrics.score === 12, JSON.stringify(m.metrics));
+  assert.equal(m.trials.length, 5); assert.deepEqual(m.trials.map(x => x.len), [2, 3, 4, 5, 5]);
+}
+await pauseClock();
+
+// ---------- 6. Струп: 40 проб; ответ на совпадение 450 мс, на нейтральное 500, на несовпадение 650 (в управляемом времени) ----------
+await page.click('#bt-single-stroop40');
+await until(page, () => !!document.getElementById('bt-state-skip')); await page.click('#bt-state-skip');
+await until(page, () => !!document.getElementById('bt-go'));
+assert.ok(await page.locator('#bt-skip').isVisible(), 'тест на цвета можно пропустить');
+await page.click('#bt-go');
+{
+  let answered = 0, wrongLeft = 3;
+  for (let k = 0; k < 6000; k++) {
+    const s = await snap();
+    if (s.done) break;
+    if (s.test === 'stroop40' && s.ink) {
+      if (answered === 0) assert.ok(await noScroll(), 'Струп: без горизонтальной прокрутки при 320 px');
+      await step(s.kind === 'con' ? 450 : s.kind === 'neu' ? 500 : 650);
+      const wrong = s.kind === 'inc' && wrongLeft > 0 && (answered % 7 === 0 || answered > 30);
+      const colors = ['red', 'blue', 'green', 'yellow'];
+      const pick = wrong ? colors.find(c => c !== s.ink) : s.ink;
+      if (wrong) wrongLeft--;
+      await page.click(`.stroop-btn[data-c="${pick}"]`); answered++;
+      await step(10);
+    } else if (s.go) { await page.click('#bt-go'); await step(50); }
+    else await step(10);                                            // мелкий шаг: время ответа в управляемых часах считается от появления слова
+  }
+  await finish();
+  assert.equal(answered, 40);
+}
+await page.click('#bt-done');
+{
+  const m = (await lastRun()).tests.stroop40;
+  assert.ok(m.ok && m.metrics.n === 40 && m.metrics.errorsIncongruent === 3 && m.metrics.correct === 37, JSON.stringify(m.metrics));
+  assert.ok(m.metrics.meanCongruent >= 450 && m.metrics.meanCongruent <= 470, `совпадение: ${m.metrics.meanCongruent}`);
+  assert.ok(m.metrics.meanNeutral >= 500 && m.metrics.meanNeutral <= 520, `нейтральные: ${m.metrics.meanNeutral}`);
+  assert.ok(m.metrics.meanIncongruent >= 650 && m.metrics.meanIncongruent <= 670, `несовпадение: ${m.metrics.meanIncongruent}`);
+  assert.ok(m.metrics.interference >= 130 && m.metrics.interference <= 170 && m.metrics.facilitation >= 30 && m.metrics.facilitation <= 70, JSON.stringify(m.metrics));
+  assert.equal(m.trials.length, 40);
+}
+await pauseClock();
+
+// ---------- 7. Кодирование символов: 90 секунд, ответ за секунду, каждый пятый — неверный ----------
+await page.click('#bt-single-coding');
+await until(page, () => !!document.getElementById('bt-state-skip')); await page.click('#bt-state-skip');
+await until(page, () => !!document.getElementById('bt-go'));
+assert.match(await text('#bt-stage'), /Знаки названы словами для экранного диктора/);
+await page.click('#bt-go');
+{
+  let answered = 0;
+  for (let k = 0; k < 4000; k++) {
+    const s = await snap();
+    if (s.done) break;
+    if (s.test === 'coding' && s.sym !== null) {
+      if (answered === 0) {
+        assert.match(await page.getAttribute('#cd-key', 'aria-label'), /^Ключ: плюс — \d; крестик — \d;/, 'ключ описан словами');
+        assert.match(await page.getAttribute('#cd-stim', 'aria-label'), /^Знак: /, 'знак назван словами');
+        assert.ok(await noScroll(), 'кодирование: без горизонтальной прокрутки при 320 px');
+        const bb = await page.locator('.cd-pad .kp >> nth=0').boundingBox();
+        assert.ok(bb.height >= 44 && bb.width >= 44, `цифры крупные: ${bb.width}×${bb.height}`);
+      }
+      await step(1000);
+      const right = s.key[Number(s.sym)], digit = answered % 5 === 4 ? (right % 9) + 1 : right;
+      try { await page.click(`.cd-pad .kp[data-d="${digit}"]`, { timeout: 1500 }); answered++; } catch { /* время вышло во время шага: знака уже нет */ }
+    } else if (s.go) { await page.click('#bt-go'); await step(50); }
+    else await step(300);
+  }
+  await finish();
+  assert.ok(answered >= 85 && answered <= 91, `ответов за 90 секунд: ${answered}`);
+}
+await page.click('#bt-done');
+{
+  const m = (await lastRun()).tests.coding;
+  assert.ok(m.ok && m.metrics.n >= 85 && m.metrics.accuracy >= 0.78 && m.metrics.accuracy <= 0.82 && m.metrics.meanMs >= 1000 && m.metrics.meanMs <= 1150, JSON.stringify(m.metrics));
+  assert.ok(m.metrics.correct >= 68 && m.metrics.perMinute >= 46 && m.metrics.perMinute <= 52, JSON.stringify(m.metrics));
+}
+await page.clock.resume();
 
 // ---------- пропуск зрительного теста ----------
 await page.click('#bt-single-matrices');

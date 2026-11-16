@@ -8,11 +8,12 @@ import { PLANS, TESTS, TEST_BY_ID, makeRun, makeRunEvent, runsOf, runId, fmtPrim
 import { analyzeRuns, zText, zWord, selfCompare } from './bt-analytics.js';
 import { renderTestList } from './view-tests-list.js';
 import { iqRunners } from './view-tests-run-iq.js';
+import { fastRunners } from './view-tests-run-fast.js';
 import { createRunner } from './bt-ui.js';
 import { cardPool, statesOf } from './academy.js';
 import { studyStreak } from './srs.js';
 
-const MODE = { quick: 'Быстрая', full: 'Полная' };
+const MODE = { quick: 'Быстрая', full: 'Полная', logic: 'Проверка логики', speed: 'Память и скорость' };
 const hhmm = ts => { const d = new Date(ts); return `${String(d.getHours()).padStart(2, '0')}:${String(d.getMinutes()).padStart(2, '0')}`; };
 
 export function createTestsView() {
@@ -46,6 +47,8 @@ export function createTestsView() {
       el('p', { class: 'muted', id: 'bt-streak', textContent: streak ? `Дней подряд: ${streak}` : `Всего прохождений: ${runs.length}` }),
       el('button', { type: 'button', id: 'bt-quick', class: 'primary big-btn', textContent: `Быстрая проверка · ${PLANS.quick.about}`, onclick: () => start(PLANS.quick) }),
       el('button', { type: 'button', id: 'bt-full', textContent: `Полная проверка · ${PLANS.full.about}`, onclick: () => start(PLANS.full) }),
+      el('button', { type: 'button', id: 'bt-logic', textContent: `${PLANS.logic.title} · ${PLANS.logic.about}`, onclick: () => start(PLANS.logic) }),
+      el('button', { type: 'button', id: 'bt-speed', textContent: `${PLANS.speed.title} · ${PLANS.speed.about}`, onclick: () => start(PLANS.speed) }),
       el('p', { class: 'hint', textContent: 'Лучше проходить в тишине, примерно в одно и то же время и не торопиться: цель — сравнивать себя с собой.' }),
       vsLine(today));
 
@@ -80,7 +83,7 @@ export function createTestsView() {
       const pool = cardPool(events), byId = new Map(pool.map(c => [c.id, c]));
       const started = statesOf(events).filter(s => s.box >= 1).map(s => byId.get(s.card)).filter(Boolean);
       const recentWords = runsOf(events).slice(-5).flatMap(r => r.tests.words?.extra?.words ?? []);
-      runner = createRunner(host, { history: { recentWords }, cards: { started, pool }, extra: [iqRunners] });
+      runner = createRunner(host, { history: { recentWords }, cards: { started, pool }, extra: [iqRunners, fastRunners] });
       host.focus({ preventScroll: true });
       const out = await runner.runPlan(plan);
       if (!Object.keys(out.results).length) { runner.close(); toast(out.aborted ? 'Проверка прервана, результатов нет' : 'Результатов нет'); return; }

@@ -2,11 +2,11 @@
 // Главное правило: тесты не ставят диагнозов и не измеряют «настоящий IQ». Ориентиры из литературы — только справочные, не норма для тебя.
 
 export const TEST_GROUPS = [
-  { id: 'logic', title: 'Логика', note: 'Задания в духе тестов на IQ. Это не настоящий IQ-тест: у приложения нет данных о других людях, поэтому сравнивай себя только с собой.',
+  { key: 'logic', title: 'Логика', note: 'Задания в духе тестов на IQ. Это не настоящий IQ-тест: у приложения нет данных о других людях, поэтому сравнивай себя только с собой.',
     tests: ['matrices', 'seq12', 'verbal', 'rotation', 'series'] },
-  { id: 'memory', title: 'Память', note: '', tests: ['digits', 'corsi', 'nback', 'words'] },
-  { id: 'speed', title: 'Внимание и скорость', note: '', tests: ['reaction', 'gonogo', 'stroop', 'stroop40', 'schulte', 'coding'] },
-  { id: 'other', title: 'Счёт, время и знания', note: '', tests: ['math', 'time', 'recall'] },
+  { key: 'memory', title: 'Память', note: '', tests: ['digits', 'corsi', 'nback', 'words'] },
+  { key: 'speed', title: 'Внимание и скорость', note: '', tests: ['reaction', 'gonogo', 'stroop', 'stroop40', 'schulte', 'coding'] },
+  { key: 'other', title: 'Счёт, время и знания', note: '', tests: ['math', 'time', 'recall'] },
 ];
 
 const FREE = 'Задания составлены для этого приложения и не проверялись на других людях, поэтому результат годится только для сравнения с самим собой.';
@@ -32,4 +32,4 @@ export const WHAT = {
   recall: { what: 'Закрепление выученного: помнишь ли ты карточки из своих курсов.', note: 'Нужны хотя бы несколько изученных карточек.' },
 };
 
-export const groupOf = id => TEST_GROUPS.find(g => g.tests.includes(id))?.id ?? 'other';
+export const groupOf = id => TEST_GROUPS.find(g => g.tests.includes(id))?.key ?? 'other';

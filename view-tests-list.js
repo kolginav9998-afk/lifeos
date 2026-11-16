@@ -26,7 +26,7 @@ export function renderTestList(ctx) {
     const tests = g.tests.map(id => TEST_BY_ID[id]).filter(Boolean);
     tests.forEach(t => placed.add(t.id));
     if (!tests.length) continue;
-    out.push(el('h3', { class: 'tg-title', textContent: g.title }), g.note ? el('p', { class: 'muted tg-note', textContent: g.note }) : null, el('div', { class: 'list', dataset: { group: g.id } }, ...tests.map(t => row(t, ctx))));
+    out.push(el('h3', { class: 'tg-title', textContent: g.title }), g.note ? el('p', { class: 'muted tg-note', textContent: g.note }) : null, el('div', { class: 'list', dataset: { group: g.key } }, ...tests.map(t => row(t, ctx))));
   }
   const rest = TESTS.filter(t => !placed.has(t.id));
   if (rest.length) out.push(el('h3', { class: 'tg-title', textContent: 'Другие' }), el('div', { class: 'list' }, ...rest.map(t => row(t, ctx))));

@@ -45,11 +45,12 @@ export function createRunner(host, { history = {}, cards = { started: [], pool: 
   // ---------- общие экраны ----------
   const button = (text, id, onclick) => el('button', { type: 'button', id, class: 'primary big-btn', textContent: text, onclick });
   // skip — подпись второй кнопки «Пропустить тест» (для зрительных заданий): тогда вернётся 'skip'.
-  function intro(test, title, lines, btn = 'Начать', { skip = '' } = {}) {
+  // extra — дополнительные узлы внутри карточки (например, флажок), их читает сам вызывающий.
+  function intro(test, title, lines, btn = 'Начать', { skip = '', extra = [] } = {}) {
     return waitFor((done, h) => {
       const go = button(btn, 'bt-go', () => done());
       const skipBtn = skip ? el('button', { type: 'button', id: 'bt-skip', textContent: skip, onclick: () => done('skip') }) : null;
-      set(test, 'intro', el('div', { class: 'card bt-intro' }, el('h3', { id: 'bt-intro-h', tabIndex: -1, textContent: title }), ...lines.map(l => el('p', { textContent: l })), go, skipBtn));
+      set(test, 'intro', el('div', { class: 'card bt-intro' }, el('h3', { id: 'bt-intro-h', tabIndex: -1, textContent: title }), ...lines.map(l => el('p', { textContent: l })), ...extra, go, skipBtn));
       h.on(host, 'keydown', e => { if (e.key === 'Enter') { e.preventDefault(); done(); } });
     });
   }
