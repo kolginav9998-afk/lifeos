@@ -18,7 +18,6 @@ input:focus-visible,select:focus-visible,textarea:focus-visible{outline-offset:1
 #title:focus,#view:focus,.overlay:focus{outline:none}
 
 /* цвета с достаточным контрастом в особых местах */
-.toast button{color:var(--toast-action)}
 .h-actions button.on{color:var(--on-ok)}
 .bp-day.full,.bp-day.full b{color:var(--on-ok)}
 .avatar,.avatar-btn{color:#050714}
@@ -42,3 +41,15 @@ header.top h1{flex:1 1 auto;min-width:0;overflow-wrap:anywhere}
 /* пользовательский текст без пробелов не растягивает кнопки и строки итогов */
 .h-actions button,.chip,.result,.quiz-opt,.series-opt{overflow-wrap:anywhere}
 .cat-row{align-items:baseline}.cat-row>:first-child{min-width:0;overflow-wrap:anywhere}.cat-row>:last-child{flex:none;white-space:nowrap}
+
+/* ===== после слияния оформления и доступности (контраст и узкий экран) ===== */
+/* красный текст чипа на розовой подложке в светлой теме давал 4,1:1; в тёмной теме берётся обычный --danger */
+:root{--danger-ink:#a8202b}
+@media (prefers-color-scheme: dark){:root:not([data-theme=light]){--danger-ink:var(--danger)}}
+:root[data-theme=dark]{--danger-ink:var(--danger)}
+.chip.danger,.chip.static.danger,button.danger{color:var(--danger-ink)}
+/* выполненная задача приглушена цветом и перечёркнута; прозрачность поверх этого роняла контраст ниже 4,5:1 */
+.item.done{opacity:1}
+/* нижняя панель на 320 px и при шрифте 130 %: подписи должны помещаться, а не выталкивать «Ещё» за край */
+#tabs button{min-width:0}
+@media (max-width: 359px){#tabs{left:6px;right:6px;padding:4px;gap:0}#tabs button{padding-inline:0;font-size:.62rem;font-weight:500}#tabs button[aria-current=page]{font-weight:600}}

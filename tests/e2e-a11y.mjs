@@ -41,12 +41,15 @@ async function runAxe(page, label) {
 const settle = (page, ms = 250) => page.waitForTimeout(ms);
 const setTheme = async (page, theme) => { await page.emulateMedia({ colorScheme: theme, reducedMotion: 'reduce' }); await settle(page, 200); };
 // «Раскрытый» вид экрана: открыты все <details>, показаны спрятанные блоки и поля (кроме окон) — так проверяются и формы, которые обычно закрыты.
-const expand = page => page.evaluate(() => {
-  const v = [...document.querySelectorAll('#view > section')].find(x => !x.hidden);
-  if (!v) return;
-  for (const d of v.querySelectorAll('details')) d.open = true;
-  for (const h of v.querySelectorAll('[hidden]')) if (!h.classList.contains('overlay')) h.hidden = false;
-});
+const expand = async page => {
+  await page.evaluate(() => {
+    const v = [...document.querySelectorAll('#view > section')].find(x => !x.hidden);
+    if (!v) return;
+    for (const d of v.querySelectorAll('details')) d.open = true;
+    for (const h of v.querySelectorAll('[hidden]')) if (!h.classList.contains('overlay')) h.hidden = false;
+  });
+  await page.evaluate(() => new Promise(r => requestAnimationFrame(() => requestAnimationFrame(r))));   // наблюдатель уровней заголовков срабатывает на следующем кадре
+};
 // Одинаковые id на странице (в том числе в спрятанных экранах): их читают диктор и тесты, берётся первый попавшийся.
 const duplicateIds = page => page.evaluate(() => {
   const seen = new Map();

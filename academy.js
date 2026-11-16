@@ -192,7 +192,7 @@ export function comebackInfo(events, today, { minDays = 3, minDue = 8 } = {}) {
 export function nextLesson(events) {
   const done = doneLessons(events), last = new Map();
   for (const e of events) if (e.type === 'lesson' && (!last.has(e.payload.track) || last.get(e.payload.track) < e.payload.date)) last.set(e.payload.track, e.payload.date);
-  const order = [...TRACKS].sort((a, b) => (last.get(b.id) || '').localeCompare(last.get(a.id) || ''));
+  const order = TRACKS.filter(t => !t.zero).sort((a, b) => (last.get(b.id) || '').localeCompare(last.get(a.id) || ''));      // курсы «с нуля» идут по ступеням на своём экране
   for (const t of order) { const l = t.lessons.find(x => !done.has(x.id)); if (l) return { track: t, lesson: l }; }
   return null;
 }
@@ -302,12 +302,18 @@ export function wordOfDay(date, trackId) {
 
 // Поиск по содержимому курсов: уроки (название, текст, задание) и слова/термины колод. Без индексов: данных немного.
 const nrm = x => String(x ?? '').normalize('NFKC').toLowerCase().replace(/ё/g, 'е');
-export function searchAcademy(query, limit = 12) {
+// Курсы «с нуля» (zero: true) открываются по ступеням, поэтому поиск не раскрывает их содержимое: только названия уроков из набора openZero
+// (id открытых уроков, его считает curriculum.js: openLessonIds). Без набора таких уроков в результатах нет.
+export function searchAcademy(query, limit = 12, openZero = null) {
   const tokens = nrm(query).split(/\s+/).filter(Boolean);
   if (!tokens.length || tokens.join('').length < 2) return [];
   const lessons = [], words = [];
   for (const t of TRACKS) {
     for (const l of t.lessons) {
+      if (t.zero) {
+        if (openZero?.has(l.id) && tokens.every(k => nrm(l.title).includes(k))) lessons.push({ kind: 'Урок', title: `${l.title} · ${t.title}`, trackId: t.id, lessonId: l.id, score: 0, zero: true });
+        continue;
+      }
       const title = nrm(l.title), hay = nrm([l.title, ...l.body, l.task].join(' '));
       if (tokens.every(k => hay.includes(k))) lessons.push({ kind: 'Урок', title: `${l.title} · ${t.title}`, trackId: t.id, lessonId: l.id, score: tokens.every(k => title.includes(k)) ? 0 : 1 });
     }

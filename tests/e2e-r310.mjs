@@ -1,13 +1,13 @@
 // R3.10: цели уроков, конспект → карточка, дневник практики с недельными целями, подсказка «нового давно нет» и др.
 import assert from 'node:assert/strict';
-import { launch, tab, until } from './helpers.mjs';
+import { launch, tab, until, appReady, waitToast, eventually } from './helpers.mjs';
 
 const t = await launch({ ctxOptions: { permissions: ['clipboard-read', 'clipboard-write'] } });
 const { page, errors } = t;
 await page.goto(t.url);
-await until(page, () => !document.getElementById('app').hidden);
+await appReady(page);
 const text = sel => page.textContent(sel);
-const toast = async re => until(page, r => new RegExp(r).test(document.getElementById('toast').textContent), re.source);
+const toast = re => waitToast(page, re);
 const clearToast = () => page.evaluate(async () => (await import('./ui.js')).clearToast());
 const evs = type => page.evaluate(async ty => (await import('./store.js')).state.events.filter(e => e.type === ty), type);
 const day = n => page.evaluate(async k => { const ev = await import('./events.js'); return ev.addDays(ev.todayStr(), k); }, n);
@@ -29,8 +29,7 @@ await clearToast();
 await page.fill('.lesson[data-lesson="en-01"] .lesson-note', 'Пять слов в день, вечером повторение'); await page.click('.note-card[data-note-card="en-01"]'); await toast(/Карточка обновлена/);
 cards = await evs('ucard'); assert.equal(cards.length, 1, 'вторая карточка не создаётся'); assert.equal(cards[0].payload.a, 'Пять слов в день, вечером повторение');
 await page.click('#toast button');                                      // «Отменить» возвращает прежний текст
-await until(page, () => true); await page.waitForTimeout(200);
-assert.equal((await evs('ucard'))[0].payload.a, 'Учить по пять слов в день и повторять вечером');
+await eventually(() => evs('ucard'), v => assert.equal(v[0].payload.a, 'Учить по пять слов в день и повторять вечером'));          // «Отменить» сохраняет прежний текст чуть позже клика
 await page.click('#learn-back');
 await page.click('.track-card[data-track="my"]');
 await until(page, () => /что главное/.test(document.getElementById('view-learn').textContent));
@@ -176,7 +175,7 @@ assert.match(await page.evaluate(() => [...document.querySelectorAll('.habit')].
 
 // ---------- навыки ----------
 await tab(page, 'skills');
-assert.deepEqual(await page.locator('#subnav button').allTextContents(), ['Учёба', 'Навыки', 'Тесты', 'Аналитика', 'Цели']);
+assert.deepEqual(await page.locator('#subnav button').allTextContents(), ['Учёба', 'С нуля', 'Навыки', 'Тесты', 'Аналитика', 'Цели']);
 assert.match(await text('#skills-empty'), /Пока навыков нет/);
 await page.locator('#skill-new').evaluate(d => { d.open = true; });
 await page.click('#skill-add'); assert.match(await text('#skill-err'), /Напиши, что ты умеешь/);

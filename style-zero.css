@@ -1,1 +1,118 @@
 /* Экран «С нуля» (курсы английского и иврита). Подключается после style-help.css. */
+/* ===== zero ===== */
+/* Все цвета — только токены из style.css и style-design.css; работает на 320 px и при шрифте 130 %; движение только без prefers-reduced-motion: reduce. */
+.zero-stack{display:flex;flex-direction:column;gap:var(--s4);min-width:0}
+.zero-stack>*{min-width:0}
+.zero-routes .chip{white-space:normal;text-align:left;min-height:44px}
+.zero-routes .chip[aria-pressed=true]{background:var(--tint-accent);border-color:var(--mode-accent);font-weight:700}
+.zero-routes .chip[aria-pressed=true]::before{content:"✓ "}
+.zero-ringrow{align-items:center;gap:var(--s4);flex-wrap:nowrap}
+.zero-ringrow .ring{flex:none}
+.zero-ringrow .grow{min-width:0}
+.zero-ringrow h3{margin-bottom:var(--s1)}
+.zero-ringrow p{margin:var(--s1) 0}
+.zero-intro-card p{margin:0 0 var(--s2)}
+.zero-how summary{color:var(--text);font-weight:600}
+.zero-status-help{list-style:none;padding:0;display:flex;flex-direction:column;gap:var(--s2)}
+.zero-due-list{list-style:none;padding:0;margin:var(--s2) 0;display:flex;flex-direction:column;gap:var(--s2)}
+.zero-quick p{margin:0 0 var(--s3)}
+
+/* статус урока: слово и значок, не только цвет */
+.zero-st{display:inline-flex;align-items:center;gap:var(--s1);padding:2px var(--s2);border-radius:var(--r8);background:var(--soft);color:var(--text);font-size:var(--t12);font-weight:700;line-height:1.3}
+.zero-st .ic{flex:none;color:var(--mode-accent)}
+.zero-st-mastered .ic,.zero-st-confirmed .ic{color:var(--ok)}
+.zero-st-review .ic{color:var(--warn)}
+.zero-st-locked .ic{color:var(--muted)}
+.zero-st-mastered,.zero-st-confirmed{background:var(--tint-ok)}
+.zero-st-review{background:var(--tint-warn)}
+
+/* этапы и строки уроков */
+.zero-stage>summary{display:flex;flex-wrap:wrap;gap:var(--s1);align-items:baseline;color:var(--text)}
+.zero-list{list-style:none;margin:0;padding:0;display:flex;flex-direction:column;gap:var(--s2)}
+.zero-row{display:grid;grid-template-columns:auto minmax(0,1fr) auto;gap:var(--s3);align-items:center;width:100%;min-height:52px;padding:var(--s2) var(--s3);text-align:left;border-radius:var(--r12);background:var(--card);border:1px solid var(--line);box-shadow:var(--shadow-sm);overflow-wrap:anywhere}
+.zero-row-locked .zero-rt strong{color:var(--muted)}
+.zero-row-review{border-color:var(--warn)}
+.zero-n{display:grid;place-items:center;min-width:28px;height:28px;border-radius:50%;background:var(--soft);font-size:var(--t12);font-weight:700;font-variant-numeric:tabular-nums}
+.zero-rt{display:flex;flex-direction:column;min-width:0}
+@media (max-width:420px){.zero-row{grid-template-columns:auto minmax(0,1fr)}.zero-row .zero-st{grid-column:2;justify-self:start}}
+
+/* окно урока и проверок */
+.zero-content{display:flex;flex-direction:column;gap:var(--s4);min-width:0}
+.zero-lesson{display:flex;flex-direction:column;gap:var(--s3);min-width:0}
+.zero-title{font-size:var(--t24);line-height:1.2;margin:0;overflow-wrap:anywhere;display:flex;gap:var(--s2);align-items:center;flex-wrap:wrap}
+.zero-title:focus{outline:none}
+.zero-qh{font-size:var(--t16);margin:0 0 var(--s2);color:var(--muted)}
+.zero-qh:focus{outline:none}
+.zero-p{margin:0;font-size:var(--t16);line-height:1.55}
+.zero-he{unicode-bidi:isolate;font-size:1.15em}
+.zero-en{unicode-bidi:isolate}
+.zero-words{display:flex;flex-direction:column;gap:var(--s2)}
+.zero-word{display:inline-flex;align-items:center;gap:var(--s2);flex-wrap:wrap;padding:var(--s1) var(--s2);border-radius:var(--r12);background:var(--soft)}
+.zero-table-wrap{overflow-x:auto;border:1px solid var(--line);border-radius:var(--r12)}
+.zero-table{border-collapse:collapse;width:100%}
+.zero-table th,.zero-table td{padding:var(--s2) var(--s3);border-bottom:1px solid var(--line);text-align:start;vertical-align:top;overflow-wrap:anywhere}
+.zero-table th{background:var(--soft);font-size:var(--t12)}
+.zero-table tr:last-child td{border-bottom:0}
+.zero-statusline{margin:0}
+.zero-actions{gap:var(--s2)}
+.zero-actions button{flex:1 1 12rem}
+.zero-lockmsg{display:flex;align-items:center;gap:var(--s2);margin:0}
+.zero-lockmsg .ic{color:var(--muted)}
+.zero-missing{margin:0;padding-left:var(--s4)}
+.zero-score{font-size:var(--t20);font-weight:700;margin:0}
+.zero-progress{margin:0}
+.zero-seq-head{display:flex;flex-direction:column;gap:var(--s1)}
+.zero-result.passed .zero-title .ic{color:var(--ok)}
+.zero-result.failed .zero-title .ic{color:var(--warn)}
+.zero-opened{display:flex;gap:var(--s2);align-items:center;margin:0}
+
+/* задание */
+.zero-drill{display:flex;flex-direction:column;gap:var(--s3);min-width:0}
+.zero-big{font-size:var(--t40);line-height:1.2;text-align:center;margin:0;overflow-wrap:anywhere}
+.zero-q{font-size:var(--t20);font-weight:700;margin:0;line-height:1.3}
+.zero-read{font-size:var(--t20);margin:0;padding:var(--s3);border-radius:var(--r12);background:var(--soft)}
+.zero-say-text{margin:0;font-size:var(--t16)}
+.zero-body{display:flex;flex-direction:column;gap:var(--s3)}
+.zero-opts,.zero-col{display:flex;flex-direction:column;gap:var(--s2);min-width:0}
+.zero-opt{justify-content:flex-start;text-align:start;white-space:normal;min-height:48px;padding:var(--s3) var(--s4);border-radius:var(--r12);gap:var(--s2);overflow-wrap:anywhere}
+.zero-opt:disabled{opacity:1}
+.zero-opts button:disabled:not(.right):not(.wrong){opacity:.6}
+.zero-opt.right{border-color:var(--ok);background:var(--tint-ok)}
+.zero-opt.wrong{border-color:var(--danger);background:var(--tint-danger)}
+.zero-opt .ic{flex:none}
+.zero-opt.paired{border-color:var(--mode-accent);background:var(--tint-accent)}
+.zero-opt[aria-pressed=true]{outline:2px solid var(--mode-accent);outline-offset:1px}
+.zero-pn{color:var(--muted);font-size:var(--t14)}
+.zero-match{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:var(--s3)}
+.zero-typed{display:flex;gap:var(--s2);flex-wrap:wrap}
+.zero-typed .zero-input{flex:1 1 10rem;min-width:0;font-size:var(--t20)}
+.zero-tiles{display:flex;flex-wrap:wrap;gap:var(--s2);align-items:center;min-height:56px;padding:var(--s2);border:1px dashed var(--line);border-radius:var(--r12)}
+.zero-out{border-style:solid}
+.zero-tile{min-width:48px;min-height:48px;padding:var(--s2) var(--s3);border-radius:var(--r12);font-size:var(--t20)}
+.zero-tile.static{display:inline-flex;align-items:center;min-width:0;min-height:0;padding:2px var(--s2);font-size:var(--t16);border-radius:var(--r8);background:var(--soft)}
+.zero-right{border:0;padding:0;min-height:0;display:inline-flex;vertical-align:middle}
+.zero-hint{margin:0;padding:var(--s3);border-left:3px solid var(--warn);background:var(--tint-warn);border-radius:0 var(--r8) var(--r8) 0}
+.zero-fb-box{display:flex;flex-direction:column;gap:var(--s3)}
+.zero-fb{display:flex;flex-direction:column;gap:var(--s2);padding:var(--s3) var(--s4);border-radius:var(--r12);border:1px solid var(--line);background:var(--soft)}
+.zero-fb p{margin:0}
+.zero-fb.ok{border-color:var(--ok);background:var(--tint-ok)}
+.zero-fb.bad{border-color:var(--danger);background:var(--tint-danger)}
+.zero-verdict{display:flex;align-items:center;gap:var(--s2);font-size:var(--t16)}
+.zero-fb.ok .zero-verdict .ic{color:var(--ok)}
+.zero-fb.bad .zero-verdict .ic{color:var(--danger)}
+
+/* каталог внешних курсов */
+.zero-catalog{display:flex;flex-direction:column;gap:var(--s4);min-width:0}
+.zero-catalog h3:focus{outline:none}
+.zero-filters{display:grid;grid-template-columns:repeat(auto-fit,minmax(min(100%,9rem),1fr));gap:var(--s3);margin:var(--s3) 0}
+.zero-res-list{list-style:none;margin:0;padding:0;display:flex;flex-direction:column;gap:var(--s3)}
+.zero-res{display:flex;flex-direction:column;gap:var(--s2);min-width:0}
+.zero-res p{margin:0}
+.zero-res-t{margin:0;font-size:var(--t16);overflow-wrap:anywhere}
+.zero-rec{display:flex;align-items:center;gap:var(--s1);font-size:var(--t12);font-weight:700}
+.zero-chips{gap:var(--s2)}
+.zero-res-sel{display:flex;align-items:center;gap:var(--s2);flex-wrap:wrap}
+.zero-res-status{width:auto;min-width:9rem}
+
+/* движение только если человек его не отключил */
+@media (prefers-reduced-motion:no-preference){.zero-progress>span{transition:width .2s var(--ease)}}

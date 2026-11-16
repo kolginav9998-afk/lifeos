@@ -23,6 +23,8 @@ import { createNotesView } from './view-notes.js';
 import { createDiaryView } from './view-diary.js';
 import { createHealthView } from './view-health.js';
 import { createLearnView } from './view-learn.js';
+import { createZeroView } from './view-zero.js';
+import { openLessonIds } from './curriculum.js';
 import { createSkillsView } from './view-skills.js';
 import { createWorkoutsView } from './view-workouts.js';
 import { createPlansView } from './view-plans.js';
@@ -49,7 +51,8 @@ const DEFS = [
   { id: 'workouts', group: 'diary', title: 'Тренировки', sub: 'Тренировки', make: () => createWorkoutsView() },
   { id: 'notes', group: 'diary', title: 'Заметки', sub: 'Заметки', make: () => createNotesView() },
   { id: 'reflect', group: 'diary', title: 'Рефлексия', sub: 'Рефлексия', make: () => createReflectView() },
-  { id: 'learn', group: 'grow', title: 'Учёба', sub: 'Учёба', make: () => createLearnView() },
+  { id: 'learn', group: 'grow', title: 'Учёба', sub: 'Учёба', make: ctx => createLearnView(ctx) },
+  { id: 'zero', group: 'grow', title: 'С нуля', sub: 'С нуля', make: () => createZeroView() },
   { id: 'skills', group: 'grow', title: 'Навыки', sub: 'Навыки', make: () => createSkillsView() },
   { id: 'tests', group: 'grow', title: 'Проверка', sub: 'Тесты', make: () => createTestsView() },
   { id: 'insights', group: 'grow', title: 'Аналитика', sub: 'Аналитика', make: () => createInsightsView() },
@@ -72,7 +75,7 @@ const MODE_OF = { learn: 'learn', tests: 'learn', skills: 'learn', zero: 'learn'
 const FOCUS_TAB = { task: 'today', habit: 'habits', expense: 'money', note: 'notes', diary: 'diary', measure: 'health' };
 
 // Простой режим: меньше вкладок и экранов, только самое нужное. Остальные экраны по-прежнему открываются из чипов и поиска.
-const SIMPLE_VIEWS = new Set(['today', 'habits', 'diary', 'health', 'notes', 'more', 'account', 'help']);
+const SIMPLE_VIEWS = new Set(['today', 'habits', 'diary', 'health', 'notes', 'more', 'account', 'help', 'zero']);
 const visibleDefs = () => (getPref('simple') ? DEFS.filter(d => SIMPLE_VIEWS.has(d.id)) : DEFS);
 
 // ---------- тема ----------
@@ -158,11 +161,11 @@ function renderSearch() {
   const box = $('search-results');
   if (!q.trim()) { box.replaceChildren(); return; }
   const res = searchEvents(store.state.events, q);
-  const courses = searchAcademy(q);
+  const courses = searchAcademy(q, 12, openLessonIds(store.state.events));          // уроки «с нуля» только открытые и только по названию
   box.replaceChildren(...(res.length || courses.length
     ? [...res.map(r => el('button', { type: 'button', class: 'result', onclick: () => { closeSearch(); navigate(r.tab); } },
       el('span', { class: 'kind', textContent: r.kind }), el('span', { textContent: r.title }))),
-      ...courses.map(r => el('button', { type: 'button', class: 'result course', dataset: { track: r.trackId }, onclick: () => { closeSearch(); navigate('learn'); views.learn.open(r.trackId, r.lessonId); } },
+      ...courses.map(r => el('button', { type: 'button', class: 'result course', dataset: { track: r.trackId }, onclick: () => { closeSearch(); if (r.zero) { navigate('zero'); views.zero.open(r.trackId, r.lessonId); } else { navigate('learn'); views.learn.open(r.trackId, r.lessonId); } } },
         el('span', { class: 'kind', textContent: r.kind }), el('span', { textContent: r.title })))]
     : [el('p', { class: 'muted', textContent: 'Ничего не найдено' }),
       ...searchHelp(q, 2).map(h => el('button', { type: 'button', class: 'chip help-hit', dataset: { help: h.id }, onclick: () => { closeSearch(); openHelp(h.id); } }, `Справка: ${h.title}`))]));
@@ -350,7 +353,7 @@ function handleUrlParams() {
 // Экраны создаются заново и при блокировке: в скрытых экранах и открытых окнах не должно оставаться личных данных.
 function buildViews() {
   const main = $('view'), ctx = { go: navigate, lockNow, applyTheme, applyMode, onVaultChange: updateLockButton, openAccount: () => go('account'), exportCsv: () => views.more.exportCsv(),
-    openHelp, showTour: () => { window.scrollTo(0, 0); tour.show(); },
+    openHelp, openZero: (trackId, lessonId) => { navigate('zero'); views.zero.open(trackId, lessonId); }, showTour: () => { window.scrollTo(0, 0); tour.show(); },
     onLoggedOut: () => { paintAvatar(store.state.events); if (REQUIRE_ACCOUNT) showGate(); } };
   for (const d of DEFS) {
     const v = d.make(ctx);
@@ -364,7 +367,7 @@ function buildTabs() {
   const groups = GROUPS.filter(g => visibleDefs().some(d => d.group === g.id));
   $('tabs').replaceChildren(...groups.map(g => el('button', { type: 'button', dataset: { tab: g.id },
     onclick: () => navigate(visibleDefs().find(d => d.group === g.id).id) }, icon(g.icon), el('span', { textContent: g.label }))));
-  $('tabs').style.gridTemplateColumns = `repeat(${groups.length}, 1fr)`;
+  $('tabs').style.gridTemplateColumns = `repeat(${groups.length}, minmax(0, 1fr))`;      // minmax(0, …): длинная подпись не раздвигает панель за край экрана
 }
 // Включили или выключили простой режим: пересобрать вкладки; если текущий экран скрыт, перейти на «Сегодня».
 function applyMode() {

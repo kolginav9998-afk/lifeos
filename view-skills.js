@@ -96,7 +96,7 @@ export function createSkillsView() {
       parts.push(el('div', { class: 'card', id: 'skills-ready' }, el('h3', { textContent: `Можно добавить в навыки (${status.ready.length})` }),
         el('p', { class: 'muted', textContent: 'Эти уроки пройдены, и ты уже уверенно помнишь их карточки.' }),
         ...status.ready.map(r => el('div', { class: 'row ready-row', dataset: { lesson: r.lesson.id } },
-          el('span', { class: 'grow' }, el('strong', { textContent: cap(r.goal || r.lesson.title) }), el('div', { class: 'muted', textContent: `${r.track.title} · выучено карточек ${r.mastered} из ${r.total}` })),
+          el('span', { class: 'grow' }, el('strong', { textContent: cap(r.goal || r.lesson.title) }), el('div', { class: 'muted', textContent: r.proof ? `${r.track.title} · ${r.proof}` : `${r.track.title} · выучено карточек ${r.mastered} из ${r.total}` })),
           el('button', { type: 'button', class: 'chip ready-add', textContent: 'Добавить', onclick: async () => { const ev = skillFromLesson(r.track, r.lesson, events); await store.save(ev); toast('Навык добавлен', { actionLabel: 'Отменить', onAction: () => store.remove(ev.id) }); } }))),
         status.ready.length > 1 ? el('button', { type: 'button', id: 'ready-add-all', class: 'primary', textContent: 'Добавить все', onclick: async () => { const evs = readySkillEvents(events); await store.saveMany(evs); toast(`Добавлено навыков: ${evs.length}`, { actionLabel: 'Отменить', onAction: () => store.removeMany(evs.map(x => x.id)) }); } }) : null));
     }

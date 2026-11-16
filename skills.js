@@ -4,6 +4,7 @@
 import { isYmd, todayStr, newId } from './events.js';
 import { TRACKS, trackById, doneLessons, lessonGoal, statesOf } from './academy.js';
 import { MASTERED_BOX } from './srs.js';
+import { masteredZero, proofText, lessonStatus } from './curriculum.js';
 
 export const LEVELS = { 1: 'Знаю', 2: 'Умею', 3: 'Уверенно' };
 export const LEVEL_HINT = { 1: 'понимаю и могу объяснить своими словами', 2: 'могу сделать самостоятельно', 3: 'делаю свободно и могу научить другого' };
@@ -58,9 +59,11 @@ export function lessonMastery(lesson, events, states = new Map(statesOf(events).
   return { total, started, mastered, needed, ready: total > 0 && mastered >= needed };
 }
 function evidenceText(track, lesson, m) { return `Урок «${lesson.title}» пройден; выучено карточек: ${m.mastered} из ${m.total} (повторение раз в две недели и реже)`; }
+// У курсов «с нуля» подтверждение — результат проверки: «проверка 6/6, ГГГГ-ММ-ДД» (у входной проверки — «входная проверка …»).
+const zeroEvidence = (lesson, events, now) => proofText(lessonStatus(lesson.id, events, now)) || 'проверка пройдена';
 export function skillFromLesson(track, lesson, events, now = Date.now()) {
   const m = lessonMastery(lesson, events), goal = lessonGoal(lesson.id);
-  return makeSkill({ title: goal ? goal.charAt(0).toUpperCase() + goal.slice(1) : lesson.title, area: track.title, level: 1, evidence: evidenceText(track, lesson, m), source: 'lesson', ref: lesson.id, id: lessonSkillId(lesson.id) }, now);
+  return makeSkill({ title: goal ? goal.charAt(0).toUpperCase() + goal.slice(1) : lesson.title, area: track.title, level: 1, evidence: track.zero ? zeroEvidence(lesson, events, now) : evidenceText(track, lesson, m), source: 'lesson', ref: lesson.id, id: lessonSkillId(lesson.id) }, now);
 }
 // «Задание урока выполнено»: навык «Умею». Если навык из урока уже есть, его уровень поднимается не ниже «Умею», подтверждение дополняется.
 export function skillFromTask(track, lesson, events, now = Date.now()) {
@@ -74,10 +77,11 @@ export function lessonSkillStatus(events) {
   const done = doneLessons(events), have = new Set(skillsOf(events).filter(e => e.payload.source === 'lesson').map(e => e.payload.ref));
   const states = new Map(statesOf(events).map(s => [s.card, s])), ready = [], learning = [];
   for (const track of TRACKS) for (const lesson of track.lessons) {
-    if (!done.has(lesson.id) || have.has(lesson.id)) continue;
+    if (track.zero || !done.has(lesson.id) || have.has(lesson.id)) continue;                  // уроки «с нуля» идут отдельно: их навык подтверждает проверка, а не карточки
     const m = lessonMastery(lesson, events, states);
     (m.ready ? ready : learning).push({ track, lesson, ...m, goal: lessonGoal(lesson.id) });
   }
+  for (const { track, lesson, st } of masteredZero(events)) if (!have.has(lesson.id)) ready.push({ track, lesson, total: lesson.cards.length, started: 0, mastered: 0, needed: 0, ready: true, goal: lessonGoal(lesson.id), proof: proofText(st) });
   learning.sort((a, b) => b.mastered / b.total - a.mastered / a.total || b.started - a.started);
   return { ready, learning: learning.filter(x => x.started > 0) };
 }
