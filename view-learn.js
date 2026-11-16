@@ -10,6 +10,7 @@ import { openSpeaking, hasRunningSpeak, speakWeek, SPEAK_LANGS } from './speakin
 import { plateauInfo } from './practice.js';
 import { lessonSkillStatus, skillFromLesson, skillFromTask } from './skills.js';
 import { practiceCard } from './view-learn-extra.js';
+import { routeProgress } from './curriculum.js';
 
 const QUALITY_LABEL = { again: 'Забыл', hard: 'Трудно', good: 'Помню' };
 
@@ -24,7 +25,7 @@ function copyText(text) {
   if (navigator.clipboard?.writeText) navigator.clipboard.writeText(text).then(done, fallback); else fallback();
 }
 
-export function createLearnView() {
+export function createLearnView(ctx = {}) {
   let events = [];
   let page = { name: 'home' };
   let session = null;
@@ -85,7 +86,7 @@ export function createLearnView() {
       bar(Math.min(sw.minutes, sw.goal), sw.goal),
       el('div', { class: 'row wrap' }, ...Object.entries(SPEAK_LANGS).map(([k, name]) => el('button', { type: 'button', id: `speak-${k}`, class: 'chip', textContent: name, onclick: () => startSpeaking(k) }))));
     const mine = userCards(events);
-    const cards = TRACKS.map(t => {
+    const cards = TRACKS.filter(t => !t.zero).map(t => {
       const p = trackProgress(t, events, t0);
       return el('button', { type: 'button', class: 'track-card', dataset: { track: t.id }, onclick: () => go({ name: 'track', id: t.id }) },
         el('span', { class: 'track-ic', style: `background:${t.color}`, textContent: t.icon, 'aria-hidden': 'true' }),
@@ -98,7 +99,12 @@ export function createLearnView() {
       el('span', { class: 'track-ic', style: `background:${MY_TRACK.color}`, textContent: MY_TRACK.icon, 'aria-hidden': 'true' }),
       el('span', { class: 'track-body' }, el('strong', { textContent: MY_TRACK.title }), el('span', { class: 'muted', textContent: mine.length ? `Карточек: ${mine.length}` : 'Добавляй свои вопросы и ответы' })));
     const note = el('p', { class: 'muted', textContent: 'Курсы — учебный материал, а не медицинская, юридическая или финансовая консультация.' });
-    mount(head, comeback, fifteen, revisit, speaking, practiceCard(events, t0), leech, el('h2', { textContent: 'Курсы' }), ...cards, my, note);
+    const zeroTracks = TRACKS.filter(t => t.zero);
+    const zeroCard = zeroTracks.length ? el('div', { class: 'card zero-entry', id: 'learn-zero' }, el('h3', { textContent: 'Курсы с нуля' }),
+      el('p', { class: 'muted', textContent: 'Английский, иврит и библейский иврит с самого начала: звуки, буквы, чтение. Уроки открываются по порядку, а «Освоено» ставится после проверки.' }),
+      el('ul', { class: 'plain' }, ...zeroTracks.map(z => { const p = routeProgress(z, events); return el('li', { textContent: `${z.title}: освоено ${p.done} из ${p.total}` }); })),
+      el('button', { type: 'button', id: 'learn-zero-open', class: 'primary', textContent: 'Открыть «С нуля»', onclick: () => ctx.openZero?.() })) : null;
+    mount(head, comeback, fifteen, revisit, speaking, practiceCard(events, t0), leech, el('h2', { textContent: 'Курсы' }), zeroCard, ...cards, my, note);
   }
 
   // ---------- конспект урока и открытие урока ----------
@@ -153,6 +159,7 @@ export function createLearnView() {
     return box;
   }
   function openLesson(trackId, lessonId) {
+    if (trackById(trackId)?.zero) { ctx.openZero?.(trackId, lessonId); return; }                  // уроки «с нуля» открываются только на своём экране (допуск по ступеням)
     page = { name: 'track', id: trackId }; openLessons.add(lessonId);
     render();
     root.querySelector(`.lesson[data-lesson="${lessonId}"]`)?.scrollIntoView?.({ block: 'start' });
@@ -205,8 +212,13 @@ export function createLearnView() {
       return d;
     });
     const sources = el('details', { class: 'card' }, el('summary', { textContent: 'Источники и опора' }), el('ul', { class: 'plain' }, ...t.sources.map(s => el('li', { textContent: s }))));
+    const before = TRACKS.filter(z => z.zero && z.after === t.id && routeProgress(z, events).fraction < 1);
+    const banner = before.length ? el('div', { class: 'card calm', id: 'learn-zero-banner' }, el('strong', { textContent: 'Начинаешь с нуля?' }),
+      el('p', { textContent: `Этот курс — следующая ступень после «${before.map(z => z.title).join('» и «')}». Если буквы и звуки ещё незнакомы, начни там. Здесь ничего не закрыто, решай сам.` }),
+      el('div', { class: 'row wrap' }, ...before.map(z => el('button', { type: 'button', class: 'chip', dataset: { zero: z.id }, textContent: `Открыть: ${z.title}`, onclick: () => ctx.openZero?.(z.id) })))) : null;
     mount(
       el('button', { type: 'button', id: 'learn-back', class: 'link back-link', onclick: () => go({ name: 'home' }) }, icon('chevL', 18), 'Все курсы'),
+      banner,
       el('div', { class: 'card' },
         el('div', { class: 'row' }, el('span', { class: 'track-ic', style: `background:${t.color}`, textContent: t.icon, 'aria-hidden': 'true' }), el('h3', { textContent: t.title })),
         el('p', { textContent: t.intro }),
@@ -354,7 +366,7 @@ export function createLearnView() {
 
   // ---------- общий ----------
   function render() {
-    if (page.name === 'track') { const t = trackById(page.id); if (t) return renderTrack(t); page = { name: 'home' }; }
+    if (page.name === 'track') { const t = trackById(page.id); if (t && !t.zero) return renderTrack(t); page = { name: 'home' }; }
     if (page.name === 'my') return renderMy();
     renderHome();
   }
@@ -371,6 +383,7 @@ export function createLearnView() {
     // открыть курс (и урок) из поиска
     open(trackId, lessonId = null) {
       if (session) return;
+      if (trackById(trackId)?.zero) { ctx.openZero?.(trackId, lessonId); return; }
       page = trackById(trackId) ? { name: 'track', id: trackId } : { name: 'home' };
       if (lessonId) openLessons.add(lessonId);
       render();

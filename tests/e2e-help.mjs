@@ -99,7 +99,7 @@ assert.equal(await p.locator('#search-panel').isVisible(), false);
 // простой режим не прячет справку
 await tab(p, 'more');
 await p.check('#simple-mode');
-await until(p, () => document.querySelectorAll('#tabs button').length === 3);
+await until(p, () => document.querySelectorAll('#tabs button').length === 4);
 assert.ok((await p.locator('#subnav button').allTextContents()).includes('Справка'));
 await p.uncheck('#simple-mode');
 await until(p, () => document.querySelectorAll('#tabs button').length === 5);
