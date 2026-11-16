@@ -4,6 +4,7 @@ import { el, focusNode } from './ui.js';
 import { makeMatrixSet, layoutCell, describeMatrix, describeOption } from './iq-matrices.js';
 import { makeSeriesSet } from './iq-series.js';
 import { makeVerbalSet, KIND_LABEL } from './iq-verbal.js';
+import { makeRotationSet, describeShape, describeRotationOption, bbox, norm, frameSize } from './iq-rotation.js';
 import { scoreItems } from './iq-core.js';
 
 const NS = 'http://www.w3.org/2000/svg';
@@ -51,6 +52,14 @@ function chooseConfirm(h, buttons) {
   const skip = el('button', { type: 'button', id: 'mx-idk', class: 'link', textContent: 'Не знаю' });
   buttons.forEach((b, i) => h.on(b, 'click', () => { picked = i; buttons.forEach((x, j) => x.setAttribute('aria-pressed', String(i === j))); ok.disabled = false; }));
   return { ok, skip, picked: () => picked };
+}
+
+// Фигура из клеток: квадрат рисунка общий для всех фигур задания, чтобы масштаб был одинаковым. Подпись — у внешнего элемента.
+function polySvg(cells, frame) {
+  const U = 20, pad = 4, size = frame * U + 2 * pad, { w, h } = bbox(cells), ox = pad + ((frame - w) * U) / 2, oy = pad + ((frame - h) * U) / 2;
+  const s = svg('svg', { class: 'rt-fig', viewBox: `0 0 ${size} ${size}`, 'aria-hidden': 'true', focusable: 'false' });
+  for (const [x, y] of norm(cells)) s.append(svg('rect', { class: 'rt-c', x: ox + x * U, y: oy + y * U, width: U, height: U, rx: 2 }));
+  return s;
 }
 
 export function iqRunners(api) {
@@ -139,5 +148,40 @@ export function iqRunners(api) {
     return { metrics: scoreItems(trials), trials, extra: { seed } };
   }
 
-  return { matrices, seq12, verbal };
+  async function rotation({ n = 12 }) {
+    const go = await intro('rotation', 'Вращение фигур', ['Сначала даётся фигура из клеток. Нужно понять, какая из фигур — та же самая, только повёрнутая (не зеркальная и не изменённая).',
+      `Заданий: ${n}, от лёгких к трудным. Время не ограничено.`, 'Задание зрительное. Для экранного диктора каждая фигура описана по рядам клеток. Если это неудобно, тест можно пропустить.'], 'Начать', { skip: 'Пропустить тест' });
+    if (go === 'skip') return { skipped: 'пропущено по желанию' };
+    const seed = rng.int(1, 2 ** 30), items = makeRotationSet(seed, n), trials = [];
+    for (let i = 0; i < items.length; i++) {
+      const item = items[i], t0 = now(), frame = frameSize(item);
+      const r = await waitFor((done, h) => {
+        const heading = el('h3', { id: 'rt-pos', tabIndex: -1, textContent: `Задание ${i + 1} из ${items.length}` });
+        const fig = (cells, caption, label) => el('div', { class: 'rt-box' }, el('div', { class: 'rt-img', role: 'img', 'aria-label': `${caption}: ${label}` }, polySvg(cells, frame)), el('div', { class: 'rt-cap', 'aria-hidden': 'true', textContent: caption }));
+        let body;
+        if (item.format === 'pair') {
+          const btns = item.options.map((o, k) => el('button', { type: 'button', class: 'series-opt wide', dataset: { i: String(k) }, textContent: o }));
+          btns.forEach((b, k) => h.on(b, 'click', () => done({ choice: k, rt: now() - t0 })));
+          const idk = el('button', { type: 'button', id: 'mx-idk', class: 'link', textContent: 'Не знаю' });
+          h.on(idk, 'click', () => done({ choice: null, rt: now() - t0 }));
+          body = [el('p', { class: 'iq-q', id: 'rt-q', textContent: 'Вторая фигура — такая же, как образец, только повёрнута, или зеркальная?' }),
+            el('div', { class: 'rt-figs' }, fig(item.ref, 'Образец', describeShape(item.ref)), fig(item.probe, 'Вторая фигура', describeShape(item.probe))),
+            el('div', { class: 'series-opts one-col', role: 'group', 'aria-label': 'Варианты ответа' }, ...btns), el('div', { class: 'row mx-actions' }, idk)];
+        } else {
+          const buttons = item.options.map((o, k) => el('button', { type: 'button', class: 'mx-opt', dataset: { i: String(k) }, 'aria-pressed': 'false', 'aria-label': describeRotationOption(item, k) }, polySvg(o, frame), el('span', { class: 'mx-n', 'aria-hidden': 'true', textContent: String(k + 1) })));
+          const c = chooseConfirm(h, buttons);
+          h.on(c.ok, 'click', () => done({ choice: c.picked(), rt: now() - t0 }));
+          h.on(c.skip, 'click', () => done({ choice: null, rt: now() - t0 }));
+          body = [el('p', { class: 'iq-q', id: 'rt-q', textContent: 'Какая фигура получится, если повернуть образец (не отражая)?' }), el('div', { class: 'rt-figs' }, fig(item.ref, 'Образец', describeShape(item.ref))),
+            el('div', { class: 'mx-opts rt-opts', role: 'group', 'aria-label': 'Варианты ответа' }, ...buttons), el('div', { class: 'row mx-actions' }, c.ok, c.skip)];
+        }
+        set('rotation', 'run', el('div', { id: 'rt-item', class: 'iq-item', dataset: { seed: String(item.seed), i: String(i), level: String(item.level), format: item.format } }, heading, ...body));
+        focusNode(heading);
+      });
+      trials.push({ i, level: item.level, correct: r.choice === item.correct, rt: r.rt, choice: r.choice, fmt: item.format === 'pair' ? 2 : 4 });
+    }
+    return { metrics: scoreItems(trials), trials, extra: { seed } };
+  }
+
+  return { matrices, seq12, verbal, rotation };
 }

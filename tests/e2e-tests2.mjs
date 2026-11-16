@@ -14,7 +14,7 @@ const SAVED = () => page.evaluate(async () => (await import('./store.js')).state
 // ---------- список: группы, пояснения, 320 px без горизонтальной прокрутки ----------
 const ids = await page.evaluate(async () => (await import('./bt-core.js')).TESTS.map(x => x.id));
 await waitCount(page, '.test-row', ids.length);
-for (const id of ['matrices', 'seq12', 'verbal']) assert.ok(ids.includes(id), `в реестре есть ${id}`);
+for (const id of ['matrices', 'seq12', 'verbal', 'rotation']) assert.ok(ids.includes(id), `в реестре есть ${id}`);
 assert.ok(await page.locator('.tg-title').count() >= 4, 'тесты разбиты на группы');
 assert.match(await text('[data-group="logic"]'), /Матрицы/);
 assert.match(await text('.tg-note'), /не настоящий IQ-тест/, 'честная подпись у группы «Логика»');
@@ -131,6 +131,34 @@ await page.click('#bt-done');
   const m = (await lastRun()).tests.verbal;
   assert.ok(m.ok && m.metrics.n === 15 && m.metrics.correct === 13, JSON.stringify(m.metrics));
   assert.equal(m.trials.length, 15); assert.ok(m.extra.seed > 0);
+}
+
+// ---------- 4. Вращение фигур: «такая же или зеркальная?» и выбор из четырёх ----------
+await startSingle('rotation');
+assert.match(await text('#bt-stage'), /описана по рядам клеток/, 'сказано про описание фигур словами');
+assert.ok(await page.locator('#bt-skip').isVisible(), 'зрительный тест можно пропустить');
+await page.click('#bt-go');
+for (let i = 0; i < 12; i++) {
+  await until(page, k => document.getElementById('rt-item')?.dataset.i === String(k), i);
+  const { seed, level, format } = await page.evaluate(() => ({ ...document.getElementById('rt-item').dataset }));
+  const item = await page.evaluate(async ([s, l]) => { const x = (await import('./iq-rotation.js')).makeRotation(Number(s), Number(l)); return { correct: x.correct, n: x.options.length }; }, [seed, level]);
+  if (i === 0 || i === 2) {
+    assert.equal(format, i === 0 ? 'pair' : 'pick4');
+    for (const im of await page.locator('.rt-img').all()) assert.match(await im.getAttribute('aria-label'), /Фигура из \d клеток, ряд 1:/, 'у фигуры есть описание по рядам');
+    assert.ok(await noScroll(), `вращение (${format}): без горизонтальной прокрутки при 320 px`);
+    const b = await page.locator(format === 'pair' ? '.series-opt >> nth=0' : '.mx-opt >> nth=0').boundingBox();
+    assert.ok(b.height >= 44, `крупная цель нажатия: ${b.height}`);
+  }
+  if (format === 'pair') await page.click(`#rt-item .series-opt[data-i="${i === 1 ? 1 - item.correct : item.correct}"]`);
+  else { await page.click(`.mx-opt[data-i="${i === 5 ? (item.correct + 1) % 4 : item.correct}"]`); await page.click('#mx-ok'); }
+}
+await finish();
+assert.match(await text('#bt-result .res-row[data-test="rotation"]'), /10/, 'верно 10 из 12 (две ошибки)');
+await page.click('#bt-done');
+{
+  const m = (await lastRun()).tests.rotation;
+  assert.ok(m.ok && m.metrics.n === 12 && m.metrics.correct === 10, JSON.stringify(m.metrics));
+  assert.equal(m.metrics.maxScore, 78); assert.equal(m.metrics.score, 78 - 2 - 6);
 }
 
 // ---------- пропуск зрительного теста ----------
