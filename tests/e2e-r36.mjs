@@ -1,13 +1,13 @@
 // R3.6: рефлексия (намерение дня, вечерний обзор, итоги недели, решения, радости), подсказки на «Сегодня».
 import assert from 'node:assert/strict';
-import { launch, tab, until } from './helpers.mjs';
+import { launch, tab, until, appReady, waitToast } from './helpers.mjs';
 
 const t = await launch();
 const { page, errors } = t;
 await page.goto(t.url);
-await until(page, () => !document.getElementById('app').hidden);
+await appReady(page);
 const text = sel => page.textContent(sel);
-const toast = async re => until(page, r => new RegExp(r).test(document.getElementById('toast').textContent), re.source);
+const toast = re => waitToast(page, re);
 const evs = type => page.evaluate(async ty => (await import('./store.js')).state.events.filter(e => e.type === ty), type);
 const inject = (fn, arg) => page.evaluate(`(async () => { const store = await import('./store.js'); const ev = await import('./events.js'); const dr = await import('./diary.js'); const rf = await import('./reflect.js'); const today = ev.todayStr(); const arg = ${JSON.stringify(arg ?? null)}; ${fn} })()`);
 
@@ -26,7 +26,7 @@ await page.fill('#intent-input', 'Только важное'); await page.press(
 await until(page, () => document.getElementById('intent-text')?.textContent === 'Только важное');
 assert.equal((await evs('intention')).length, 1, 'правка обновляет ту же запись');
 await page.reload();
-await until(page, () => !document.getElementById('app').hidden);
+await appReady(page);
 assert.equal(await text('#intent-text'), 'Только важное', 'намерение пережило перезапуск');
 
 // ---------- подсказки: перегруз, мало сил, долго низкое настроение ----------

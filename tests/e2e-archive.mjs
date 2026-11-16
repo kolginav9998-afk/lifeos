@@ -3,16 +3,16 @@ import assert from 'node:assert/strict';
 import fs from 'node:fs';
 import os from 'node:os';
 import path from 'node:path';
-import { launch, tab, until } from './helpers.mjs';
+import { launch, tab, until, appReady, waitToast } from './helpers.mjs';
 import { makeZip } from '../zip.js';
 
 const t = await launch();
 const { page, errors } = t;
 page.on('dialog', d => d.accept());
 await page.goto(t.url);
-await until(page, () => !document.getElementById('app').hidden);
+await appReady(page);
 const text = (p, sel) => p.textContent(sel);
-const toast = (p, re, timeout = 10000) => p.waitForFunction(r => new RegExp(r).test(document.getElementById('toast').textContent), re.source, { timeout }).catch(async e => { throw new Error(`Не появилось сообщение ${re}; сейчас: «${await p.textContent('#toast')}»`); });
+const toast = (p, re, timeout = 10000) => waitToast(p, re, timeout);
 const clearToast = p => p.evaluate(async () => (await import('./ui.js')).clearToast());
 const evs = (p, type) => p.evaluate(async ty => (await import('./store.js')).state.events.filter(e => e.type === ty), type);
 const tmp = fs.mkdtempSync(path.join(os.tmpdir(), 'archive-e2e-'));
@@ -20,7 +20,7 @@ async function download(p, sel) { const [dl] = await Promise.all([p.waitForEvent
 async function freshDevice() {
   const ctx = await t.browser.newContext({ viewport: { width: 390, height: 844 }, acceptDownloads: true, locale: 'ru-RU' });
   const p = await ctx.newPage(); p.on('dialog', d => d.accept()); p.on('pageerror', e => errors.push('pageerror: ' + e.message));
-  await p.goto(t.url); await until(p, () => !document.getElementById('app').hidden);
+  await p.goto(t.url); await appReady(p);
   return { ctx, p };
 }
 
@@ -53,7 +53,7 @@ const total = archive.events.length;
   await p.setInputFiles('#import-input', plainFile);
   await toast(p, new RegExp(`Восстановлено записей: ${total}.*настройки применены`));
   await p.waitForFunction(() => document.documentElement.getAttribute('data-theme') === 'dark', null, { timeout: 15000 });      // после перезапуска тема из архива
-  await until(p, () => !document.getElementById('app').hidden);
+  await appReady(p);
   assert.equal(await p.evaluate(() => getComputedStyle(document.documentElement).getPropertyValue('--fs').trim()), '1.15');
   assert.equal((await evs(p, 'task')).length, 2); assert.equal((await evs(p, 'skill')).length, 1); assert.equal((await evs(p, 'habit'))[0].payload.days.join(), '1,3,5');
   assert.equal(await p.evaluate(async () => (await import('./prefs.js')).getPref('remindersOn')), false, 'разрешение на уведомления на новом устройстве не переносится');
@@ -132,7 +132,7 @@ assert.ok(!fs.readFileSync(encFile, 'utf8').includes('Купить хлеб'), '
   await p.fill('#imp-pass', 'длинный-пароль-архива'); await p.click('#imp-go');
   await toast(p, /Восстановлено записей/);
   await p.waitForFunction(() => document.documentElement.getAttribute('data-theme') === 'dark', null, { timeout: 15000 });
-  await until(p, () => !document.getElementById('app').hidden);
+  await appReady(p);
   assert.equal((await evs(p, 'task')).length, 2); assert.equal((await evs(p, 'note')).length, 1);
   await ctx.close();
 }

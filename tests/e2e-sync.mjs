@@ -1,7 +1,7 @@
 // Аккаунт и синхронизация между «устройствами» против настоящего сервера (Node + SQLite).
 import assert from 'node:assert/strict';
 import fs from 'node:fs';
-import { launch, tab, until, newDevice } from './helpers.mjs';
+import { launch, tab, until, newDevice, appReady } from './helpers.mjs';
 import { createServer } from '../server/node/server.js';
 
 const PW = 'длинная-надёжная-фраза';
@@ -13,7 +13,7 @@ const t = await launch({ buildEnv: { LIFEOS_CSP_CONNECT: 'http://localhost:*' } 
 const A = { page: t.page, errors: t.errors };
 t.page.on('dialog', d => d.accept());
 await t.page.goto(t.url);
-await until(A.page, () => !document.getElementById('app').hidden);
+await appReady(A.page);
 
 const waitFor = async (fn, ms = 20000) => { const t0 = Date.now(); while (Date.now() - t0 < ms) { if (await fn()) return; await new Promise(r => setTimeout(r, 100)); } throw new Error('waitFor: условие не выполнилось: ' + fn.toString().slice(0, 80)); };
 const hasTask = (page, text) => page.evaluate(x => [...document.querySelectorAll('.item .text')].some(n => n.textContent.endsWith(x)), text);
@@ -76,7 +76,7 @@ assert.equal(await B.page.locator('#lock-top').isVisible(), true, 'на втор
 await B.page.reload();                                        // перезапуск: нужен пароль
 await until(B.page, () => !document.getElementById('lock').hidden);
 await B.page.fill('#lock-input', PW); await B.page.click('#lock-btn');
-await until(B.page, () => !document.getElementById('app').hidden);
+await appReady(B.page);
 await waitTask(B.page, 'купить хлеб');
 await waitIdle(B.page);
 
@@ -97,7 +97,7 @@ await t.ctx.setOffline(true); await B.ctx.setOffline(true);
 await tab(A.page, 'today');
 await A.page.locator('.item', { hasText: 'оплатить жильё' }).locator('.body').click();
 await A.page.fill('.edit-text', 'жильё: правка A'); await A.page.click('form.editing .save');
-await A.page.waitForTimeout(50);
+await until(A.page, () => [...document.querySelectorAll('.item .text')].some(n => n.textContent === 'жильё: правка A'));          // правка A сохранена до правки B («позже»)
 await tab(B.page, 'today');
 await B.page.locator('.item', { hasText: 'оплатить жильё' }).locator('.body').click();
 await B.page.fill('.edit-text', 'жильё: правка B (позже)'); await B.page.click('form.editing .save');
@@ -162,7 +162,7 @@ await B.page.click('#lock-top');
 await until(B.page, () => !document.getElementById('lock').hidden);
 assert.equal(await B.page.locator('#sync-badge').isVisible(), false, 'пока заблокировано, синхронизации нет');
 await B.page.fill('#lock-input', PW2); await B.page.click('#lock-btn');       // локально пароль ещё прежний
-await until(B.page, () => !document.getElementById('app').hidden);
+await appReady(B.page);
 await until(B.page, () => document.getElementById('sync-badge').dataset.state === 'needs-login', null, 30000);
 await tab(B.page, 'account');
 await until(B.page, () => document.getElementById('acc-relogin-pass'), null, 10000);
@@ -170,7 +170,7 @@ await B.page.fill('#acc-relogin-pass', PW3); await B.page.click('#acc-relogin');
 await waitIdle(B.page);
 await B.page.click('#lock-top');                                              // теперь локальный пароль — новый
 await B.page.fill('#lock-input', PW3); await B.page.click('#lock-btn');
-await until(B.page, () => !document.getElementById('app').hidden);
+await appReady(B.page);
 await waitIdle(B.page);
 await tab(B.page, 'account');
 await B.page.click('#acc-logout');

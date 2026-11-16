@@ -1,13 +1,13 @@
 // R3.4: умный ввод, тренировки (и далее — таймер фокуса, отчёты, деньги, заметки, мелочи «Сегодня»).
 import assert from 'node:assert/strict';
-import { launch, tab, until } from './helpers.mjs';
+import { launch, tab, until, appReady, waitToast } from './helpers.mjs';
 
 const t = await launch({ ctxOptions: { permissions: ['clipboard-read', 'clipboard-write'] } });
 const { page, errors } = t;
 await page.goto(t.url);
-await until(page, () => !document.getElementById('app').hidden);
+await appReady(page);
 const text = sel => page.textContent(sel);
-const toast = async re => until(page, r => new RegExp(r).test(document.getElementById('toast').textContent), re.source);
+const toast = re => waitToast(page, re);
 const evs = type => page.evaluate(async ty => (await import('./store.js')).state.events.filter(e => e.type === ty), type);
 
 // ---------- умный ввод ----------
@@ -60,7 +60,7 @@ await page.fill('#wk-reps-1', '0'); await page.click('#wk-add-1');
 assert.match(await text('#toast'), /повторений/);
 // тренировка переживает перезапуск
 await page.reload();
-await until(page, () => !document.getElementById('app').hidden);
+await appReady(page);
 await tab(page, 'workouts');
 await until(page, () => document.getElementById('wk-active'));
 assert.equal(await page.locator('.wk-ex[data-ex="0"] .wk-sets li').count(), 2);
@@ -261,7 +261,7 @@ await page.selectOption('#font-select', '1.3');
 assert.equal(await page.evaluate(() => getComputedStyle(document.documentElement).getPropertyValue('--fs').trim()), '1.3');
 assert.equal(await page.evaluate(() => parseFloat(getComputedStyle(document.body).fontSize)), 20.8);
 await page.reload();
-await until(page, () => !document.getElementById('app').hidden);
+await appReady(page);
 assert.equal(await page.evaluate(() => parseFloat(getComputedStyle(document.body).fontSize)), 20.8, 'размер текста запоминается');
 await tab(page, 'more'); await page.selectOption('#font-select', '1');
 

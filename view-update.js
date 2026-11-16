@@ -25,7 +25,6 @@ export async function autoCheckUpdate(notify) {
     return r;
   } catch { return null; }                                   // тихо: нет сети или GitHub занят — это не ошибка для человека
 }
-export const updateAvailable = () => found?.state === 'newer';
 
 export function createUpdateCard({ openHelp = () => {} } = {}) {
   const root = el('section', { id: 'upd-card', class: 'card settings-card' });

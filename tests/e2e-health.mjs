@@ -1,15 +1,15 @@
 import assert from 'node:assert/strict';
 import fs from 'node:fs';
-import { launch, tab, until } from './helpers.mjs';
+import { launch, tab, until, appReady, waitToast } from './helpers.mjs';
 
 const t = await launch();
 const { page, errors } = t;
 await page.goto(t.url);
-await until(page, () => !document.getElementById('app').hidden);
+await appReady(page);
 const text = sel => page.textContent(sel);
 const count = sel => page.locator(sel).count();
 const waitCount = (sel, n) => until(page, ([s, k]) => document.querySelectorAll(s).length === k, [sel, n]);
-const toast = async re => until(page, r => new RegExp(r).test(document.getElementById('toast').textContent), re.source);
+const toast = re => waitToast(page, re);
 const rate = (box, field, v) => page.click(`${box} .rate[data-field="${field}"][data-v="${v}"]`);
 const plus = (box, field, label, n = 1) => { const sel = `${box} .stepper[data-field="${field}"] button[aria-label="${label}: больше"]`; return (async () => { for (let i = 0; i < n; i++) await page.click(sel); })(); };
 const dateStr = off => { const d = new Date(); d.setDate(d.getDate() + off); return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`; };
@@ -65,7 +65,7 @@ assert.match(await page.inputValue('#diary-text'), /Хороший день/);
 
 // сохранённое переживает перезапуск
 await page.reload();
-await until(page, () => !document.getElementById('app').hidden);
+await appReady(page);
 await tab(page, 'diary');
 assert.match(await page.inputValue('#diary-text'), /Хороший день/);
 assert.equal(await page.inputValue('#ci-weight'), '72,4');

@@ -1,13 +1,13 @@
 // R3.9: отложенные мысли, «что нового», главная метрика, тепловая карта, рекорды, день отдыха, тихие часы и др.
 import assert from 'node:assert/strict';
-import { launch, tab, until } from './helpers.mjs';
+import { launch, tab, until, appReady, waitToast, eventually } from './helpers.mjs';
 
 const t = await launch();
 const { page, errors } = t;
 await page.goto(t.url);
-await until(page, () => !document.getElementById('app').hidden);
+await appReady(page);
 const text = sel => page.textContent(sel);
-const toast = async re => until(page, r => new RegExp(r).test(document.getElementById('toast').textContent), re.source);
+const toast = re => waitToast(page, re);
 const evs = type => page.evaluate(async ty => (await import('./store.js')).state.events.filter(e => e.type === ty), type);
 const day = n => page.evaluate(async k => { const ev = await import('./events.js'); return ev.addDays(ev.todayStr(), k); }, n);
 
@@ -15,7 +15,7 @@ const day = n => page.evaluate(async k => { const ev = await import('./events.js
 assert.equal(await page.locator('#whatsnew').isHidden(), true, 'первая установка: ничего не показываем');
 await page.evaluate(async () => (await import('./prefs.js')).setPref('lastSeenVersion', 'R3.7'));
 await page.reload();
-await until(page, () => !document.getElementById('app').hidden);
+await appReady(page);
 await until(page, () => !document.getElementById('whatsnew').hidden);
 const ver = await page.evaluate(async () => (await import('./version.js')).VERSION);
 assert.match(await text('#whatsnew'), new RegExp(`Что нового в ${ver}`)); assert.match(await text('#whatsnew'), /R3\.8/);
@@ -23,7 +23,7 @@ assert.ok(!/null/.test(await text('#whatsnew')));
 await page.click('#whatsnew-ok');
 await until(page, () => document.getElementById('whatsnew').hidden);
 await page.reload();
-await until(page, () => !document.getElementById('app').hidden);
+await appReady(page);
 assert.equal(await page.locator('#whatsnew').isHidden(), true, 'после «Понятно» не возвращается');
 
 // ---------- отложенные мысли ----------
@@ -93,7 +93,6 @@ await until(page, () => !document.getElementById('hint-rest'));
 
 
 // ---------- отсрочка покупок: сутки ожидания ----------
-const sleepless = () => page.waitForTimeout(150);
 await tab(page, 'plans');
 await page.click('#wish-add'); assert.match(await text('#wish-err'), /Напиши, что хочешь купить/);
 await page.fill('#wish-text', 'Новые наушники'); await page.fill('#wish-amt', '4500'); await page.click('#wish-add'); await toast(/Записано/);
@@ -176,11 +175,11 @@ await page.fill('#exp-amount', '2000'); await page.fill('#exp-category', 'Еда
 await toast(/Это заметно больше обычного для «Еда» \(обычно около 355\s₽\)/);
 const nExp = async () => (await evs('expense')).length;
 assert.equal(await nExp(), 7);
-await page.click('#toast button'); await until(page, () => true); await sleepless();
-assert.equal(await nExp(), 6, 'отмена убирает запись');
+await page.click('#toast button');
+await eventually(nExp, v => assert.equal(v, 6, 'отмена убирает запись'));
 await page.evaluate(async () => (await import('./ui.js')).clearToast());
 await page.fill('#exp-amount', '400'); await page.fill('#exp-category', 'Еда'); await page.click('#exp-form button[type=submit]');
-await until(page, () => true); await sleepless(); assert.equal(await nExp(), 7); assert.ok(!/заметно больше обычного/.test(await text('#toast')), 'обычная трата без предупреждения');
+await eventually(nExp, v => assert.equal(v, 7)); assert.ok(!/заметно больше обычного/.test(await text('#toast')), 'обычная трата без предупреждения');
 await tab(page, 'today');
 await page.fill('#add-input', 'потратил 3000 на продукты'); await page.click('#cap-chip');
 await toast(/заметно больше обычного для «Еда»/);

@@ -1,12 +1,12 @@
 import assert from 'node:assert/strict';
-import { launch, tab, until, ymd } from './helpers.mjs';
+import { launch, tab, until, ymd, appReady, waitToast } from './helpers.mjs';
 
 const t = await launch({ ctxOptions: { permissions: ['clipboard-read', 'clipboard-write'] } });
 const { page, errors } = t;
 await page.goto(t.url);
-await until(page, () => !document.getElementById('app').hidden);
+await appReady(page);
 const text = sel => page.textContent(sel);
-const toast = async re => until(page, r => new RegExp(r).test(document.getElementById('toast').textContent), re.source);
+const toast = re => waitToast(page, re);
 
 // ---------- главная «Учёбы» ----------
 await tab(page, 'learn');
@@ -58,7 +58,7 @@ assert.match(await text('#learn-streak'), /Занятий подряд: 1 дн\.
 
 // ---------- состояние переживает перезапуск; просроченное появляется в очереди ----------
 await page.reload();
-await until(page, () => !document.getElementById('app').hidden);
+await appReady(page);
 await tab(page, 'learn');
 assert.equal(await text('#learn-count'), '0');
 await page.evaluate(async () => {
