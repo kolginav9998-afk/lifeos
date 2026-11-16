@@ -51,5 +51,5 @@ header.top h1{flex:1 1 auto;min-width:0;overflow-wrap:anywhere}
 /* выполненная задача приглушена цветом и перечёркнута; прозрачность поверх этого роняла контраст ниже 4,5:1 */
 .item.done{opacity:1}
 /* нижняя панель на 320 px и при шрифте 130 %: подписи должны помещаться, а не выталкивать «Ещё» за край */
-#tabs button{min-width:0}
-@media (max-width: 359px){#tabs{left:6px;right:6px;padding:4px;gap:0}#tabs button{padding-inline:0;font-size:.62rem;font-weight:500}#tabs button[aria-current=page]{font-weight:600}}
+#tabs button{min-width:0;font-size:min(.7rem,12px)}   /* при шрифте 130 % подпись не растёт дальше 12 px: «Развитие» в широком шрифте иначе не помещается */
+@media (max-width: 359px){#tabs{left:6px;right:6px;padding:4px;gap:0}#tabs button{padding-inline:0;font-size:min(.62rem,10.5px);font-weight:500}#tabs button[aria-current=page]{font-weight:600}}
