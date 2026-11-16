@@ -7,6 +7,8 @@ const t = await launch({ viewport: { width: 320, height: 640 } });
 const { page, errors } = t;
 await page.goto(t.url);
 await appReady(page);
+// E2E_FONT=1.3 node tests/e2e-tests2.mjs — те же проверки при шрифте 130% (в приложении это значение настройки «Размер текста»)
+if (process.env.E2E_FONT) await page.evaluate(f => document.documentElement.style.setProperty('--fs', f), process.env.E2E_FONT);
 await tab(page, 'tests');
 const text = sel => page.textContent(sel);
 const SAVED = () => page.evaluate(async () => (await import('./store.js')).state.events.filter(e => e.type === 'testrun').map(e => e.payload).sort((a, b) => a.startedAt - b.startedAt));
