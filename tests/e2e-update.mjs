@@ -30,7 +30,7 @@ await p.addInitScript(() => {
 
 const asset = { name: 'lifeos.apk', size: 1000, browser_download_url: APK_LINK, digest: 'sha256:' + 'ab'.repeat(32) };
 const release = version => ({ body: `<!-- lifeos-update ${JSON.stringify({ version, notes: ['Новое первое', 'Новое второе'] })} -->\nАвтосборка`, assets: [asset] });
-let reply = { status: 200, json: release('R3.99') };
+let reply = { status: 200, json: release('R9.99') };
 let asked = 0;
 await p.route('https://api.github.com/**', route => { asked++; route.fulfill({ status: reply.status, contentType: 'application/json', headers: { 'access-control-allow-origin': '*' }, body: JSON.stringify(reply.json ?? {}) }); });
 
@@ -38,12 +38,12 @@ await p.goto(t.url);
 await appReady(p);
 
 // ===== при запуске приложение само узнаёт о новой версии и говорит об этом один раз =====
-await until(p, () => /Доступна новая версия R3\.99/.test(document.getElementById('toast').textContent), null, 10000);
+await until(p, () => /Доступна новая версия R9\.99/.test(document.getElementById('toast').textContent), null, 10000);
 assert.equal(asked, 1);
 await p.click('#toast button');
 assert.equal(await p.textContent('#title'), 'Профиль');
 await until(p, () => document.getElementById('upd-go'));
-assert.match(await p.textContent('#upd-status'), /Доступна новая версия R3\.99 \(1 КБ\)/);
+assert.match(await p.textContent('#upd-status'), /Доступна новая версия R9\.99 \(1 КБ\)/);
 assert.match(await p.textContent('#upd-card'), /Новое первое[\s\S]*Новое второе/);
 assert.match(await p.textContent('#upd-version'), new RegExp(`${VERSION.replaceAll('.', '\\.')}.*Android-приложение`));
 
@@ -93,7 +93,7 @@ await until(p, () => /Нет связи/.test(document.getElementById('upd-statu
 
 // «что нового» — в той же карточке
 await p.click('#upd-changes summary');
-assert.match(await p.textContent('#upd-changes'), /Что нового в R3/);
+assert.match(await p.textContent('#upd-changes'), /Что нового в R\d+/);
 
 const real = t.errors.filter(x => !/Failed to load resource|ERR_FAILED/.test(x));
 assert.deepEqual(real, [], 'нет ошибок в консоли:\n' + real.join('\n'));

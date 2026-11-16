@@ -64,7 +64,7 @@ assert.equal(await A.textContent('#profile-who-motto'), 'Шаг за шагом'
 assert.equal((await A.textContent('#profile-btn')).trim(), '🦊');
 assert.equal(await A.evaluate(() => document.getElementById('profile-btn').style.getPropertyValue('--av')), '#14b8a6');
 // карточка версии и обновлений на месте
-assert.match(await A.textContent('#upd-version'), /R3\.\d+/);
+assert.match(await A.textContent('#upd-version'), /R\d+\.\d+/);
 assert.equal(await A.locator('#upd-check').isVisible(), true);
 
 // ===== 3. Перезапуск: пароль (защита включена вместе с аккаунтом), а не экран входа =====
