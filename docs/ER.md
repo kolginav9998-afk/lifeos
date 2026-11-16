@@ -10,6 +10,7 @@ erDiagram
   med ||--o{ medlog : "medId"
   goal ||--o{ goalmove : "goalId"
   lesson ||--o{ lessonnote : "lesson"
+  item ||--o{ itemlog : "item"
   day ||--o{ checkin : "date"
   day ||--o{ diary : "date"
   day ||--o{ measure : "date"
@@ -41,6 +42,7 @@ erDiagram
 | `med` | `medlog` | `medId` | приёмы лекарства |
 | `goal` | `goalmove` | `goalId` | взносы в копилку |
 | `lesson` | `lessonnote` | `lesson` | конспект к пройденному уроку |
+| `item` | `itemlog` | `item` | история вещи: надел, постирал, починил |
 
 ## Записи по дням
 

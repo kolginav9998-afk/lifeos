@@ -4,7 +4,7 @@ _Файл создан из `registry.js` и сверяется с ним тес
 
 Все данные Life OS — журнал событий `{id, type, ts, payload, source, confidence, evidence}`. Новые типы только добавляются; записи прошлых версий читаются всегда, а незнакомые типы сохраняются и не мешают.
 
-Всего типов: 49. «В выгрузке» — попадают ли данные этой записи в ZIP для аналитики (числа и отметки, названия привычек и упражнений). Тексты дневника, заметок, мыслей и решений, а также деньги в выгрузку не входят.
+Всего типов: 51. «В выгрузке» — попадают ли данные этой записи в ZIP для аналитики (числа и отметки, названия привычек и упражнений). Тексты дневника, заметок, мыслей и решений, а также деньги в выгрузку не входят.
 
 ## Дела
 
@@ -33,6 +33,13 @@ _Файл создан из `registry.js` и сверяется с ним тес
 | `sub` | Подписка | name, amountMinor, period, day, month, active | деньги | нет | `planning.js` |
 | `wish` | Хочу купить (отсрочка на сутки) | text, amountMinor, date, until, status, resolvedDate | деньги | нет | `wishes.js` |
 | `debt` | Долг или заём | who, amountMinor, direction, due, note, date, paidMinor, settled, settledDate | деньги | нет | `debts.js` |
+
+## Дом
+
+| Тип | Что это | Поля | Приватность | В выгрузке | Модуль |
+|---|---|---|---|---|---|
+| `item` | Вещь (дом, одежда) | name, kind (clothes|shoes|underwear|bedding|towels|electronics|kitchen|tools|furniture|documents|other), place, brand, color, size, material, qty, bought, priceMinor, currency, warranty, care{how, temp, washEveryWears, washEveryDays}, status (active|stored|sold|gone), tags, note | личный текст | нет | `home.js` |
+| `itemlog` | Отметка в истории вещи | item, kind (wear|wash|use|repair|move|note), date, note, place | числа и отметки | да | `home.js` |
 
 ## Заметки и дневник
 
