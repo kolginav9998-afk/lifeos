@@ -161,7 +161,7 @@ assert.match(dld.suggestedFilename(), /^lifeos-doctor-\d{4}-\d{2}-\d{2}\.md$/);
 // ---------- планы: лимиты, копилки, подписки, прогноз ----------
 await tab(page, 'plans');
 assert.equal(await text('#title'), 'Планы');
-assert.deepEqual(await page.locator('#subnav button').allTextContents(), ['Деньги', 'Планы']);
+assert.deepEqual(await page.locator('#subnav button').allTextContents(), ['Расходы', 'Зарплата', 'График', 'Планы']);
 assert.match(await text('#plan-forecast'), /Потрачено за/);
 // лимит по «Еда»: расход 350 ₽ уже есть
 await page.selectOption('#lim-cat', 'Еда'); await page.fill('#lim-amt', '400'); await page.click('#lim-save');

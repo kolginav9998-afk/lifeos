@@ -119,7 +119,7 @@ await clickJs('#subnav button[data-view="health"]'); await until(page, () => !do
 await clickJs('#em-show'); await until(page, () => !document.getElementById('em-overlay').hidden);
 await clickJs('#tabs button[data-tab="grow"]'); await until(page, () => !document.getElementById('view-learn').hidden);
 await clickJs('#speak-english'); await until(page, () => !document.getElementById('speak-host').hidden);
-await clickJs('#tabs button[data-tab="diary"]'); await clickJs('#subnav button[data-view="notes"]'); await until(page, () => !document.getElementById('view-notes').hidden);
+await clickJs('#tabs button[data-tab="today"]'); await clickJs('#subnav button[data-view="notes"]'); await until(page, () => !document.getElementById('view-notes').hidden);
 await clickJs('#note-past'); await until(page, () => !document.getElementById('note-past-box').hidden);       // окно с «заметкой из прошлого» тоже должно очиститься
 await page.evaluate(() => document.getElementById('lock-top').click());                 // кнопка закрыта окном, как и при автоблокировке по таймеру
 await until(page, () => !document.getElementById('lock').hidden);
@@ -337,7 +337,7 @@ await page.evaluate(async () => {
   document.getElementById('lock-top').hidden = false;
 });
 await page.clock.fastForward('04:00');
-await page.click('#tabs button[data-tab="diary"]');                          // активность в 4-й минуте
+await page.click('#tabs button[data-tab="today"]');                          // активность в 4-й минуте
 await page.clock.fastForward('03:00');                                       // с последней активности 3 минуты
 assert.equal(await lockVisible(page), false, 'пока активен — не блокируется');
 await page.clock.fastForward('03:00');                                       // 6 минут без касаний

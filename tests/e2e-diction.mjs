@@ -43,7 +43,7 @@ async function ax(label) {
 // ===== 1. Экран открывается, вкладки, честные границы =====
 await tab(page, 'diction');
 assert.equal(await text('#title'), 'Дикция');
-assert.deepEqual(await page.locator('#subnav button').allTextContents(), ['Учёба', 'С нуля', 'Дикция', 'Навыки', 'Тесты', 'Аналитика', 'Цели']);
+assert.deepEqual(await page.locator('#subnav button').allTextContents(), ['Курсы', 'С нуля', 'Дикция', 'Навыки', 'Тесты', 'Цели', 'Аналитика']);
 assert.deepEqual(await page.locator('#dic-tabs [role=tab]').allTextContents(), ['Сегодня', 'Разминка', 'Дыхание', 'Скороговорки', 'Ударения', 'Чтение вслух', 'Оценка', 'Курс']);
 assert.equal(await page.getAttribute('#dic-tab-today', 'aria-selected'), 'true');
 assert.equal(await page.getAttribute('#dic-panel', 'aria-labelledby'), 'dic-tab-today');

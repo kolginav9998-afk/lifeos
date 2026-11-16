@@ -71,7 +71,7 @@ const groups = await p.$$eval('#tabs button[data-tab]', bs => bs.map(b => b.data
 const screens = [];
 for (const g of groups) {
   await p.click(`#tabs button[data-tab="${g}"]`);
-  const views = await p.$$eval('#subnav button[data-view]', bs => bs.map(b => b.dataset.view));
+  const views = await p.$$eval('#subnav:not([hidden]) button[data-view]', bs => bs.map(b => b.dataset.view));
   if (views.length) screens.push(...views.map(view => ({ group: g, view }))); else screens.push({ group: g, view: null });
 }
 assert.ok(screens.length >= 15, `найдено экранов: ${screens.length}`);
@@ -106,7 +106,7 @@ await eventually(() => p.locator('#skip-link').boundingBox(), b => assert.ok(b &
 assert.match(await p.textContent('#skip-link'), /Перейти к содержимому/);
 await p.keyboard.press('Enter');
 assert.equal(await p.evaluate(() => document.activeElement?.id), 'view', 'Enter переносит фокус в главную область');
-await p.click('#tabs button[data-tab="diary"]');
+await tab(p, 'diary');
 assert.equal(await p.evaluate(() => document.activeElement?.id), 'title', 'после смены экрана фокус на заголовке');
 assert.equal(await p.evaluate(() => document.activeElement?.tagName), 'H1');
 

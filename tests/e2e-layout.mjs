@@ -78,7 +78,7 @@ for (const cfg of CONFIGS) {
   const screens = [];
   for (const g of groups) {
     await p.click(`#tabs button[data-tab="${g}"]`);
-    const views = await p.$$eval('#subnav button[data-view]', bs => bs.map(b => b.dataset.view));
+    const views = await p.$$eval('#subnav:not([hidden]) button[data-view]', bs => bs.map(b => b.dataset.view));
     if (views.length) screens.push(...views.map(view => ({ group: g, view }))); else screens.push({ group: g, view: null });
   }
   assert.ok(screens.length >= 15, `экранов: ${screens.length}`);
