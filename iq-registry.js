@@ -41,9 +41,11 @@ export const IQ_VALID = {
   corsi: m => (m.attempts >= 2 ? null : 'мало попыток'),
   stroop40: m => (m.n >= 20 ? (m.accuracy >= 0.5 ? null : 'точность ниже половины') : 'мало проб'),
   coding: m => (m.n >= 10 ? (m.accuracy >= 0.5 ? null : 'точность ниже половины') : 'мало ответов'),
+  selfprofile: m => (m.n >= 15 ? null : 'мало ответов'),      // самоописание: не тест, в TESTS его нет, в общую аналитику не входит
 };
 
 export const IQ_PLANS = {
   logic: { id: 'logic', title: 'Проверка логики', about: 'около 25 минут', steps: [IQ_STEPS.matrices, IQ_STEPS.seq12, IQ_STEPS.verbal, IQ_STEPS.rotation] },
   speed: { id: 'speed', title: 'Память и скорость', about: 'около 9 минут', steps: [IQ_STEPS.corsi, IQ_STEPS.stroop40, IQ_STEPS.coding] },
+  selfprofile: { id: 'selfprofile', title: 'Профиль характера (ориентир)', about: 'около 5 минут', steps: [{ id: 'selfprofile' }] },
 };

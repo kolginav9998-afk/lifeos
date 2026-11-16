@@ -311,6 +311,42 @@ await finish();
 assert.match(await text('#bt-result'), /пропущено: пропущено по желанию/);
 await page.click('#bt-done');
 
+// ---------- 8. Профиль характера (ориентир): самоописание, а не тест ----------
+await until(page, () => !!document.getElementById('bt-profile'));
+assert.match(await text('#pf-card-not'), /а не тест и не диагноз/, 'на карточке сказано, что это не тест и не диагноз');
+await page.click('#bt-profile');
+await until(page, () => !!document.getElementById('bt-state-skip')); await page.click('#bt-state-skip');
+await until(page, () => !!document.getElementById('bt-go'));
+assert.match(await text('#bt-stage'), /не проверялись на людях/, 'во вступлении честная оговорка');
+await page.click('#bt-go');
+for (let i = 0; i < 25; i++) {
+  await until(page, k => document.getElementById('pf-item')?.dataset.i === String(k), i);
+  if (i === 0) {
+    assert.equal(await page.locator('#pf-item .series-opt').count(), 5);
+    assert.equal(await page.locator('#pf-pos').evaluate(n => document.activeElement === n), true, 'фокус на заголовке утверждения');
+    assert.ok(await noScroll(), 'профиль: без горизонтальной прокрутки при 320 px');
+  }
+  if (i === 3) await page.click('#pf-skip'); else await page.click(`#pf-item .series-opt[data-v="${i % 2 ? 4 : 2}"]`);
+}
+await finish();
+assert.match(await text('#pf-n'), /Отвечено утверждений: 24 из 25/);
+assert.match(await text('#pf-not'), /не сравнивается с другими людьми/);
+assert.equal(await page.locator('#pf-result .pf-row').count(), 5);
+assert.match(await text('#pf-result .pf-row[data-scale="order"]'), /Порядок и планирование.*из 5 · (скорее не про меня|посередине|скорее про меня)/s, 'число и слово, не только полоса');
+assert.match(await page.getAttribute('#pf-result .pf-bar >> nth=0', 'aria-label'), /из 5/, 'полоса описана словами');
+assert.ok(await noScroll(), 'итог профиля без горизонтальной прокрутки при 320 px');
+await page.click('#bt-done');
+{
+  const run = await lastRun(), m = run.tests.selfprofile;
+  assert.equal(run.mode, 'selfprofile'); assert.ok(m.ok && m.metrics.n === 24, JSON.stringify(m.metrics));
+  assert.equal(m.trials.length, 25);
+}
+await until(page, () => !!document.getElementById('pf-last'));
+assert.match(await text('#pf-last'), /Порядок и планирование: [\d,]+;/, 'на карточке видно последний результат');
+assert.equal(await text('#bt-profile'), 'Заполнить ещё раз');
+await page.click('details.run:first-of-type summary');
+assert.match(await text('details.run[open]'), /Профиль характера \(ориентир\)/, 'прохождение профиля показывается в истории');
+
 // ---------- условный индекс логики на экране тестов ----------
 await until(page, () => !!document.getElementById('bt-iq') && !!document.getElementById('iq-value'));
 {

@@ -10,12 +10,14 @@ import { renderTestList } from './view-tests-list.js';
 import { iqRunners } from './view-tests-run-iq.js';
 import { fastRunners } from './view-tests-run-fast.js';
 import { renderLogicIndex } from './view-tests-index.js';
+import { profileRunner, renderProfileCard, profileResultCard, lastProfile } from './view-tests-profile.js';
+import { profileLine } from './iq-profile.js';
 import { logicIndexNow, indexShort, rawLine, INDEX_NOT_IQ, LOGIC_IDS } from './iq-index.js';
 import { createRunner } from './bt-ui.js';
 import { cardPool, statesOf } from './academy.js';
 import { studyStreak } from './srs.js';
 
-const MODE = { quick: 'Быстрая', full: 'Полная', logic: 'Проверка логики', speed: 'Память и скорость' };
+const MODE = { quick: 'Быстрая', full: 'Полная', logic: 'Проверка логики', speed: 'Память и скорость', selfprofile: 'Профиль характера' };
 const hhmm = ts => { const d = new Date(ts); return `${String(d.getHours()).padStart(2, '0')}:${String(d.getMinutes()).padStart(2, '0')}`; };
 
 export function createTestsView() {
@@ -62,6 +64,7 @@ export function createTestsView() {
           a?.composite != null ? el('span', { class: `badge ${a.composite >= 1 ? 'good' : a.composite <= -1 ? 'bad' : ''}`, textContent: zText(a.composite) }) : null),
         ...tests.map(([id, x]) => {
           const t = TEST_BY_ID[id];
+          if (!t) return id === 'selfprofile' ? el('p', {}, el('strong', { textContent: 'Профиль характера (ориентир)' }), el('br'), el('span', { class: 'muted', textContent: x.skipped ? `пропущено (${x.skipped})` : profileLine(x.metrics) })) : null;
           if (x.skipped) return el('p', { class: 'muted', textContent: `${t.title}: пропущено (${x.skipped})` });
           const all = Object.entries(t.metrics).filter(([k]) => x.metrics[k] !== undefined && x.metrics[k] !== null).map(([k, lab]) => `${lab}: ${fmtMetric(id, k, x.metrics[k])}`).join(' · ');
           return el('p', {}, el('strong', { textContent: `${t.title}: ${fmtPrimary(id, x.metrics)}` }), x.ok ? null : el('span', { class: 'warn', textContent: ` — не засчитано (${x.why})` }), el('br'), el('span', { class: 'muted', textContent: all }));
@@ -72,7 +75,7 @@ export function createTestsView() {
       d.addEventListener('toggle', () => { if (d.open) openRuns.add(r.startedAt); else openRuns.delete(r.startedAt); });
       return d;
     });
-    mount(head, renderLogicIndex(runs), ...renderTestList({ runs, an, start }),
+    mount(head, renderLogicIndex(runs), ...renderTestList({ runs, an, start }), renderProfileCard(runs, () => start(PLANS.selfprofile)),
       history.length ? el('h2', { textContent: 'История' }) : null, ...history,
       el('p', { class: 'muted', textContent: 'Это не медицинская диагностика и не IQ-тест. Результаты нужны, чтобы видеть свою динамику и находить связи со сном, нагрузкой и привычками.' }));
   }
@@ -85,7 +88,7 @@ export function createTestsView() {
       const pool = cardPool(events), byId = new Map(pool.map(c => [c.id, c]));
       const started = statesOf(events).filter(s => s.box >= 1).map(s => byId.get(s.card)).filter(Boolean);
       const recentWords = runsOf(events).slice(-5).flatMap(r => r.tests.words?.extra?.words ?? []);
-      runner = createRunner(host, { history: { recentWords }, cards: { started, pool }, extra: [iqRunners, fastRunners] });
+      runner = createRunner(host, { history: { recentWords }, cards: { started, pool }, extra: [iqRunners, fastRunners, profileRunner] });
       host.focus({ preventScroll: true });
       const out = await runner.runPlan(plan);
       if (!Object.keys(out.results).length) { runner.close(); toast(out.aborted ? 'Проверка прервана, результатов нет' : 'Результатов нет'); return; }
@@ -104,6 +107,13 @@ export function createTestsView() {
   }
 
   function showResult(payload) {
+    if (payload.tests.selfprofile && !payload.tests.selfprofile.skipped && Object.keys(payload.tests).length === 1) {          // самоописание: свой итог без «личной нормы»
+      const before = lastProfile(runsOf(store.state.events).filter(r => r.startedAt < payload.startedAt));
+      runner.show(el('div', { class: 'card', id: 'bt-result' }, el('h3', { textContent: 'Готово' }), profileResultCard(payload, before?.tests.selfprofile.metrics ?? null)),
+        el('button', { type: 'button', id: 'bt-done', class: 'primary big-btn', textContent: 'Готово', onclick: () => { runner.close(); runner = null; running = false; render(); } }));
+      announce('Профиль заполнен. Результаты на экране. Это самоописание, а не диагноз.');
+      return;
+    }
     const an = analyzeRuns(runsOf(store.state.events));
     const a = an.perRun.find(r => r.startedAt === payload.startedAt);
     const rows = TESTS.filter(t => payload.tests[t.id]).map(t => {

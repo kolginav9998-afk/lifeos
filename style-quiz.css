@@ -83,3 +83,15 @@
 .iq-result{border-top:1px solid var(--line);padding-top:8px;margin-top:4px;display:flex;flex-direction:column;gap:4px}
 .iq-result p{margin:0}
 .res-raw{flex-basis:100%;font-size:.85rem}
+
+/* ---- профиль характера ---- */
+.pf-card{display:flex;flex-direction:column;gap:8px}
+.pf-card p{margin:0}
+.pf-result{display:flex;flex-direction:column;gap:10px}
+.pf-result p{margin:0}
+.pf-row{display:flex;flex-direction:column;gap:4px}
+.pf-head{display:flex;flex-wrap:wrap;justify-content:space-between;gap:2px 10px}
+.pf-val{font-weight:600}
+.pf-bar{height:10px;border-radius:999px;background:var(--soft);overflow:hidden}
+.pf-fill{display:block;height:100%;background:var(--accent);border-radius:999px}
+.pf-about,.pf-cmp{margin:0}

@@ -355,7 +355,7 @@ export function createRunner(host, { history = {}, cards = { started: [], pool: 
       if (askStateFirst) state = await askState();
       for (const step of plan.steps) {
         const meta = TEST_BY_ID[step.id === 'wordsRecall' ? 'words' : step.id];
-        if (step.id !== 'wordsLearn') { k++; label.textContent = `${meta ? meta.title : ''} · ${k} из ${real.length}`; } else label.textContent = 'Запомни слова';
+        if (step.id !== 'wordsLearn') { k++; label.textContent = `${meta ? meta.title : plan.title} · ${k} из ${real.length}`; } else label.textContent = 'Запомни слова';
         const s0 = now();
         const out = await RUNNERS[step.id](step);
         if (out) results[step.id === 'wordsRecall' ? 'words' : step.id] = { ...out, ms: now() - s0 };
