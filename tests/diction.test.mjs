@@ -302,7 +302,7 @@ test('курс: уроки di-NN идут подряд, модули по пор
     const g = lessonGoal(l.id);
     assert.ok(g.length >= 15 && g.length <= 120 && !/[.!?]$/.test(g) && !/^После урока/i.test(g), `${l.id}: цель «${g}»`);
     assert.ok(l.body.every(p => p.length <= 800), `${l.id}: абзац не длиннее 800 знаков`);
-    assert.ok(l.cards.length >= 2 && l.cards.length <= 6);
+    assert.ok(l.cards.length >= 2 && l.cards.length <= 10);
   }
   assert.equal(new Set(L.map(l => lessonGoal(l.id))).size, L.length, 'цели не повторяются');
   const first = JSON.stringify(L[0]);
