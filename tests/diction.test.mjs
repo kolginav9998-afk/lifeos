@@ -274,3 +274,59 @@ test('типы записей diction и dictself описаны в реестр
     assert.ok(!/https?:\/\//.test(s), `${f}: ссылки`);
   }
 });
+
+// ---------- курс «Дикция» ----------
+import { TRACKS, validateTrack, lessonGoal, cardsOfTrack } from '../academy.js';
+import { validateDrill, GRADED } from '../zero-kit.js';
+import diction, { MODULES } from '../c-diction.js';
+
+const course = TRACKS.find(t => t.id === 'diction');
+const allText = o => (typeof o === 'string' ? [o] : Array.isArray(o) ? o.flatMap(allText) : o && typeof o === 'object' ? Object.values(o).flatMap(allText) : []);
+
+test('курс: зарегистрирован, не «с нуля», проходит проверку структуры академии', () => {
+  assert.equal(course, diction);
+  assert.equal(course.zero, undefined, 'флага zero нет');
+  assert.equal(course.icon, 'Дк');
+  assert.deepEqual(validateTrack(course), []);
+  assert.ok(course.mentor.principles.length >= 4 && course.mentor.prompts.length === 3 && course.plan.length === 4);
+  assert.ok(course.mentor.prompts.every(p => p.length > 80), 'запросы для внешнего ИИ-тренера');
+  assert.ok(!/https?:|www\./i.test(JSON.stringify(course)), 'ссылок нет');
+});
+test('курс: уроки di-NN идут подряд, модули по порядку, у каждого цель и честные границы', () => {
+  const L = course.lessons;
+  L.forEach((l, i) => assert.equal(l.id, `di-${String(i + 1).padStart(2, '0')}`));
+  assert.deepEqual(MODULES.map(m => m.n), [1, 2, 3, 4, 5, 6, 7, 8]);
+  let prev = 1;
+  for (const l of L) { assert.ok(l.module >= prev && l.module <= 8 && MODULES.some(m => m.n === l.module), `${l.id}: модуль`); prev = l.module; }
+  for (const l of L) {
+    const g = lessonGoal(l.id);
+    assert.ok(g.length >= 15 && g.length <= 120 && !/[.!?]$/.test(g) && !/^После урока/i.test(g), `${l.id}: цель «${g}»`);
+    assert.ok(l.body.every(p => p.length <= 800), `${l.id}: абзац не длиннее 800 знаков`);
+    assert.ok(l.cards.length >= 2 && l.cards.length <= 6);
+  }
+  assert.equal(new Set(L.map(l => lessonGoal(l.id))).size, L.length, 'цели не повторяются');
+  const first = JSON.stringify(L[0]);
+  for (const w of ['логопед', 'ЛОР', 'ИИ', 'боль', 'не записывает']) assert.ok(first.includes(w), `первый урок: «${w}»`);
+});
+test('курс: задания собраны конструкторами zero-kit и проходят проверку; проверяемых хватает', () => {
+  for (const l of course.lessons) {
+    assert.ok(l.drills.length >= 3, `${l.id}: заданий ${l.drills.length}`);
+    l.drills.forEach((d, i) => assert.deepEqual(validateDrill(d), [], `${l.id}[${i}]`));
+    assert.ok(l.drills.filter(d => GRADED.has(d.t)).length >= 2, `${l.id}: проверяемых заданий`);
+    for (const d of l.drills) if (d.t === 'choose') assert.ok(d.wrong.length >= 2 && d.wrong.length <= 3);
+  }
+});
+test('курс: без обещаний, диагнозов и лечения; карточки уникальны; файлы курса в пределах', () => {
+  const text = allText(course).join(' ');
+  assert.ok(!/вылеч|излеч|гарантир|за\s+\d+\s*(дн|недел|месяц)|заменяет врача|в совершенстве/i.test(text), 'опасное обещание');
+  assert.ok(!/<script|javascript:/i.test(text));
+  const cards = cardsOfTrack(course);
+  assert.equal(new Set(cards.map(c => c.id)).size, cards.length);
+  assert.equal(new Set(cards.map(c => c.q)).size, cards.length, 'вопросы карточек не повторяются');
+  for (const f of ['c-diction.js', ...fs.readdirSync(root).filter(x => /^diction-les-/.test(x))]) {
+    const s = fs.readFileSync(path.join(root, f), 'utf8');
+    assert.ok(Buffer.byteLength(s) <= 64000, `${f}: ${Buffer.byteLength(s)} байт`);
+    assert.ok(!/\btype:/.test(s), `${f}: ключ type:`);
+    for (const m of s.matchAll(/from\s*'\.\/([^']+)'/g)) assert.ok(m[1] === 'zero-kit.js' || /^diction-les-[a-z]\.js$/.test(m[1]), `${f} → ${m[1]}`);
+  }
+});
