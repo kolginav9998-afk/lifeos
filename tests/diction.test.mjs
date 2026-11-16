@@ -296,6 +296,9 @@ test('курс: уроки di-NN идут подряд, модули по пор
   const L = course.lessons;
   L.forEach((l, i) => assert.equal(l.id, `di-${String(i + 1).padStart(2, '0')}`));
   assert.deepEqual(MODULES.map(m => m.n), [1, 2, 3, 4, 5, 6, 7, 8]);
+  assert.equal(L.length, 32, 'уроков: 32');
+  assert.deepEqual(MODULES.map(m => L.filter(l => l.module === m.n).length), [3, 3, 3, 8, 3, 3, 4, 5]);
+  for (const l of L.filter(x => x.module === 4)) assert.ok(l.drills.some(d => d.t === 'read'), `${l.id}: в уроке про звуки есть чтение слогов, слов и фраз вслух`);
   let prev = 1;
   for (const l of L) { assert.ok(l.module >= prev && l.module <= 8 && MODULES.some(m => m.n === l.module), `${l.id}: модуль`); prev = l.module; }
   for (const l of L) {
