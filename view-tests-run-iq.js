@@ -2,6 +2,7 @@
 // Все рисунки — SVG, и у каждого есть описание словами для экранного диктора (aria-label). Время в этих тестах не ограничено.
 import { el, focusNode } from './ui.js';
 import { makeMatrixSet, layoutCell, describeMatrix, describeOption } from './iq-matrices.js';
+import { makeSeriesSet } from './iq-series.js';
 import { scoreItems } from './iq-core.js';
 
 const NS = 'http://www.w3.org/2000/svg';
@@ -52,7 +53,7 @@ function chooseConfirm(h, buttons) {
 }
 
 export function iqRunners(api) {
-  const { rng, now, waitFor, set, intro } = api;
+  const { rng, now, waitFor, set, intro, keypad } = api;
 
   async function matrices({ n = 12 }) {
     const go = await intro('matrices', 'Матрицы', ['В таблице 3×3 одна клетка пропущена (на её месте знак вопроса). Найди правило и выбери фигуру, которая подходит.',
@@ -77,5 +78,42 @@ export function iqRunners(api) {
     return { metrics: scoreItems(trials), trials, extra: { seed } };
   }
 
-  return { matrices };
+  async function seq12({ n = 12 }) {
+    const go = await intro('seq12', 'Числовые ряды: 12 заданий', ['Найди закономерность и продолжи ряд: выбери число из вариантов или введи своё.', `Заданий: ${n}, от лёгких к трудным. Время не ограничено.`, 'Если ряд не получается, выбери любой вариант или нажми «Не знаю».'], 'Начать');
+    if (go === 'skip') return { skipped: 'пропущено по желанию' };
+    const seed = rng.int(1, 2 ** 30), items = makeSeriesSet(seed, n), trials = [];
+    for (let i = 0; i < items.length; i++) {
+      const item = items[i], t0 = now();
+      const r = await waitFor((done, h) => {
+        const heading = el('h3', { id: 'sq-pos', tabIndex: -1, textContent: `Ряд ${i + 1} из ${items.length}` });
+        const area = el('div', { class: 'sq-area' });
+        const modeBtn = el('button', { type: 'button', id: 'sq-mode', class: 'chip', textContent: 'Ввести число самому', 'aria-expanded': 'false' });
+        const idk = el('button', { type: 'button', id: 'sq-idk', class: 'link', textContent: 'Не знаю' });
+        const answer = (val, typed) => done({ val, typed, rt: now() - t0 });
+        const showOptions = () => {
+          const opts = item.options.map((o, k) => el('button', { type: 'button', class: 'series-opt', dataset: { v: String(o), i: String(k) }, textContent: String(o), 'aria-label': `Ответ ${o}` }));
+          opts.forEach(b => h.on(b, 'click', () => answer(Number(b.dataset.v), false)));
+          area.replaceChildren(el('div', { class: 'series-opts' }, ...opts));
+          modeBtn.textContent = 'Ввести число самому'; modeBtn.setAttribute('aria-expanded', 'false');
+        };
+        const showTyping = () => {
+          const kp = keypad(v => answer(Number(v), true), h, { maxLen: 6, display: el('div', { class: 'kp-out', id: 'kp-out', role: 'status', 'aria-label': 'Введённое число' }) });
+          area.replaceChildren(kp.out, kp.grid);
+          modeBtn.textContent = 'Выбрать из вариантов'; modeBtn.setAttribute('aria-expanded', 'true');
+        };
+        let typing = false;
+        h.on(modeBtn, 'click', () => { typing = !typing; if (typing) showTyping(); else showOptions(); });
+        h.on(idk, 'click', () => done({ val: null, typed: false, rt: now() - t0 }));
+        showOptions();
+        set('seq12', 'run', el('div', { id: 'sq-item', class: 'iq-item', dataset: { seed: String(item.seed), i: String(i), level: String(item.level) } }, heading,
+          el('p', { class: 'muted', textContent: 'Время не ограничено. Какое число стоит на месте знака вопроса?' }),
+          el('div', { class: 'bt-problem', id: 'bt-series', textContent: `${item.terms.join(',  ')},  ?` }), area, el('div', { class: 'row mx-actions' }, modeBtn, idk)));
+        focusNode(heading);
+      });
+      trials.push({ i, level: item.level, correct: r.val === item.answer, rt: r.rt, val: r.val, typed: r.typed });
+    }
+    return { metrics: { ...scoreItems(trials), typed: trials.filter(t => t.typed).length }, trials, extra: { seed } };
+  }
+
+  return { matrices, seq12 };
 }

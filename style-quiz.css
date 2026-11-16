@@ -33,3 +33,7 @@
 .mx-opt[aria-pressed=true]{border-color:var(--accent);box-shadow:0 0 0 2px var(--accent);background:var(--soft)}
 .mx-n{position:absolute;top:3px;left:8px;font-weight:700;font-size:.85rem;color:var(--muted)}
 .mx-opt[aria-pressed=true] .mx-n::after{content:" \2713"}
+
+/* ---- числовые ряды ---- */
+.sq-area{display:flex;flex-direction:column;gap:10px}
+.sq-area .series-opts{grid-template-columns:repeat(2,1fr)}

@@ -14,7 +14,7 @@ const SAVED = () => page.evaluate(async () => (await import('./store.js')).state
 // ---------- список: группы, пояснения, 320 px без горизонтальной прокрутки ----------
 const ids = await page.evaluate(async () => (await import('./bt-core.js')).TESTS.map(x => x.id));
 await waitCount(page, '.test-row', ids.length);
-for (const id of ['matrices']) assert.ok(ids.includes(id), `в реестре есть ${id}`);
+for (const id of ['matrices', 'seq12']) assert.ok(ids.includes(id), `в реестре есть ${id}`);
 assert.ok(await page.locator('.tg-title').count() >= 4, 'тесты разбиты на группы');
 assert.match(await text('[data-group="logic"]'), /Матрицы/);
 assert.match(await text('.tg-note'), /не настоящий IQ-тест/, 'честная подпись у группы «Логика»');
@@ -71,6 +71,41 @@ await page.click('#bt-done');
   assert.equal(m.metrics.maxScore, 78); assert.equal(m.metrics.score, 78 - 4 - 9 - 11);
   assert.ok(m.extra.seed > 0 && m.trials.length === 12, 'зерно и пробы сохранены');
   assert.equal(run.mode, 'single:matrices');
+}
+
+// ---------- 2. Числовые ряды: 12 заданий (выбор и ввод цифрами) ----------
+await startSingle('seq12');
+await page.click('#bt-go');
+for (let i = 0; i < 12; i++) {
+  await until(page, k => document.getElementById('sq-item')?.dataset.i === String(k), i);
+  const { seed, level } = await page.evaluate(() => ({ ...document.getElementById('sq-item').dataset }));
+  const item = await page.evaluate(async ([s, l]) => { const x = (await import('./iq-series.js')).makeSeriesItem(Number(s), Number(l)); return { answer: x.answer, options: x.options, terms: x.terms }; }, [seed, level]);
+  if (i === 0) {
+    assert.equal(await text('#bt-series'), `${item.terms.join(',  ')},  ?`, 'ряд показан текстом');
+    assert.equal(await page.locator('.series-opt').count(), 6);
+    assert.ok(await noScroll(), 'ряд без горизонтальной прокрутки при 320 px');
+    assert.equal(await page.getAttribute('#sq-mode', 'aria-expanded'), 'false');
+  }
+  if (i === 7) await page.click('#sq-idk');
+  else if (i === 5) {                                              // ввод числа цифрами
+    await page.click('#sq-mode');
+    assert.equal(await page.getAttribute('#sq-mode', 'aria-expanded'), 'true');
+    for (const ch of String(item.answer)) await page.click(`#kp-${ch}`);
+    await waitText(page, '#kp-out', String(item.answer));
+    await page.click('#kp-ok');
+  } else {
+    const v = i === 2 ? item.options.find(o => o !== item.answer) : item.answer;
+    await page.click(`.series-opt[data-v="${v}"]`);
+  }
+}
+await finish();
+assert.match(await text('#bt-result .res-row[data-test="seq12"]'), /10/, 'верно 10 из 12 (ошибка и «Не знаю»)');
+await page.click('#bt-done');
+{
+  const m = (await lastRun()).tests.seq12;
+  assert.ok(m.ok && m.metrics.n === 12 && m.metrics.correct === 10 && m.metrics.typed === 1, JSON.stringify(m.metrics));
+  assert.equal(m.metrics.maxScore, 78); assert.equal(m.metrics.score, 78 - 3 - 8);
+  assert.ok(m.trials.some(x => x.typed === 1), 'ответ, введённый цифрами, помечен');
 }
 
 // ---------- пропуск зрительного теста ----------
