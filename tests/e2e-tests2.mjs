@@ -64,6 +64,9 @@ for (let i = 0; i < 12; i++) {
 }
 await finish();
 assert.match(await text('#bt-result .res-row[data-test="matrices"]'), /9/, 'верных 9 из 12 (две ошибки и «Не знаю»)');
+assert.match(await text('#bt-result .res-row[data-test="matrices"]'), /Верно 9 из 12/, 'сырой результат словами: верные ответы');
+assert.match(await text('#bt-iq-line'), /Условный индекс логики: \d+ из 100 \(примерно от \d+ до \d+\) — не IQ/, 'в итоге есть условный индекс с диапазоном и пометкой «не IQ»');
+assert.match(await text('#bt-iq-line'), /нет данных о других людях/, 'в итоге объяснено, почему это не IQ');
 await page.click('#bt-done');
 {
   const run = await lastRun(), m = run.tests.matrices;
@@ -305,6 +308,30 @@ await page.click('#bt-skip');
 await finish();
 assert.match(await text('#bt-result'), /пропущено: пропущено по желанию/);
 await page.click('#bt-done');
+
+// ---------- условный индекс логики на экране тестов ----------
+await until(page, () => !!document.getElementById('bt-iq') && !!document.getElementById('iq-value'));
+{
+  const cur = await page.evaluate(async () => { const st = await import('./store.js'), c = await import('./bt-core.js'), i = await import('./iq-index.js'); const runs = c.runsOf(st.state.events); const r = i.logicIndexNow(runs); return { ...r, runsWithLogic: i.logicProgress(runs).length }; });
+  assert.equal(cur.items, 51, 'в основе 12 + 12 + 15 + 12 заданий последних прохождений');
+  assert.deepEqual(cur.parts.map(p => p.id).sort(), ['matrices', 'rotation', 'seq12', 'verbal']);
+  assert.ok(cur.index >= 70 && cur.index <= 85, `ожидаемый индекс по известным ответам около 78: ${cur.index}`);
+  assert.ok(cur.hi - cur.lo >= 15 && cur.lo < cur.index && cur.index < cur.hi, `диапазон широкий: ${cur.lo}–${cur.hi}`);
+  assert.equal(cur.runsWithLogic, 4, 'пропущенный тест в динамику не попал');
+  assert.equal(await text('#iq-value strong'), String(cur.index));
+  assert.match(await text('#iq-title'), /Условный индекс логики \(для интереса, не медицинский IQ\)/);
+  assert.match(await text('#iq-range'), new RegExp(`от ${cur.lo} до ${cur.hi}`));
+  assert.match(await text('#iq-from'), /Матрицы.*Числовые ряды: 12 заданий.*Слова и логика.*Вращение фигур/);
+  assert.match(await text('#iq-not-iq'), /не IQ и не диагноз.*нет данных о других людях/);
+  assert.match(await page.getAttribute('#iq-bar', 'aria-label'), new RegExp(`индекс ${cur.index}, примерный диапазон от ${cur.lo} до ${cur.hi}`), 'шкала описана словами');
+  assert.match(await text('#iq-change'), /Последнее прохождение выше|Последнее прохождение ниже|в пределах случайного разброса/, 'динамика словами, не только цветом');
+  assert.match(await page.getAttribute('#iq-spark', 'aria-label'), /^График индекса по прохождениям: \d+/);
+  assert.equal(await page.evaluate(() => document.getElementById('iq-how').open), false);
+  await page.click('#iq-how summary');
+  assert.match(await text('#iq-how'), /неопределённость/);
+  assert.ok(await noScroll(), 'карточка индекса без горизонтальной прокрутки при 320 px');
+  assert.ok(await page.evaluate(() => { const r = document.getElementById('bt-iq').getBoundingClientRect(); return r.left >= 0 && r.right <= innerWidth + 1; }), 'карточка в пределах экрана');
+}
 
 assert.deepEqual(errors, [], 'нет ошибок в консоли:\n' + errors.join('\n'));
 await t.close();

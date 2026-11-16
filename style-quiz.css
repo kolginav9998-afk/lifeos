@@ -67,3 +67,19 @@
 .cd-big{width:84px;height:84px}
 .cd-big .cd-p{stroke-width:2}
 .cd-pad .kp{min-height:56px}
+
+/* ---- условный индекс логики ---- */
+.iq-card{display:flex;flex-direction:column;gap:8px}
+.iq-card p{margin:0}
+.iq-num{font-size:2.6rem;font-weight:800;line-height:1.1}
+.iq-num small{font-size:1rem;font-weight:600;color:var(--muted)}
+.iq-bar{position:relative;height:14px;border-radius:999px;background:var(--soft);margin:8px 10px 2px}
+.iq-band{position:absolute;top:0;bottom:0;border-radius:999px;background:var(--accent);opacity:.4}
+.iq-dot{position:absolute;top:-4px;width:22px;height:22px;margin-left:-11px;border-radius:50%;background:var(--accent);border:3px solid var(--card)}
+.iq-scale{display:flex;justify-content:space-between;font-size:.8rem;color:var(--muted);margin:0 6px}
+.iq-change{display:flex;flex-direction:column;gap:6px}
+.iq-how summary{cursor:pointer;color:var(--accent);min-height:36px;display:flex;align-items:center}
+.iq-how p{margin:6px 0}
+.iq-result{border-top:1px solid var(--line);padding-top:8px;margin-top:4px;display:flex;flex-direction:column;gap:4px}
+.iq-result p{margin:0}
+.res-raw{flex-basis:100%;font-size:.85rem}

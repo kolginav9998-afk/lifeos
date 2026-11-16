@@ -9,6 +9,8 @@ import { analyzeRuns, zText, zWord, selfCompare } from './bt-analytics.js';
 import { renderTestList } from './view-tests-list.js';
 import { iqRunners } from './view-tests-run-iq.js';
 import { fastRunners } from './view-tests-run-fast.js';
+import { renderLogicIndex } from './view-tests-index.js';
+import { logicIndexNow, indexShort, rawLine, INDEX_NOT_IQ, LOGIC_IDS } from './iq-index.js';
 import { createRunner } from './bt-ui.js';
 import { cardPool, statesOf } from './academy.js';
 import { studyStreak } from './srs.js';
@@ -70,7 +72,7 @@ export function createTestsView() {
       d.addEventListener('toggle', () => { if (d.open) openRuns.add(r.startedAt); else openRuns.delete(r.startedAt); });
       return d;
     });
-    mount(head, ...renderTestList({ runs, an, start }),
+    mount(head, renderLogicIndex(runs), ...renderTestList({ runs, an, start }),
       history.length ? el('h2', { textContent: 'История' }) : null, ...history,
       el('p', { class: 'muted', textContent: 'Это не медицинская диагностика и не IQ-тест. Результаты нужны, чтобы видеть свою динамику и находить связи со сном, нагрузкой и привычками.' }));
   }
@@ -109,8 +111,9 @@ export function createTestsView() {
       if (x.skipped) return el('div', { class: 'res-row' }, el('span', { textContent: t.title }), el('span', { class: 'muted', textContent: `пропущено: ${x.skipped}` }));
       const z = a?.z[t.id];
       const note = !x.ok ? `не засчитано: ${x.why}` : z == null ? 'норма копится' : `${zText(z)} · ${zWord(z)}`;
+      const raw = rawLine(t.id, x.metrics);
       return el('div', { class: 'res-row', dataset: { test: t.id } }, el('span', { textContent: t.title }), el('strong', { textContent: fmtPrimary(t.id, x.metrics) }),
-        el('span', { class: `badge ${x.ok && z != null ? (z >= 1 ? 'good' : z <= -1 ? 'bad' : '') : ''}`, textContent: note }));
+        el('span', { class: `badge ${x.ok && z != null ? (z >= 1 ? 'good' : z <= -1 ? 'bad' : '') : ''}`, textContent: note }), raw ? el('span', { class: 'muted res-raw', textContent: raw }) : null);
     });
     const comp = a?.composite;
     runner.show(
@@ -119,6 +122,8 @@ export function createTestsView() {
         comp != null ? el('p', { class: 'big', id: 'bt-composite', textContent: zWord(comp) }) : el('p', { class: 'muted', id: 'bt-composite', textContent: 'Личная норма накапливается: после 5–6 прохождений появится сравнение с самим собой.' }),
         comp != null ? el('p', { class: 'muted', textContent: `Общий результат ${zText(comp)} относительно твоей нормы` }) : null,
         ...rows,
+        (() => { const idx = LOGIC_IDS.some(id => payload.tests[id] && !payload.tests[id].skipped) ? logicIndexNow(runsOf(store.state.events)) : null;
+          return idx ? el('div', { class: 'iq-result', id: 'bt-iq-line' }, el('p', { id: 'bt-iq-text', textContent: indexShort(idx) }), el('p', { class: 'muted', textContent: INDEX_NOT_IQ })) : null; })(),
         el('div', { id: 'bt-effort', class: 'effort' }, el('span', { class: 'muted', textContent: 'Насколько трудно было? (по желанию, попадёт в выгрузку)' }),
           el('div', { class: 'row wrap', role: 'group', 'aria-label': 'Усилие от 1 до 5' }, ...[1, 2, 3, 4, 5].map(v => el('button', { type: 'button', class: 'chip effort-btn', dataset: { v: String(v) }, 'aria-pressed': 'false', textContent: String(v), title: EFFORT_LABEL[v - 1],
             onclick: async e => {
