@@ -153,6 +153,9 @@ test('список стирки: только вещи «в использова
   assert.deepEqual(laundryGroups(lo.due).map(g => [g.how, g.rows.length]), [['machine', 1], ['hand', 1], ['dry', 1]]);
   assert.equal(laundryCount(evs, TODAY), 3); assert.equal(laundryCount([], TODAY), 0);
   assert.equal(washProgress(wool, statsOf(wool, logsOf(evs, wool.id), TODAY)).text, 'Надето 2 из 2');
+  assert.equal(washProgress(shirt, statsOf(shirt, logsOf(evs, shirt.id), TODAY)).text, 'Надето 2 (стирать после 1)', 'сверх нормы: без «2 из 1»');
+  const bed = mk({ name: 'Простыня', kind: 'bedding' }, '2026-11-01');
+  assert.deepEqual([washProgress(bed, statsOf(bed, [], '2026-11-08')).text, washProgress(bed, statsOf(bed, [], TODAY)).text], ['Прошло 7 из 14 дн.', 'Прошло 15 дн. (стирать раз в 14)']);
   assert.equal(washProgress(idle, statsOf(idle, [], TODAY)), null);
 });
 

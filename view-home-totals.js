@@ -32,11 +32,9 @@ export function createTotalsTab(H) {
     if (!m.items.length) { fill(root, emptyState({ art: 'home', title: 'Итогов пока нет', text: 'Добавь вещи и отмечай «Надел» и «Постирал»: здесь появятся рейтинги и графики.', action: { label: 'Добавить вещь', icon: 'plus', onClick: () => H.openEdit(null) } })); return; }
     const s = summaryOf(m), maxKind = s.byKind.reduce((x, k) => Math.max(x, k.count), 1), chartCard = chart(s);
     chartCard.id = 'hm-chart';
-    const hero = card('Всего', el('div', { class: 'hm-big3' },
-      el('p', {}, el('strong', { class: 'big', textContent: String(s.count) }), el('span', { class: 'muted', textContent: ` ${plural(s.count, 'вещь', 'вещи', 'вещей')}` })),
-      s.qty !== s.count ? el('p', {}, el('strong', { class: 'big', textContent: String(s.qty) }), el('span', { class: 'muted', textContent: ' штук всего' })) : null,
-      s.priced ? el('p', {}, el('strong', { class: 'big', textContent: moneyText(s.valueMinor) }), el('span', { class: 'muted', textContent: ` стоимость (цена указана у ${s.priced})` })) : null),
-    el('p', { class: 'muted', textContent: `Надето всего: ${timesText(s.totalWears)} · Стирок: ${s.totalWashes}${s.stored ? ` · На хранении: ${s.stored}` : ''}` }));
+    const cell = (value, label) => el('p', { class: 'hm-cell' }, el('strong', { class: 'big', textContent: value }), el('span', { class: 'muted', textContent: label }));
+    const hero = card('Всего', el('div', { class: 'hm-big3' }, cell(String(s.count), plural(s.count, 'вещь', 'вещи', 'вещей')), s.qty !== s.count ? cell(String(s.qty), 'штук всего') : null, s.priced ? cell(moneyText(s.valueMinor), `стоимость, цена указана у ${s.priced}`) : null),
+      el('p', { class: 'muted', textContent: `Надето всего: ${timesText(s.totalWears)} · Стирок: ${s.totalWashes}${s.stored ? ` · На хранении: ${s.stored}` : ''}` }));
     const kinds = card('По видам', ...s.byKind.map(k => share(`${k.label}${k.qty !== k.count ? ` (${k.qty} шт.)` : ''}`, k.count, maxKind)));
     const laundry = card('Стирка', s.laundry.length
       ? el('p', {}, `Пора стирать: ${s.laundry.length} ${plural(s.laundry.length, 'вещь', 'вещи', 'вещей')}. `, el('button', { type: 'button', class: 'link hm-link', id: 'hm-to-wash', textContent: 'Открыть стирку', onclick: () => H.setTab('laundry') }))

@@ -68,10 +68,11 @@ export function createDetailWindow(H) {
     const w = washable ? washProgress(item, s) : null;
     const meter = w ? el('div', { class: `progress thin${s.needsWash ? ' warn' : ''}`, 'aria-hidden': 'true' }, el('span')) : null;
     meter?.firstChild.style.setProperty('--w', `${Math.round(Math.min(1, w.fraction) * 100)}%`);
-    const verb = acts.includes('wear') ? 'надето' : 'использовано';
-    const lines = [statsLine(s, p.kind), washable ? `С последней стирки ${acts.includes('wear') ? 'надето' : 'использовано'}: ${timesText(s.wearsSinceWash)}` : '', w ? `${w.text}${s.needsWash ? ' · пора стирать' : ''}` : '',
-      s.lastWorn ? `Последний раз ${verb}: ${dt(s.lastWorn)}` : '', washable ? (s.lastWashed ? `Последняя стирка: ${dt(s.lastWashed)}` : 'Ещё не стирали') : '', `У тебя уже: ${ageText(s.ageDays)}`,
-      s.costPerWear !== null ? `Цена за одно использование: ${moneyText(s.costPerWear)}` : ''].filter(Boolean);
+    const verb = acts.includes('wear') ? 'надето' : 'использовано', use = acts.includes('wear') ? 'надевание' : 'использование';
+    const lines = [el('p', { textContent: statsLine(s, p.kind) }), !w && washable ? el('p', { textContent: `С последней стирки ${verb}: ${timesText(s.wearsSinceWash)}` }) : null,
+      w ? el('p', { textContent: `${w.text}${s.needsWash ? ' · пора стирать' : ''}` }) : null, meter, s.lastWorn ? el('p', { textContent: `Последний раз ${verb}: ${dt(s.lastWorn)}` }) : null,
+      washable ? el('p', { textContent: s.lastWashed ? `Последняя стирка: ${dt(s.lastWashed)}` : 'Ещё не стирали' }) : null, el('p', { textContent: `У тебя уже: ${ageText(s.ageDays)}` }),
+      s.costPerWear !== null ? el('p', { textContent: `Цена за одно ${use}: ${moneyText(s.costPerWear)}` }) : null].filter(x => x && x.textContent !== '');
     const params = [['Вид', KIND_LABEL[p.kind]], ['Состояние', STATUS_LABEL[p.status]], ['Где лежит', p.place], ['Бренд', p.brand], ['Цвет', p.color], ['Размер', p.size], ['Материал', p.material], ['Количество', p.qty > 1 ? `${p.qty} шт.` : ''],
       ['Куплено', p.bought ? dt(p.bought) : ''], ['Цена', p.priceMinor !== null && p.priceMinor !== undefined ? moneyText(p.priceMinor) : ''], ['Гарантия до', p.warranty ? dt(p.warranty) : ''], ['Уход', acts.includes('wash') || c.how !== 'none' ? careText(c) : ''],
       ['Метки', (p.tags ?? []).join(', ')], ['Заметка', p.note]].filter(([, v]) => v);
@@ -92,7 +93,7 @@ export function createDetailWindow(H) {
       el('div', { class: 'sess-top' }, el('span', { class: 'muted', textContent: KIND_LABEL[p.kind] }), el('button', { type: 'button', id: 'hm-detail-close', class: 'chip', textContent: 'Закрыть', onclick: close })),
       el('h3', { class: 'hm-title', tabIndex: -1, textContent: p.qty > 1 ? `${p.name} × ${p.qty}` : p.name }),
       acts.length && ['active', 'stored'].includes(p.status) ? el('div', { class: 'hm-quick' }, ...acts.map((k, i) => btn(k, logButton(k, p.kind), () => H.mark([item], k), `hm-q${i === 0 ? ' primary' : ''}`, k === 'wash' ? 'sync' : 'check'))) : null,
-      el('section', { class: 'card hm-lines' }, el('h2', { class: 'hm-h', textContent: 'Сколько раз' }), ...lines.map(t => el('p', { textContent: t })), meter),
+      el('section', { class: 'card hm-lines' }, el('h2', { class: 'hm-h', textContent: 'Сколько раз' }), ...lines),
       el('section', { class: 'card' }, el('h2', { class: 'hm-h', textContent: 'Параметры' }), el('dl', { class: 'hm-dl' }, ...params.flatMap(([k, v]) => [el('dt', { textContent: k }), el('dd', { textContent: v })]))),
       el('section', { class: 'card' }, el('h2', { class: 'hm-h', textContent: 'История' }), ...hist),
       logBox,

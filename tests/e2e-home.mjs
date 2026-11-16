@@ -161,7 +161,7 @@ await card('Куртка летняя').locator('.hm-open').click(); await waitV
 await clearToast(page); await page.click('#hm-detail [data-fk$="|st-sold"]');
 await waitToast(page, /«Куртка летняя»: продано/);
 await page.click('#hm-detail-close'); await waitCount(page, '#hm-list .hm-card', 3);          // проданное скрыто из обычного списка
-await page.selectOption('#hm-show', 'gone'); await waitCount(page, '#hm-list .hm-card', 1);
+await page.click('#hm-gone'); await waitCount(page, '#hm-list .hm-card', 1);
 await waitText(page, '#hm-list .hm-badge', /Продано/); assert.equal(await page.locator('#hm-list .hm-q').count(), 0, 'у проданной вещи нет кнопок «Надел»');
 await card('Куртка летняя').locator('.hm-open').click(); await waitVisible(page, '#hm-detail');
 await page.click('#hm-detail [data-fk$="|del"]');
@@ -169,10 +169,10 @@ await waitVisible(page, '#hm-detail .hm-confirm'); await waitText(page, '#hm-det
 await page.click('#hm-detail [data-fk$="|no"]'); await waitVisible(page, '#hm-detail .hm-confirm', false);
 await page.click('#hm-detail [data-fk$="|del"]'); await clearToast(page); await page.click('#hm-detail [data-fk$="|yes"]');
 await waitVisible(page, '#hm-detail', false); await waitToast(page, /Удалено: «Куртка летняя»/);
-await waitCount(page, '#hm-list .hm-card', 0);
+await waitCount(page, '#hm-list .hm-card', 3); await waitVisible(page, '#hm-gone', false);       // проданного больше нет: список вернулся к обычному
 await page.click('#toast button');                                                      // вернуть удалённое
-await waitCount(page, '#hm-list .hm-card', 1);
-await page.selectOption('#hm-show', 'live'); await waitCount(page, '#hm-list .hm-card', 3);
+await waitVisible(page, '#hm-gone');
+await page.click('#hm-gone'); await waitCount(page, '#hm-list .hm-card', 1); await page.click('#hm-gone'); await waitCount(page, '#hm-list .hm-card', 3);
 
 // ---------- поиск и фильтры ----------
 await addItem('Кроссовки белые', { kind: 'shoes', more: { place: 'Обувница', color: 'белый' } });
@@ -184,7 +184,7 @@ await page.fill('#hm-q', 'ботинки'); await waitText(page, '#hm-list .hm-n
 await page.fill('#hm-q', 'самолёт'); await waitText(page, '#hm-list .empty-t', 'Ничего не нашлось');
 await page.click('#hm-list .empty-a'); await waitValue(page, '#hm-q', ''); await waitCount(page, '#hm-list .hm-card', 5);
 await page.fill('#hm-q', 'кухня'); await waitText(page, '#hm-list .hm-name', 'Чайник'); await page.fill('#hm-q', '');
-await waitCount(page, '#hm-kinds .hm-kind', 5);                                          // «Все» и четыре вида
+await waitCount(page, '#hm-kinds .hm-kind:not(#hm-gone)', 5);                            // «Все» и четыре вида; рядом отдельная кнопка «Проданное и выброшенное»
 await page.click('#hm-kinds .hm-kind:has-text("Одежда")'); await waitCount(page, '#hm-list .hm-card', 2);
 assert.equal(await page.getAttribute('#hm-kinds .hm-kind:has-text("Одежда")', 'aria-pressed'), 'true');
 assert.equal(await page.evaluate(() => document.activeElement.textContent.startsWith('Одежда')), true, 'фокус остался на нажатом фильтре');

@@ -33,7 +33,9 @@
 #view-home .hm-help,#view-home .hm-ok{margin:0}
 #view-home .hm-ok{font-weight:600}
 #view-home .hm-ok::before{content:"✓ ";color:var(--ok)}
-#view-home .hm-sec{display:flex;flex-direction:column;gap:var(--s3)}
+#view-home .hm-sec{display:flex;flex-direction:column;align-items:flex-start;gap:var(--s3)}
+#view-home .hm-sec>*{max-width:100%}
+#view-home .hm-sec>ul,#view-home .hm-sec>h2{align-self:stretch}
 #view-home .hm-h,#hm-detail .hm-h{font-size:var(--t16);font-weight:700;text-transform:none;letter-spacing:0;color:var(--text);margin:0 0 var(--s2)}
 #view-home .hm-sec>.hm-h{margin:0}
 #view-home .hm-gh{font-size:var(--t14);color:var(--muted);margin:var(--s2) 0 0}
@@ -51,8 +53,9 @@
 
 /* «Итоги» */
 #view-home .hm-card-t{display:flex;flex-direction:column;gap:var(--s2)}
-#view-home .hm-big3 p{margin:0 0 var(--s2);overflow-wrap:anywhere}
-#view-home .hm-big3 .big{font-size:var(--t32)}
+#view-home .hm-big3{display:grid;grid-template-columns:repeat(auto-fit,minmax(min(100%,130px),1fr));gap:var(--s3)}
+#view-home .hm-cell{display:flex;flex-direction:column;margin:0;min-width:0;overflow-wrap:anywhere}
+#view-home .hm-big3 .big{font-size:var(--t24);line-height:1.2}
 #view-home .hm-top{list-style:decimal;margin:0;padding-left:1.5em;display:flex;flex-direction:column;gap:var(--s1)}
 #view-home .hm-top li{padding-left:2px}
 #view-home .hm-top li::marker{color:var(--muted);font-weight:600}

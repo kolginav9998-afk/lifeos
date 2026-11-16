@@ -3,9 +3,9 @@ import { el, fill, icon, emptyState, announce, dateRu } from './ui.js';
 import { daysBetween } from './events.js';
 import { KINDS, STATUS_LABEL, searchItems, placesOf, quickLogs, logButton, statsLine, WARRANTY_DAYS } from './home.js';
 
-const SHOW = [['live', 'Всё, что у меня есть'], ['active', 'Только в использовании'], ['stored', 'Убрано на хранение'], ['gone', 'Проданное и выброшенное'], ['all', 'Вообще всё']];
 const SORT = [['name', 'По названию'], ['new', 'Сначала новые'], ['worn', 'Чаще надеваю'], ['idle', 'Давно не использовал']];
-const passStatus = (show, status) => (show === 'all' ? true : show === 'live' ? status === 'active' || status === 'stored' : show === 'gone' ? status === 'sold' || status === 'gone' : status === show);
+const gone = status => status === 'sold' || status === 'gone';
+const passStatus = (show, status) => (show === 'gone' ? gone(status) : !gone(status));            // по умолчанию — всё, что есть; проданное и выброшенное показывается отдельной кнопкой
 
 export function createItemsTab(H) {
   const state = { q: '', kind: '', place: '', show: 'live', sort: 'name' };
@@ -17,13 +17,11 @@ export function createItemsTab(H) {
   const kinds = el('div', { id: 'hm-kinds', class: 'chips hm-kinds', role: 'group', 'aria-label': 'Вид вещи' });
   const select = (id, label, onchange) => { const s = el('select', { id }); s.onchange = () => onchange(s.value); return [el('label', { class: 'field hm-sel' }, el('span', { textContent: label }), s), s]; };
   const [placeBox, place] = select('hm-place', 'Где лежит', v => { state.place = v; list(); });
-  const [showBox, show] = select('hm-show', 'Показать', v => { state.show = v; render(H.model()); });
   const [sortBox, sort] = select('hm-sort', 'Сначала', v => { state.sort = v; list(); });
-  for (const [v, t] of SHOW) show.append(el('option', { value: v, textContent: t }));
   for (const [v, t] of SORT) sort.append(el('option', { value: v, textContent: t }));
   const count = el('p', { id: 'hm-count', class: 'muted hm-count' });
   const box = el('ul', { id: 'hm-list', class: 'hm-list' });
-  const root = el('div', { class: 'hm-items' }, add, el('div', { class: 'hm-find' }, q), kinds, el('div', { class: 'hm-filters' }, placeBox, showBox, sortBox), count, box);
+  const root = el('div', { class: 'hm-items' }, add, el('div', { class: 'hm-find' }, q), kinds, el('div', { class: 'hm-filters' }, placeBox, sortBox), count, box);
 
   const badge = (ic, text, cls = '') => el('span', { class: `hm-badge ${cls}`.trim() }, icon(ic, 14), text);
   function card(item, s, today) {
@@ -64,18 +62,22 @@ export function createItemsTab(H) {
 
   function render(m) {
     last = m;
+    const away = m.items.filter(i => gone(i.payload.status)).length;
+    if (state.show === 'gone' && !away) state.show = 'live';                      // проданного больше нет: назад к обычному списку
     const base = m.items.filter(i => passStatus(state.show, i.payload.status));
     const places = placesOf(m.items);
     if (state.place && !places.includes(state.place)) state.place = '';
     if (state.kind && !base.some(i => i.payload.kind === state.kind)) state.kind = '';
     const sig = places.join('\n');
     if (place.dataset.sig !== sig) { place.dataset.sig = sig; fill(place, el('option', { value: '', textContent: 'Везде' }), ...places.map(p => el('option', { value: p, textContent: p }))); }
-    place.value = state.place; show.value = state.show; sort.value = state.sort; sort.disabled = !!state.q.trim();
+    place.value = state.place; sort.value = state.sort; sort.disabled = !!state.q.trim();
     placeBox.hidden = !places.length;
     const counts = new Map();
     for (const i of base) counts.set(i.payload.kind, (counts.get(i.payload.kind) || 0) + 1);
     const chip = (key, label, n) => el('button', { type: 'button', class: 'chip hm-kind', textContent: `${label} (${n})`, 'aria-pressed': String(state.kind === key), dataset: { fk: `kind|${key}` }, onclick: () => H.keep(() => { state.kind = state.kind === key ? '' : key; render(H.model()); }) });
-    fill(kinds, base.length > 1 && counts.size > 1 ? [chip('', 'Все', base.length), ...KINDS.filter(([k]) => counts.has(k)).map(([k, t]) => chip(k, t, counts.get(k)))] : []);
+    const awayChip = away ? el('button', { type: 'button', id: 'hm-gone', class: 'chip hm-kind', textContent: `Проданное и выброшенное (${away})`, 'aria-pressed': String(state.show === 'gone'), dataset: { fk: 'show|gone' },
+      onclick: () => H.keep(() => { state.show = state.show === 'gone' ? 'live' : 'gone'; state.kind = ''; render(H.model()); }) }) : null;
+    fill(kinds, base.length > 1 && counts.size > 1 ? [chip('', 'Все', base.length), ...KINDS.filter(([k]) => counts.has(k)).map(([k, t]) => chip(k, t, counts.get(k)))] : [], awayChip);
     kinds.hidden = !kinds.childNodes.length;
     list();
   }

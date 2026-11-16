@@ -212,7 +212,9 @@ export function statsLine(s, kind) {
 export function washProgress(item, s) {
   const c = careOf(item.payload), fw = c.washEveryWears ? s.wearsSinceWash / c.washEveryWears : -1, fd = c.washEveryDays ? s.daysSinceWash / c.washEveryDays : -1;
   if (s.progress === null) return null;
-  return { fraction: s.progress, text: fw >= fd ? `Надето ${s.wearsSinceWash} из ${c.washEveryWears}` : `Прошло ${s.daysSinceWash} из ${c.washEveryDays} дн.` };
+  const text = fw >= fd ? (s.wearsSinceWash <= c.washEveryWears ? `Надето ${s.wearsSinceWash} из ${c.washEveryWears}` : `Надето ${s.wearsSinceWash} (стирать после ${c.washEveryWears})`)
+    : (s.daysSinceWash <= c.washEveryDays ? `Прошло ${s.daysSinceWash} из ${c.washEveryDays} дн.` : `Прошло ${s.daysSinceWash} дн. (стирать раз в ${c.washEveryDays})`);
+  return { fraction: s.progress, text };
 }
 
 // ---------- итоги ----------
