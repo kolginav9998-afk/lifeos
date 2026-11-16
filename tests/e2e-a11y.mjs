@@ -6,7 +6,7 @@
 import assert from 'node:assert/strict';
 import fs from 'node:fs';
 import path from 'node:path';
-import { launch, tab, until, root } from './helpers.mjs';
+import { launch, tab, until, root, eventually } from './helpers.mjs';
 import { seedDemo } from './seed.mjs';
 import { createServer } from '../server/node/server.js';
 
@@ -102,8 +102,7 @@ await p.reload();                                                               
 await until(p, () => !document.getElementById('app').hidden);
 await p.keyboard.press('Tab');
 assert.equal(await p.evaluate(() => document.activeElement?.id), 'skip-link', 'первый Tab — на ссылку «Перейти к содержимому»');
-const skipBox = await p.locator('#skip-link').boundingBox();
-assert.ok(skipBox && skipBox.y >= 0 && skipBox.height > 20, 'ссылка видна, пока на ней фокус');
+await eventually(() => p.locator('#skip-link').boundingBox(), b => assert.ok(b && b.y >= 0 && b.height > 20, 'ссылка видна, пока на ней фокус'));   // на медленной машине кадр с показом приходит позже
 assert.match(await p.textContent('#skip-link'), /Перейти к содержимому/);
 await p.keyboard.press('Enter');
 assert.equal(await p.evaluate(() => document.activeElement?.id), 'view', 'Enter переносит фокус в главную область');

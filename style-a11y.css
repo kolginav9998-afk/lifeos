@@ -8,7 +8,7 @@
 
 /* ссылка «Перейти к содержимому»: видна, только когда на ней фокус с клавиатуры; текст для диктора скрыт визуально */
 .sr-only{position:absolute;width:1px;height:1px;margin:-1px;padding:0;border:0;overflow:hidden;clip:rect(0 0 0 0);clip-path:inset(50%);white-space:nowrap}
-.skip-link{position:fixed;left:12px;top:-120px;z-index:100;padding:12px 18px;border-radius:14px;background:var(--text);color:var(--bg);font-weight:700;text-decoration:none;box-shadow:var(--shadow-lg)}
+.skip-link{transition:none;position:fixed;left:12px;top:-120px;z-index:100;padding:12px 18px;border-radius:14px;background:var(--text);color:var(--bg);font-weight:700;text-decoration:none;box-shadow:var(--shadow-lg)}
 .skip-link:focus,.skip-link:focus-visible{top:max(12px,env(safe-area-inset-top))}
 #view{scroll-margin-top:84px}
 
