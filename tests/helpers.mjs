@@ -179,6 +179,11 @@ export const appReady = (page, timeout = 15000) => until(page, async () => !docu
 
 // Повторять «прочитать → проверить», пока проверка (assert) не пройдёт или не выйдет время; потом вернуть последнее прочитанное.
 // Для значений, которых нет в DOM: записи в store, содержимое IndexedDB, localStorage. Проверка остаётся обычным assert.
+// Дождаться, пока смена цветовой темы дойдёт до разметки (после page.emulateMedia): медиазапрос сработал, плюс запас, который растёт при замедлении процессора.
+export async function settleTheme(page, theme, ms = 150) {
+  for (let i = 0; i < 50 && !(await page.evaluate(t => matchMedia(`(prefers-color-scheme: ${t})`).matches, theme)); i++) await page.waitForTimeout(40);
+  await page.waitForTimeout(ms * SCALE);
+}
 export async function eventually(read, check, timeout = 5000) {
   const end = Date.now() + timeout * SCALE;
   for (;;) {

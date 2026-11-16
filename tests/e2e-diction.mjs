@@ -4,7 +4,7 @@
 import assert from 'node:assert/strict';
 import fs from 'node:fs';
 import path from 'node:path';
-import { launch, tab, until, appReady, waitText, waitCount, waitVisible, eventually, root } from './helpers.mjs';
+import { launch, tab, until, appReady, waitText, waitCount, waitVisible, eventually, root, settleTheme } from './helpers.mjs';
 
 const t = await launch({ ctxOptions: { serviceWorkers: 'block', bypassCSP: true } });
 const { page, errors } = t;
@@ -33,7 +33,7 @@ const a11y = [];
 async function ax(label) {
   if (!(await page.evaluate(() => typeof window.axe !== 'undefined'))) await page.addScriptTag({ content: AXE });
   for (const theme of ['light', 'dark']) {
-    await page.emulateMedia({ colorScheme: theme, reducedMotion: 'reduce' }); await page.waitForTimeout(150);
+    await page.emulateMedia({ colorScheme: theme, reducedMotion: 'reduce' }); await settleTheme(page, theme, 150);
     const res = await page.evaluate(async tags => (await axe.run(document, { runOnly: { type: 'tag', values: tags }, resultTypes: ['violations'] })).violations.map(v => ({ id: v.id, impact: v.impact, nodes: v.nodes.map(n => `${n.target.join(' ')} ${(n.any[0] || n.all[0] || n.none[0] || {}).message || ''}`) })), TAGS);
     for (const v of res) if (v.impact === 'serious' || v.impact === 'critical' || ZERO_RULES.has(v.id)) a11y.push(`${theme} / ${label}: [${v.impact}] ${v.id}: ${v.nodes.slice(0, 2).join(' | ')}`);
   }
