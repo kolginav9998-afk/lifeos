@@ -297,6 +297,25 @@ assert.deepEqual([les[0].track, les[0].lesson], ['diction', 'di-01']);
 await tab(page, 'learn');
 assert.match(await text('.track-card[data-track="diction"]'), /Дикция: ясная речь[\s\S]*Уроки 1\/32/, 'курс виден и в «Учёбе»');
 
+// ===== 11. Узкий экран 320 px и крупный шрифт: ничего не вылезает за край (вкладки и окна тренажёров) =====
+await tab(page, 'diction');
+await page.setViewportSize({ width: 320, height: 640 });
+await page.evaluate(() => document.documentElement.style.setProperty('--fs', '1.3'));
+const overflow = sel => page.evaluate(sel => [document.documentElement.scrollWidth > innerWidth ? `страница шире экрана: ${document.documentElement.scrollWidth}` : '',
+  ...[...document.querySelectorAll(sel)].filter(n => { const r = n.getBoundingClientRect(); return r.width && (r.right > innerWidth + 0.5 || r.left < -0.5) && !n.closest('svg'); }).slice(0, 3).map(n => `за краем: ${n.tagName}.${n.className} «${(n.textContent || '').slice(0, 30)}»`)].filter(Boolean), sel);
+for (const id of ['today', 'warmup', 'breath', 'twisters', 'stress', 'reading', 'rubric', 'course']) {
+  await page.click(`#dic-tab-${id}`);
+  assert.deepEqual(await overflow('#dic-panel *, #dic-tabs *'), [], `вкладка «${id}» на 320 px`);
+}
+await page.click('#dic-tab-twisters'); await page.locator('#dic-tw-list .dic-tw-pick').nth(5).click();
+assert.deepEqual(await overflow('#dic-host *'), [], 'окно скороговорки на 320 px'); await page.click('#dic-t-close');
+await page.click('#dic-tab-stress'); await page.click('#dic-st-go');
+assert.deepEqual(await overflow('#dic-host *'), [], 'окно ударений на 320 px'); await page.click('#dic-stop'); await page.click('#dic-s-close');
+await page.click('#dic-tab-reading'); await page.selectOption('#dic-read-pick', 'rt06'); await page.click('#dic-read-open');
+assert.deepEqual(await overflow('#dic-host *'), [], 'окно чтения на 320 px'); await page.click('#dic-r-close');
+await page.click('#dic-tab-warmup'); await page.click('#dic-sets .dic-set[data-set="tongue"]');
+assert.deepEqual(await overflow('#dic-host *'), [], 'окно разминки на 320 px'); await page.click('#dic-stop'); await page.click('#dic-w-close');
+
 assert.deepEqual(a11y, [], 'доступность:\n' + a11y.join('\n'));
 assert.deepEqual(noise(errors), [], 'нет ошибок в консоли:\n' + noise(errors).join('\n'));
 await t.close();
