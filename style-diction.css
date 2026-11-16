@@ -39,6 +39,8 @@
 /* ударения */
 .dic-opts{display:flex;flex-direction:column;gap:var(--s2);margin:var(--s3) 0}
 .dic-opt{justify-content:flex-start;min-height:56px;font-size:var(--t20);text-align:left;border-radius:var(--r12)}
+.dic-opt:disabled{opacity:1;cursor:default}
+.dic-opt:disabled:not(.right):not(.wrong){opacity:.7}
 .dic-opt.right{border-color:var(--ok);background:var(--tint-ok)}
 .dic-opt.wrong{border-color:var(--danger);background:var(--tint-danger)}
 .dic-st{font-weight:800;text-decoration:underline;text-decoration-thickness:3px;text-underline-offset:.18em}

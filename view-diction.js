@@ -97,17 +97,14 @@ export function createDictionView(ctx = {}) {
     if (next) { e.preventDefault(); select(next, null, true); }
   });
 
-  const head = el('section', { id: 'dic-head', class: 'card settings-card' },
-    el('h3', { textContent: 'Ясная речь каждый день' }),
-    el('p', { class: 'muted', textContent: 'Десять минут в день: дыхание, разминка, скороговорки, ударения и чтение вслух.' }),
-    el('p', { id: 'dic-safety', class: 'dic-safety', textContent: SAFETY }));
+  const head = el('section', { id: 'dic-head', class: 'card tight' }, el('p', { id: 'dic-safety', class: 'dic-safety', textContent: SAFETY }));
   root.append(head, tablist, panel, host);
   select('today');
 
   return {
     root,
-    // События пришли или поменялись. Пока открыто окно тренажёра, вкладку не перерисовываем, чтобы не сбить занятие.
-    update(evs) { events = evs; if (!host.hidden) { dirty = true; return; } render(); },
-    show() { events = store.state.events; if (host.hidden) render(); },
+    // События пришли или поменялись. Пока экран скрыт или открыто окно тренажёра, вкладку не перерисовываем (не сбить занятие и не тратить силы зря).
+    update(evs) { events = evs; if (root.hidden || !host.hidden) { dirty = true; return; } render(); },
+    show() { events = store.state.events; if (host.hidden) { dirty = false; render(); } else dirty = true; },
   };
 }

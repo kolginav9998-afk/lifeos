@@ -43,7 +43,7 @@ export function createStressTab(k) {
             if (j === q.answer) { b.classList.add('right'); b.append(el('span', { class: 'dic-mark', 'aria-hidden': 'true', textContent: ' ✓' })); b.setAttribute('aria-label', `${b.getAttribute('aria-label')}, верный ответ`); }
             else if (j === idx) { b.classList.add('wrong'); b.append(el('span', { class: 'dic-mark', 'aria-hidden': 'true', textContent: ' ✕' })); b.setAttribute('aria-label', `${b.getAttribute('aria-label')}, твой ответ, неверно`); }
           });
-          fb.textContent = right ? `Верно: ${w.right}. ${w.hint}` : `Не совсем. Правильно: ${w.right}. ${w.hint}`;
+          fill(fb, right ? 'Верно. ' : 'Не совсем. Правильно: ', stressNode(w.right), ` (ударение на «${letterOf(w.right)}»). ${w.hint}`);
           next.hidden = false; next.focus({ preventScroll: true });
           announce(fb.textContent);
         }
@@ -55,9 +55,9 @@ export function createStressTab(k) {
         const n = answered;
         const sec = Math.round((performance.now() - t0) / 1000);
         let note = '';
-        if (n >= 1) {
+        if (n >= 3) {
           try { await k.save(makeDiction({ kind: 'stress', seconds: sec, items: n, ok, miss: missed, fixed })); note = 'Раунд записан.'; } catch (e) { note = `Раунд не записан: ${e.message.toLowerCase()}`; toast(e.message); }
-        } else note = 'Ни одного ответа: раунд не записан.';
+        } else note = 'Мало ответов: раунд не записан. Для записи ответь хотя бы на три вопроса.';
         api.set(el('div', { class: 'card bt-intro' },
           el('h3', { id: 'dic-s-fin-title', tabIndex: -1, textContent: `Верно ${ok} из ${n}` }),
           el('p', { id: 'dic-s-fin-note', textContent: `${note} Время: ${fmtClock(sec)}.` }),
