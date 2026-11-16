@@ -2,9 +2,11 @@
 // оценка, рекорд); викторина по ударениям; чтение вслух с измерителем слов в минуту; самооценка с динамикой; серия занятий; курс (мини-тест, отметка урока);
 // образец голоса (русский голос и честное сообщение, если его нет); окно тренажёра (роль, фокус, Escape). Время в тренажёрах прокручивается часами Playwright.
 import assert from 'node:assert/strict';
-import { launch, tab, until, appReady, waitText, waitCount, waitVisible, waitAttr, eventually } from './helpers.mjs';
+import fs from 'node:fs';
+import path from 'node:path';
+import { launch, tab, until, appReady, waitText, waitCount, waitVisible, eventually, root } from './helpers.mjs';
 
-const t = await launch({ ctxOptions: { serviceWorkers: 'block' } });
+const t = await launch({ ctxOptions: { serviceWorkers: 'block', bypassCSP: true } });
 const { page, errors } = t;
 // поддельный синтез речи: русский голос есть, вызовы записываются
 await page.addInitScript(() => {
@@ -22,6 +24,21 @@ const events = type => page.evaluate(async type => (await import('./store.js')).
 const run = ms => page.clock.runFor(ms);
 const dayShift = n => page.evaluate(async n => { const E = await import('./events.js'); return E.addDays(E.todayStr(), n); }, n);
 const noise = list => list.filter(x => !/Failed to load resource|Service Worker registration blocked/.test(x));
+
+// доступность: axe-core в светлой и тёмной теме на каждой вкладке и в каждом окне тренажёра; серьёзные нарушения и «исправленные» правила — ошибка
+const AXE = fs.readFileSync(path.join(root, 'node_modules/axe-core/axe.min.js'), 'utf8');
+const TAGS = ['wcag2a', 'wcag2aa', 'wcag21a', 'wcag21aa', 'wcag22aa', 'best-practice'];
+const ZERO_RULES = new Set(['heading-order', 'label', 'select-name', 'button-name', 'link-name', 'aria-required-parent', 'aria-allowed-role', 'aria-allowed-attr', 'landmark-one-main', 'region', 'landmark-unique', 'duplicate-id', 'duplicate-id-aria', 'list', 'listitem', 'scrollable-region-focusable', 'aria-hidden-focus', 'nested-interactive', 'label-content-name-mismatch', 'aria-required-children', 'aria-valid-attr-value']);
+const a11y = [];
+async function ax(label) {
+  if (!(await page.evaluate(() => typeof window.axe !== 'undefined'))) await page.addScriptTag({ content: AXE });
+  for (const theme of ['light', 'dark']) {
+    await page.emulateMedia({ colorScheme: theme, reducedMotion: 'reduce' }); await page.waitForTimeout(150);
+    const res = await page.evaluate(async tags => (await axe.run(document, { runOnly: { type: 'tag', values: tags }, resultTypes: ['violations'] })).violations.map(v => ({ id: v.id, impact: v.impact, nodes: v.nodes.map(n => `${n.target.join(' ')} ${(n.any[0] || n.all[0] || n.none[0] || {}).message || ''}`) })), TAGS);
+    for (const v of res) if (v.impact === 'serious' || v.impact === 'critical' || ZERO_RULES.has(v.id)) a11y.push(`${theme} / ${label}: [${v.impact}] ${v.id}: ${v.nodes.slice(0, 2).join(' | ')}`);
+  }
+  await page.emulateMedia({ colorScheme: 'light', reducedMotion: 'reduce' });
+}
 
 // ===== 1. Экран открывается, вкладки, честные границы =====
 await tab(page, 'diction');
@@ -50,16 +67,19 @@ assert.equal(await page.locator('#dic-routine .dic-block').count(), 3);
 await page.click('#dic-minutes .dic-min[data-min="15"]');
 assert.equal(await page.locator('#dic-routine .dic-block').count(), 5);
 await page.click('#dic-minutes .dic-min[data-min="10"]');
+await ax('сегодня');
 
 // ===== 3. Разминка: плеер с таймером удержания и счётчиком повторов =====
 await page.click('#dic-tab-warmup');
 assert.ok(await page.locator('.dic-ex').count() >= 20, 'упражнений около двадцати');
 await page.click('.dic-ex[data-ex="spade"] summary');
 assert.match(await text('.dic-ex[data-ex="spade"]'), /Типичные ошибки/);
+await ax('разминка: список');
 await page.click('#dic-sets .dic-set[data-set="min3"]');
 await waitVisible(page, '#dic-host');
 assert.deepEqual(await page.evaluate(() => { const d = document.getElementById('dic-host'); return [d.getAttribute('role'), d.getAttribute('aria-modal'), d.contains(document.activeElement), document.getElementById('tabs').inert]; }), ['dialog', 'true', true, true], 'окно тренажёра: роль, фокус внутри, остальное недоступно');
 assert.match(await text('#dic-ex-count'), /Повтор 1 из \d+/);
+await ax('плеер разминки');
 await page.keyboard.press('Escape');
 assert.equal(await page.locator('#dic-host').isVisible(), true, 'Escape не обрывает идущую разминку');
 for (let guard = 0; guard < 150; guard++) {
@@ -86,11 +106,13 @@ await page.click('#dic-w-close');
 await page.click('#dic-tab-breath');
 await page.click('#dic-presets .dic-preset[data-preset="sound-s"]');
 assert.match(await text('#dic-preset-hint'), /вдох 4 с, выдох 10 с/);
+await ax('дыхание');
 await page.click('#dic-lengths .dic-len[data-min="1"]');
 await page.click('#dic-breath-go');
 await waitVisible(page, '#dic-circle');
 await run(1000);
 assert.match(await text('#dic-br-left'), /Осталось 0:\d\d/);
+await ax('дыхание: окно');
 await run(25000);
 await page.click('#dic-stop');
 await waitText(page, '#dic-b-fin-title', 'Остановлено');
@@ -105,6 +127,7 @@ await page.click('#dic-tab-twisters');
 assert.equal(await page.locator('#dic-tw-list .dic-tw-pick').count(), 24, 'первая порция');
 await page.click('#dic-tw-more');
 assert.ok(await page.locator('#dic-tw-list .dic-tw-pick').count() > 24);
+await ax('скороговорки: список');
 await page.click('#dic-tw-groups .chip[data-group="hushing"]');
 assert.deepEqual(await page.locator('#dic-tw-letters .chip').allTextContents(), ['Любой', 'Ш', 'Ж', 'Ч', 'Щ']);
 await page.click('#dic-tw-letters .chip[data-sound="щ"]');
@@ -127,6 +150,7 @@ await page.click('#dic-tw-go'); await run(9000); await page.click('#dic-tw-go');
 assert.match(await text('#dic-tw-time'), /Время на 3 повтора: 9(,\d)? с/);
 assert.equal(await page.locator('#dic-tw-save').isDisabled(), true, 'без оценки сохранить нельзя');
 await page.click('.rating[data-field="clarity"] .rate[data-v="4"]');
+await ax('скороговорка: оценка');
 await page.click('#dic-tw-save');
 await waitText(page, '#dic-tw-saved', /Новый личный рекорд: быстро, чёткость 4 из 5/);
 const tws = await eventually(() => events('diction'), r => assert.ok(r.some(x => x.kind === 'twister')));
@@ -152,6 +176,7 @@ await page.click('#dic-t-close');
 
 // ===== 6. Ударения: викторина =====
 await page.click('#dic-tab-stress');
+await ax('ударения');
 await page.click('#dic-st-go');
 await waitVisible(page, '#dic-st-q');
 let okCount = 0;
@@ -164,6 +189,7 @@ for (let i = 0; i < 10; i++) {
   await opts.nth(i % 2).click();
   assert.match(await text('#dic-st-fb'), /^(Верно|Не совсем)/, 'ответ назван словами, а не только цветом');
   assert.equal(await page.locator('.dic-opt .dic-mark').count() >= 1, true);
+  if (i === 1) await ax('ударения: ответ');
   if ((await text('#dic-st-fb')).startsWith('Верно')) okCount++;
   await page.click('#dic-st-next');
 }
@@ -182,6 +208,7 @@ await page.selectOption('#dic-read-pick', 'rt08');
 const words = Number((await text('#dic-read-info')).match(/Слов: (\d+)/)[1]);
 assert.equal(words, 28);
 assert.ok(await page.locator('#dic-read-card .dic-pause').count() >= 5 && await page.locator('#dic-read-card .dic-emph').count() >= 1, 'паузы и ударения видны');
+await ax('чтение: текст');
 await page.click('#dic-read-marks');
 assert.equal(await page.locator('#dic-read-card .dic-pause').count(), 0, 'разметку можно скрыть');
 await page.click('#dic-read-open');
@@ -192,6 +219,7 @@ const pace = Number(wpmText.match(/^(\d+) слов/)[1]);
 assert.ok(pace >= 110 && pace <= 130, `темп ${pace} при 28 словах за 14 секунд (около 120)`);
 assert.match(await text('#dic-rd-band'), /^Комфортно\./);
 assert.match(await text('#dic-rd-result'), /ориентиры, а не норма/i);
+await ax('чтение: результат');
 await page.click('.rating[data-field="reading"] .rate[data-v="5"]');
 await page.click('#dic-rd-save');
 await waitText(page, '#dic-rd-saved', /Записано: \d+ слов в минуту, оценка 5 из 5/);
@@ -224,6 +252,7 @@ assert.equal(await page.locator('#dic-self-delta li').count(), 6);
 assert.match(await text('#dic-self-delta'), /Чёткость: 4 из 5, выросла на 2/);
 assert.match(await text('#dic-self-focus'), /Слабее всего: Интонация/);
 assert.match(await page.getAttribute('#dic-self-result svg.spark', 'aria-label'), /Средний балл по датам: 2,3, 3,5/);
+await ax('оценка');
 assert.equal(await page.locator('#dic-self-history .dic-hist').count(), 2);
 const self = await eventually(() => events('dictself'), r => assert.equal(r.length, 2));
 assert.deepEqual(self.find(x => x.note === 'Читаю ровнее').weak.includes('velar'), true);
@@ -253,11 +282,13 @@ assert.equal(await page.locator('#dic-mentor .prompt').count(), 3);
 await page.click('#dic-course-next');
 assert.equal(await page.getAttribute('.dic-lesson[data-lesson="di-01"]', 'open'), '');
 assert.match(await text('.dic-lesson[data-lesson="di-01"]'), /логопеду или к ЛОРу/);
+await ax('курс: урок');
 const first = await page.evaluate(async () => { const t = (await import('./academy.js')).trackById('diction'); return t.lessons[0].drills[0]; });
 await page.click('.dic-quiz-start[data-lesson="di-01"]');
 assert.equal(await text('.dic-quiz[data-lesson="di-01"] .quiz-q'), first.q);
 await page.locator('.dic-quiz[data-lesson="di-01"] .quiz-opt', { hasText: first.right }).first().click();
 assert.equal(await text('.dic-quiz[data-lesson="di-01"] .dic-fb'), 'Верно.');
+await ax('курс: мини-тест');
 await page.click('.dic-quiz[data-lesson="di-01"] .dic-quiz-next');
 await page.click('.dic-lesson[data-lesson="di-01"] [data-done="di-01"]');
 await waitText(page, '#dic-course-count', 'Пройдено уроков: 1 из 32');
@@ -266,6 +297,7 @@ assert.deepEqual([les[0].track, les[0].lesson], ['diction', 'di-01']);
 await tab(page, 'learn');
 assert.match(await text('.track-card[data-track="diction"]'), /Дикция: ясная речь[\s\S]*Уроки 1\/32/, 'курс виден и в «Учёбе»');
 
+assert.deepEqual(a11y, [], 'доступность:\n' + a11y.join('\n'));
 assert.deepEqual(noise(errors), [], 'нет ошибок в консоли:\n' + noise(errors).join('\n'));
 await t.close();
 console.log('E2E DICTION OK');

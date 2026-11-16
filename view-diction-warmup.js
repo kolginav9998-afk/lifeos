@@ -11,7 +11,7 @@ export function createWarmupTab(k) {
       el('summary', {}, el('strong', { textContent: ex.title }), el('span', { class: 'muted', textContent: ` · ${repsText(ex)}` })),
       el('ol', { class: 'plain' }, ...ex.steps.map(s => el('li', { textContent: s }))),
       el('p', { class: 'muted' }, el('strong', { textContent: 'Типичные ошибки: ' }), ex.mistakes.join(' ')),
-      el('button', { type: 'button', class: 'chip dic-ex-one', dataset: { ex: ex.id }, 'aria-label': `Сделать упражнение «${ex.title}»`, textContent: 'Сделать это упражнение', onclick: () => play([ex.id], ex.id) }));
+      el('button', { type: 'button', class: 'chip dic-ex-one', dataset: { ex: ex.id }, 'aria-label': `Сделать это упражнение: ${ex.title}`, textContent: 'Сделать это упражнение', onclick: () => play([ex.id], ex.id) }));
   }
 
   function render(panel) {
