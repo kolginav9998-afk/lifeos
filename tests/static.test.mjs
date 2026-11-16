@@ -107,7 +107,7 @@ test('replaceChildren не получает null: DOM рисует его как
 // Два экрана с одним и тем же id в разметке: тесты и вспомогательные технологии берут первый попавшийся (так «Учёба» и «Планы» однажды разделили goal-err).
 test('идентификаторы элементов не повторяются в разных файлах', () => {
   const root = path.resolve(import.meta.dirname, '..');
-  const seen = new Map(), DATA_KEYS = new Set(['empty', 'health']);               // не элементы: ключ данных и id курса
+  const seen = new Map(), DATA_KEYS = new Set(['empty', 'health', 'diction']);               // не элементы: ключ данных и id курса (health, diction)
   for (const f of fs.readdirSync(root).filter(x => x.endsWith('.js'))) {
     const src = fs.readFileSync(path.join(root, f), 'utf8');
     for (const m of src.matchAll(/\bid: '([a-zA-Z][\w-]*)'/g)) { if (!DATA_KEYS.has(m[1])) (seen.get(m[1]) ?? seen.set(m[1], new Set()).get(m[1])).add(f); }

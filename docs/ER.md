@@ -23,6 +23,8 @@ erDiagram
   day ||--o{ parked : "date"
   day ||--o{ speak : "date"
   day ||--o{ breath : "date"
+  day ||--o{ diction : "date"
+  day ||--o{ dictself : "date"
   day ||--o{ testrun : "date"
   day ||--o{ expense : "date"
   day ||--o{ income : "date"
@@ -42,7 +44,7 @@ erDiagram
 
 ## Записи по дням
 
-Эти типы привязаны к дню полем `date`: `checkin`, `diary`, `measure`, `workout`, `focus`, `thought`, `intention`, `dayreview`, `joy`, `ritual`, `parked`, `speak`, `breath`, `testrun`, `expense`, `income`, `medlog`, `habit_log`, `lesson`. Узел «day» условный: отдельной записи «день» нет, день — это просто дата.
+Эти типы привязаны к дню полем `date`: `checkin`, `diary`, `measure`, `workout`, `focus`, `thought`, `intention`, `dayreview`, `joy`, `ritual`, `parked`, `speak`, `breath`, `diction`, `dictself`, `testrun`, `expense`, `income`, `medlog`, `habit_log`, `lesson`. Узел «day» условный: отдельной записи «день» нет, день — это просто дата.
 
 ## Внутри записи (не отдельные типы)
 

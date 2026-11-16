@@ -1,6 +1,6 @@
 // Озвучка слов встроенным синтезом речи устройства. Без сети: текст никуда не отправляется.
 // Если на телефоне нет голоса для нужного языка, кнопка сообщит об этом, а не промолчит.
-export const LANG = { english: 'en-US', hebrew: 'he-IL' };
+export const LANG = { english: 'en-US', hebrew: 'he-IL', russian: 'ru-RU' };       // russian: образец речи для экрана «Дикция»
 const SCRIPT = { english: /[A-Za-z]/, hebrew: /[֐-׿]/ };
 const CYR = /[А-Яа-яЁё]/;
 
@@ -27,13 +27,13 @@ export function foreignSide(card, lang) {
 }
 
 // Произнести. Возвращает true, если запрос отправлен. onError вызывается, если голоса нет.
-export function speak(text, lang, onError = () => {}) {
+export function speak(text, lang, onError = () => {}, rate = 0.9) {
   if (!canSpeak() || !text) return false;
   try {
     const synth = globalThis.speechSynthesis;
     synth.cancel();
     const u = new globalThis.SpeechSynthesisUtterance(text);
-    u.lang = LANG[lang] ?? lang; u.rate = 0.9;
+    u.lang = LANG[lang] ?? lang; u.rate = rate;
     u.onerror = e => { if (e?.error && e.error !== 'canceled' && e.error !== 'interrupted') onError(e.error); };
     synth.speak(u);
     return true;

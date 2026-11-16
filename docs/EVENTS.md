@@ -4,7 +4,7 @@ _Файл создан из `registry.js` и сверяется с ним тес
 
 Все данные Life OS — журнал событий `{id, type, ts, payload, source, confidence, evidence}`. Новые типы только добавляются; записи прошлых версий читаются всегда, а незнакомые типы сохраняются и не мешают.
 
-Всего типов: 47. «В выгрузке» — попадают ли данные этой записи в ZIP для аналитики (числа и отметки, названия привычек и упражнений). Тексты дневника, заметок, мыслей и решений, а также деньги в выгрузку не входят.
+Всего типов: 49. «В выгрузке» — попадают ли данные этой записи в ZIP для аналитики (числа и отметки, названия привычек и упражнений). Тексты дневника, заметок, мыслей и решений, а также деньги в выгрузку не входят.
 
 ## Дела
 
@@ -71,6 +71,8 @@ _Файл создан из `registry.js` и сверяется с ним тес
 | `srs` | Состояние карточки | card, box, due, first, last, reps, lapses, hist | учёба | да | `srs.js` |
 | `speak` | Говорение вслух | date, lang, seconds, minutes, topic | учёба | нет | `speaking.js` |
 | `skill` | Навык (что умею) | title, area, level, date, source, ref, evidence, note | учёба | нет | `skills.js` |
+| `diction` | Занятие по дикции | date, kind (warmup|breath|twister|stress|reading), seconds, minutes, items, rating, ref, groups, wpm, tempo, ok, miss, fixed | учёба | да | `diction.js` |
+| `dictself` | Самооценка речи (дикция) | date, scores (clarity, tempo, volume, intonation, pauses, fillers: 1–5), note, weak | учёба | нет | `diction.js` |
 | `learngoal` | Недельная цель по курсу (минуты) | track, minutes | учёба | нет | `practice.js` |
 | `ucard` | Своя карточка | q, a, hint | личный текст | нет | `academy.js` |
 | `zcheck` | Проверка урока «с нуля» | track, lesson, kind (quiz|surprise|placement), n, ok, hints, date | учёба | да | `curriculum.js` |

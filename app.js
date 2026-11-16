@@ -24,6 +24,7 @@ import { createDiaryView } from './view-diary.js';
 import { createHealthView } from './view-health.js';
 import { createLearnView } from './view-learn.js';
 import { createZeroView } from './view-zero.js';
+import { createDictionView } from './view-diction.js';
 import { openLessonIds } from './curriculum.js';
 import { createSkillsView } from './view-skills.js';
 import { createWorkoutsView } from './view-workouts.js';
@@ -53,6 +54,7 @@ const DEFS = [
   { id: 'reflect', group: 'diary', title: 'Рефлексия', sub: 'Рефлексия', make: () => createReflectView() },
   { id: 'learn', group: 'grow', title: 'Учёба', sub: 'Учёба', make: ctx => createLearnView(ctx) },
   { id: 'zero', group: 'grow', title: 'С нуля', sub: 'С нуля', make: () => createZeroView() },
+  { id: 'diction', group: 'grow', title: 'Дикция', sub: 'Дикция', make: ctx => createDictionView(ctx) },
   { id: 'skills', group: 'grow', title: 'Навыки', sub: 'Навыки', make: () => createSkillsView() },
   { id: 'tests', group: 'grow', title: 'Проверка', sub: 'Тесты', make: () => createTestsView() },
   { id: 'insights', group: 'grow', title: 'Аналитика', sub: 'Аналитика', make: () => createInsightsView() },
@@ -75,7 +77,7 @@ const MODE_OF = { learn: 'learn', tests: 'learn', skills: 'learn', zero: 'learn'
 const FOCUS_TAB = { task: 'today', habit: 'habits', expense: 'money', note: 'notes', diary: 'diary', measure: 'health' };
 
 // Простой режим: меньше вкладок и экранов, только самое нужное. Остальные экраны по-прежнему открываются из чипов и поиска.
-const SIMPLE_VIEWS = new Set(['today', 'habits', 'diary', 'health', 'notes', 'more', 'account', 'help', 'zero']);
+const SIMPLE_VIEWS = new Set(['today', 'habits', 'diary', 'health', 'notes', 'more', 'account', 'help', 'zero', 'diction']);
 const visibleDefs = () => (getPref('simple') ? DEFS.filter(d => SIMPLE_VIEWS.has(d.id)) : DEFS);
 
 // ---------- тема ----------

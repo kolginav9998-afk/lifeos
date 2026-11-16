@@ -37,6 +37,8 @@ export const REGISTRY = {
   srs: { label: 'Состояние карточки', group: 'Учёба', module: 'srs.js', privacy: 'learning', analytics: true, fields: 'card, box, due, first, last, reps, lapses, hist' },
   speak: { label: 'Говорение вслух', group: 'Учёба', module: 'speaking.js', privacy: 'learning', analytics: false, fields: 'date, lang, seconds, minutes, topic' },
   skill: { label: 'Навык (что умею)', group: 'Учёба', module: 'skills.js', privacy: 'learning', analytics: false, fields: 'title, area, level, date, source, ref, evidence, note' },
+  diction: { label: 'Занятие по дикции', group: 'Учёба', module: 'diction.js', privacy: 'learning', analytics: true, fields: 'date, kind (warmup|breath|twister|stress|reading), seconds, minutes, items, rating, ref, groups, wpm, tempo, ok, miss, fixed' },
+  dictself: { label: 'Самооценка речи (дикция)', group: 'Учёба', module: 'diction.js', privacy: 'learning', analytics: false, fields: 'date, scores (clarity, tempo, volume, intonation, pauses, fillers: 1–5), note, weak' },
   learngoal: { label: 'Недельная цель по курсу (минуты)', group: 'Учёба', module: 'practice.js', privacy: 'learning', analytics: false, fields: 'track, minutes' },
   ucard: { label: 'Своя карточка', group: 'Учёба', module: 'academy.js', privacy: 'text', analytics: false, fields: 'q, a, hint' },
   zcheck: { label: 'Проверка урока «с нуля»', group: 'Учёба', module: 'curriculum.js', privacy: 'learning', analytics: true, fields: 'track, lesson, kind (quiz|surprise|placement), n, ok, hints, date' },
@@ -89,7 +91,7 @@ export const RELATIONS = [
   ['lesson', 'lessonnote', 'lesson', 'конспект к пройденному уроку'],
 ];
 // Типы, привязанные к календарному дню полем date (в диаграмме идут от узла «день»).
-export const BY_DAY = ['checkin', 'diary', 'measure', 'workout', 'focus', 'thought', 'intention', 'dayreview', 'joy', 'ritual', 'parked', 'speak', 'breath', 'testrun', 'expense', 'income', 'medlog', 'habit_log', 'lesson'];
+export const BY_DAY = ['checkin', 'diary', 'measure', 'workout', 'focus', 'thought', 'intention', 'dayreview', 'joy', 'ritual', 'parked', 'speak', 'breath', 'diction', 'dictself', 'testrun', 'expense', 'income', 'medlog', 'habit_log', 'lesson'];
 
 export function erMarkdown() {
   const L = ['# Связи между данными (ER-диаграмма)', '', '_Файл создан из `registry.js` (`RELATIONS` и `BY_DAY`) и сверяется с ним тестом: правь реестр, а не этот файл._', '',

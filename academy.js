@@ -11,6 +11,7 @@ import analyst from './c-analyst.js';
 import engineer from './c-engineer.js';
 import health from './c-health.js';
 import ai from './c-ai.js';
+import diction from './c-diction.js';
 import { LESSON_GOALS } from './c-goals.js';
 import { summary, srsId, buildQueue, newState, isDue, MASTERED_BOX } from './srs.js';
 import { daysBetween } from './events.js';
@@ -18,7 +19,7 @@ import { isSick } from './sick.js';
 import { makeRng } from './stats.js';
 
 const english = { ...englishBase, deck: [...(englishBase.deck || []), ...englishWords] };   // колода слов лежит в отдельном файле (бюджет размера файла)
-export const TRACKS = [english, hebrew, health, ai, backend, data, analyst, engineer, enzero, hezero, hebib];   // маршруты «с нуля» (zero: true) идут в конце; на экране «С нуля» их порядок свой
+export const TRACKS = [english, hebrew, health, ai, backend, data, analyst, engineer, enzero, hezero, hebib, diction];   // маршруты «с нуля» (zero: true) идут в конце; на экране «С нуля» их порядок свой
 export const trackById = id => TRACKS.find(t => t.id === id) || null;
 const OWN_GOALS = new Map(TRACKS.flatMap(t => t.lessons.filter(l => l.goal).map(l => [l.id, l.goal])));   // у курсов «с нуля» цель лежит в самом уроке
 export const lessonGoal = id => LESSON_GOALS[id] ?? OWN_GOALS.get(id) ?? '';           // «после урока я смогу…»
