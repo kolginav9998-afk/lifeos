@@ -97,7 +97,7 @@ export function iqRunners(api) {
           modeBtn.textContent = 'Ввести число самому'; modeBtn.setAttribute('aria-expanded', 'false');
         };
         const showTyping = () => {
-          const kp = keypad(v => answer(Number(v), true), h, { maxLen: 6, display: el('div', { class: 'kp-out', id: 'kp-out', role: 'status', 'aria-label': 'Введённое число' }) });
+          const kp = keypad(v => answer(Number(v), true), h, { maxLen: 6, display: el('div', { class: 'kp-out', id: 'sq-out', role: 'status', 'aria-label': 'Введённое число' }) });
           area.replaceChildren(kp.out, kp.grid);
           modeBtn.textContent = 'Выбрать из вариантов'; modeBtn.setAttribute('aria-expanded', 'true');
         };
@@ -107,7 +107,7 @@ export function iqRunners(api) {
         showOptions();
         set('seq12', 'run', el('div', { id: 'sq-item', class: 'iq-item', dataset: { seed: String(item.seed), i: String(i), level: String(item.level) } }, heading,
           el('p', { class: 'muted', textContent: 'Время не ограничено. Какое число стоит на месте знака вопроса?' }),
-          el('div', { class: 'bt-problem', id: 'bt-series', textContent: `${item.terms.join(',  ')},  ?` }), area, el('div', { class: 'row mx-actions' }, modeBtn, idk)));
+          el('div', { class: 'bt-problem', id: 'sq-terms', textContent: `${item.terms.join(',  ')},  ?` }), area, el('div', { class: 'row mx-actions' }, modeBtn, idk)));
         focusNode(heading);
       });
       trials.push({ i, level: item.level, correct: r.val === item.answer, rt: r.rt, val: r.val, typed: r.typed });

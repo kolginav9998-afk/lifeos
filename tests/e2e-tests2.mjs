@@ -81,7 +81,7 @@ for (let i = 0; i < 12; i++) {
   const { seed, level } = await page.evaluate(() => ({ ...document.getElementById('sq-item').dataset }));
   const item = await page.evaluate(async ([s, l]) => { const x = (await import('./iq-series.js')).makeSeriesItem(Number(s), Number(l)); return { answer: x.answer, options: x.options, terms: x.terms }; }, [seed, level]);
   if (i === 0) {
-    assert.equal(await text('#bt-series'), `${item.terms.join(',  ')},  ?`, 'ряд показан текстом');
+    assert.equal(await text('#sq-terms'), `${item.terms.join(',  ')},  ?`, 'ряд показан текстом');
     assert.equal(await page.locator('.series-opt').count(), 6);
     assert.ok(await noScroll(), 'ряд без горизонтальной прокрутки при 320 px');
     assert.equal(await page.getAttribute('#sq-mode', 'aria-expanded'), 'false');
@@ -91,7 +91,7 @@ for (let i = 0; i < 12; i++) {
     await page.click('#sq-mode');
     assert.equal(await page.getAttribute('#sq-mode', 'aria-expanded'), 'true');
     for (const ch of String(item.answer)) await page.click(`#kp-${ch}`);
-    await waitText(page, '#kp-out', String(item.answer));
+    await waitText(page, '#sq-out', String(item.answer));
     await page.click('#kp-ok');
   } else {
     const v = i === 2 ? item.options.find(o => o !== item.answer) : item.answer;
