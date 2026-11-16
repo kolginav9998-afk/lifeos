@@ -1,6 +1,7 @@
 // Ежедневная проверка: реестр тестов, планы, правила достоверности и запись результата.
 // Тесты нужны для сравнения тебя с самим собой во времени, а не для оценки интеллекта или диагноза.
 import { round } from './stats.js';
+import { IQ_TESTS, IQ_STEPS, IQ_VALID, IQ_PLANS } from './iq-registry.js';
 
 export const DOMAINS = {
   speed: 'Скорость', attention: 'Внимание', control: 'Самоконтроль', memory: 'Память',
@@ -42,6 +43,7 @@ export const TESTS = [
   { id: 'recall', title: 'Проверка знаний', domain: 'learning', minutes: 1, desc: 'Вопросы из твоих курсов: помнишь ли выученное.',
     primary: { key: 'accuracy', label: 'Верных ответов', unit: '%', better: 'higher', digits: 0, scale: 100 },
     metrics: { n: 'Вопросов', correct: 'Верно', accuracy: 'Точность', meanMs: 'Среднее время, мс' } },
+  ...IQ_TESTS,                       // задачи на логику, память и скорость: описаны в iq-registry.js
 ];
 export const TEST_BY_ID = Object.fromEntries(TESTS.map(t => [t.id, t]));
 
@@ -53,12 +55,14 @@ export const PLANS = {
   full: { id: 'full', title: 'Полная проверка', about: 'около 12 минут', steps: [
     { id: 'wordsLearn', n: 12 }, { id: 'reaction', n: 8 }, { id: 'gonogo', n: 32 }, { id: 'stroop', n: 24 }, { id: 'digits', max: 10 }, { id: 'nback', n: 2, length: 24 },
     { id: 'schulte', size: 25 }, { id: 'series', n: 8 }, { id: 'math', seconds: 90 }, { id: 'time', targets: [5000, 10000, 15000] }, { id: 'recall', n: 10 }, { id: 'wordsRecall' }] },
+  ...IQ_PLANS,
 };
 export function singlePlan(testId) {
   const full = PLANS.full.steps.find(s => s.id === testId);
   if (testId === 'words') return { id: `single:words`, title: 'Слова: узнавание', about: 'около 2 минут', steps: [{ id: 'wordsLearn', n: 10 }, { id: 'digits', max: 6 }, { id: 'wordsRecall' }] };
-  if (!full || !TEST_BY_ID[testId]) throw new Error('unknown test');
-  return { id: `single:${testId}`, title: TEST_BY_ID[testId].title, about: 'около минуты', steps: [{ ...full }] };
+  const step = full ?? IQ_STEPS[testId];
+  if (!step || !TEST_BY_ID[testId]) throw new Error('unknown test');
+  return { id: `single:${testId}`, title: TEST_BY_ID[testId].title, about: `около ${TEST_BY_ID[testId].minutes <= 1 ? 'минуты' : TEST_BY_ID[testId].minutes + ' минут'}`, steps: [{ ...step }] };
 }
 
 // ---------- значения ----------
@@ -104,7 +108,7 @@ export function validity(testId, m) {
     case 'schulte': if (!(m.n >= 9)) return bad('таблица не пройдена'); break;
     case 'time': if (!(m.n >= 2)) return bad('мало попыток'); break;
     case 'recall': if (!(m.n >= 4)) return bad('мало вопросов'); break;
-    default: break;
+    default: { const why = IQ_VALID[testId]?.(m); if (why) return bad(why); }
   }
   return { ok: true };
 }

@@ -14,7 +14,7 @@ const text = sel => page.textContent(sel);
 await tab(page, 'tests');
 assert.equal(await text('#title'), 'Проверка');
 assert.deepEqual(await page.locator('#subnav button').allTextContents(), ['Учёба', 'С нуля', 'Дикция', 'Навыки', 'Тесты', 'Аналитика', 'Цели']);
-assert.equal(await page.locator('.test-row').count(), 11);
+assert.equal(await page.locator('.test-row').count(), await page.evaluate(async () => (await import('./bt-core.js')).TESTS.length), 'в списке есть все тесты');
 assert.match(await text('#bt-status'), /ещё не проходил/);
 
 // управляемое время: часы ставим после загрузки и останавливаем

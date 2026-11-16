@@ -9,7 +9,8 @@ export class Aborted extends Error {}
 const now = () => performance.now();
 
 // host — контейнер окна. history: { recentWords: [...] } (чтобы слова не повторялись), cards: { started: [...], pool: [...] } для проверки знаний.
-export function createRunner(host, { history = {}, cards = { started: [], pool: [] }, seed = Date.now() } = {}) {
+// extra — список фабрик (api) => ({ идентификатор шага: async функция }): так подключаются тесты из view-tests-run-*.js.
+export function createRunner(host, { history = {}, cards = { started: [], pool: [] }, seed = Date.now(), extra = [] } = {}) {
   const rng = makeRng(seed);
   const pending = new Set();
   let aborted = false;
@@ -43,10 +44,12 @@ export function createRunner(host, { history = {}, cards = { started: [], pool: 
 
   // ---------- общие экраны ----------
   const button = (text, id, onclick) => el('button', { type: 'button', id, class: 'primary big-btn', textContent: text, onclick });
-  function intro(test, title, lines, btn = 'Начать') {
+  // skip — подпись второй кнопки «Пропустить тест» (для зрительных заданий): тогда вернётся 'skip'.
+  function intro(test, title, lines, btn = 'Начать', { skip = '' } = {}) {
     return waitFor((done, h) => {
       const go = button(btn, 'bt-go', () => done());
-      set(test, 'intro', el('div', { class: 'card bt-intro' }, el('h3', { textContent: title }), ...lines.map(l => el('p', { textContent: l })), go));
+      const skipBtn = skip ? el('button', { type: 'button', id: 'bt-skip', textContent: skip, onclick: () => done('skip') }) : null;
+      set(test, 'intro', el('div', { class: 'card bt-intro' }, el('h3', { id: 'bt-intro-h', tabIndex: -1, textContent: title }), ...lines.map(l => el('p', { textContent: l })), go, skipBtn));
       h.on(host, 'keydown', e => { if (e.key === 'Enter') { e.preventDefault(); done(); } });
     });
   }
@@ -335,7 +338,10 @@ export function createRunner(host, { history = {}, cards = { started: [], pool: 
     return { metrics: L.scoreRecall(trials), trials };
   }
 
-  const RUNNERS = { reaction, gonogo, stroop, digits, nback, wordsLearn, wordsRecall, math, series, schulte, time, recall };
+  // Нажатие мышью, пальцем или с клавиатуры (Enter, пробел): время берём в момент касания, а клавиатурное нажатие приходит как click без касания (detail 0).
+  const tap = (h, node, fn) => { h.on(node, 'pointerdown', e => { e.preventDefault(); fn(e); }); h.on(node, 'click', e => { if (e.detail === 0) fn(e); }); };
+  const api = { rng, now, waitFor, sleep, set, intro, countdown, keypad, button, tap, shared, history, host, stage, isAborted: () => aborted };
+  const RUNNERS = { reaction, gonogo, stroop, digits, nback, wordsLearn, wordsRecall, math, series, schulte, time, recall, ...Object.assign({}, ...extra.map(make => make(api))) };
 
   // ---------- сценарий ----------
   // plan.steps выполняются по очереди. Возвращает { results, state, aborted, durationMs }.

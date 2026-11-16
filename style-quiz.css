@@ -1,1 +1,35 @@
-/* Новые тесты и задания на логику. Подключается после style-diction.css (см. index.html). */
+/* Новые тесты и задания на логику. Подключается после style-diction.css (см. index.html). Цвета только через токены из style.css. */
+
+/* ---- список тестов по группам ---- */
+.tg-title{margin:14px 0 2px;font-size:1.05rem}
+.tg-note{margin:0 0 6px}
+.test-row .what{margin:6px 0 2px}
+.test-row .what summary{cursor:pointer;color:var(--accent);font-size:.9rem;min-height:32px;display:flex;align-items:center}
+.test-row .what p{margin:4px 0}
+.tr-time{opacity:.9}
+
+/* ---- общее для заданий на логику ---- */
+.iq-item,.mx-item{display:flex;flex-direction:column;gap:12px}
+.iq-item h3:focus,.mx-item h3:focus{outline:none}
+.iq-tag{align-self:flex-start;font-size:.8rem;padding:2px 10px;border-radius:999px;background:var(--soft);color:var(--muted);font-weight:600}
+.iq-q{font-size:1.2rem;font-weight:700;line-height:1.4;margin:0;overflow-wrap:anywhere}
+.mx-actions{flex-wrap:wrap;justify-content:space-between}
+.mx-actions .primary{flex:1 1 160px}
+.mx-actions .link{min-height:48px}
+
+/* ---- матрицы ---- */
+.mx-board{width:100%;max-width:340px;height:auto;margin:0 auto;display:block}
+.mx-cell{fill:var(--card);stroke:var(--line);stroke-width:2}
+.mx-miss{stroke:var(--accent);stroke-dasharray:6 4}
+.mx-q{font-size:60px;font-weight:800;fill:var(--accent)}
+.mx-s{stroke:var(--text);stroke-width:3;stroke-linejoin:round}
+.mx-f0{fill:none}
+.mx-f1{fill:var(--text);fill-opacity:.38}
+.mx-f2{fill:var(--text)}
+.mx-dot{fill:var(--muted);opacity:.5}
+.mx-opts{display:grid;grid-template-columns:repeat(3,1fr);gap:8px}
+.mx-opt{position:relative;min-height:88px;padding:8px 4px 4px;border-radius:var(--r12);border:2px solid var(--line);background:var(--card);display:grid;place-items:center;touch-action:manipulation}
+.mx-opt svg{width:100%;max-width:84px;height:auto;display:block}
+.mx-opt[aria-pressed=true]{border-color:var(--accent);box-shadow:0 0 0 2px var(--accent);background:var(--soft)}
+.mx-n{position:absolute;top:3px;left:8px;font-weight:700;font-size:.85rem;color:var(--muted)}
+.mx-opt[aria-pressed=true] .mx-n::after{content:" \2713"}

@@ -1,12 +1,13 @@
 // Экран «Тесты»: запуск ежедневной проверки (быстрой, полной, отдельных тестов), результаты и история.
-import { normBand } from './bt-extra.js';
-import { el, toast, sparkline, dateRu } from './ui.js';
+import { el, toast, dateRu, announce } from './ui.js';
 import { todayStr } from './events.js';
 import * as store from './store.js';
 import { isNative } from './platform.js';
 import { VERSION } from './version.js';
-import { PLANS, singlePlan, TESTS, TEST_BY_ID, makeRun, makeRunEvent, runsOf, runId, fmtPrimary, fmtMetric, setEffort, EFFORT_LABEL } from './bt-core.js';
-import { analyzeRuns, zText, zWord, selfCompare, bestResult } from './bt-analytics.js';
+import { PLANS, TESTS, TEST_BY_ID, makeRun, makeRunEvent, runsOf, runId, fmtPrimary, fmtMetric, setEffort, EFFORT_LABEL } from './bt-core.js';
+import { analyzeRuns, zText, zWord, selfCompare } from './bt-analytics.js';
+import { renderTestList } from './view-tests-list.js';
+import { iqRunners } from './view-tests-run-iq.js';
 import { createRunner } from './bt-ui.js';
 import { cardPool, statesOf } from './academy.js';
 import { studyStreak } from './srs.js';
@@ -48,16 +49,6 @@ export function createTestsView() {
       el('p', { class: 'hint', textContent: 'Лучше проходить в тишине, примерно в одно и то же время и не торопиться: цель — сравнивать себя с собой.' }),
       vsLine(today));
 
-    const list = TESTS.map(t => {
-      const s = an.perTest[t.id];
-      return el('div', { class: 'entry test-row', dataset: { test: t.id } },
-        el('div', { class: 'grow' }, el('strong', { textContent: t.title }), el('div', { class: 'muted', textContent: t.desc }),
-          s.latest ? el('div', { class: 'muted', textContent: `последний: ${fmtPrimary(t.id, { [t.primary.key]: s.latest.value / (t.primary.scale ?? 1) })}` }) : null,
-          (() => { const b = bestResult(runs, t.id); return b && b.n >= 3 ? el('div', { class: 'muted test-record', textContent: `рекорд: ${fmtPrimary(t.id, { [t.primary.key]: b.value / (t.primary.scale ?? 1) })} (${dateRu(b.date)})` }) : null; })()),
-        s.series.length > 1 ? sparkline(s.series.map(p => (t.primary.better === 'lower' ? -p.value : p.value)), { width: 70, height: 28, band: normBand(t, s.baseline) }) : null,
-        el('button', { type: 'button', class: 'chip', id: `bt-single-${t.id}`, textContent: 'Пройти', onclick: () => start(singlePlan(t.id)) }));
-    });
-
     const history = runs.slice(-10).reverse().map(r => {
       const a = an.perRun.find(x => x.startedAt === r.startedAt);
       const tests = Object.entries(r.tests);
@@ -76,7 +67,7 @@ export function createTestsView() {
       d.addEventListener('toggle', () => { if (d.open) openRuns.add(r.startedAt); else openRuns.delete(r.startedAt); });
       return d;
     });
-    mount(head, el('h2', { textContent: 'Отдельные тесты' }), el('div', { class: 'list' }, ...list),
+    mount(head, ...renderTestList({ runs, an, start }),
       history.length ? el('h2', { textContent: 'История' }) : null, ...history,
       el('p', { class: 'muted', textContent: 'Это не медицинская диагностика и не IQ-тест. Результаты нужны, чтобы видеть свою динамику и находить связи со сном, нагрузкой и привычками.' }));
   }
@@ -89,7 +80,7 @@ export function createTestsView() {
       const pool = cardPool(events), byId = new Map(pool.map(c => [c.id, c]));
       const started = statesOf(events).filter(s => s.box >= 1).map(s => byId.get(s.card)).filter(Boolean);
       const recentWords = runsOf(events).slice(-5).flatMap(r => r.tests.words?.extra?.words ?? []);
-      runner = createRunner(host, { history: { recentWords }, cards: { started, pool } });
+      runner = createRunner(host, { history: { recentWords }, cards: { started, pool }, extra: [iqRunners] });
       host.focus({ preventScroll: true });
       const out = await runner.runPlan(plan);
       if (!Object.keys(out.results).length) { runner.close(); toast(out.aborted ? 'Проверка прервана, результатов нет' : 'Результатов нет'); return; }
@@ -133,6 +124,7 @@ export function createTestsView() {
               try { await store.save(setEffort(ev, v)); for (const b of e.target.parentElement.children) b.setAttribute('aria-pressed', String(b.dataset.v === String(v))); } catch (x) { toast(x.message); }
             } }))))),
       el('button', { type: 'button', id: 'bt-done', class: 'primary big-btn', textContent: 'Готово', onclick: () => { runner.close(); runner = null; running = false; render(); } }));
+    announce(payload.aborted ? 'Проверка прервана, сохранено то, что пройдено. Результаты на экране.' : 'Проверка закончена. Результаты на экране.');
   }
 
   return {
