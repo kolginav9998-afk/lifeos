@@ -13,14 +13,14 @@ export function createEditWindow(H) {
 
   const field = (label, input) => el('label', { class: 'field' }, el('span', { textContent: label }), input);
   const text = (name, label, { max = 40, list, ph = '', inputMode } = {}) => {
-    const i = el('input', { type: 'text', maxLength: max, autocomplete: 'off', placeholder: ph, inputMode });
+    const i = el('input', { id: `hm-f-${name}`, type: 'text', maxLength: max, autocomplete: 'off', placeholder: ph, inputMode });
     if (list) i.setAttribute('list', list);
     F[name] = i;
     return field(label, i);
   };
-  const num = (name, label, min, max) => { const i = el('input', { type: 'number', inputMode: 'numeric', min, max, step: 1 }); F[name] = i; return field(label, i); };
-  const date = (name, label) => { const i = el('input', { type: 'date' }); F[name] = i; return field(label, i); };
-  const select = (name, label, pairs) => { const s = el('select', {}, ...opts(pairs)); F[name] = s; return field(label, s); };
+  const num = (name, label, min, max) => { const i = el('input', { id: `hm-f-${name}`, type: 'number', inputMode: 'numeric', min, max, step: 1 }); F[name] = i; return field(label, i); };
+  const date = (name, label) => { const i = el('input', { id: `hm-f-${name}`, type: 'date' }); F[name] = i; return field(label, i); };
+  const select = (name, label, pairs) => { const s = el('select', { id: `hm-f-${name}` }, ...opts(pairs)); F[name] = s; return field(label, s); };
 
   const setValues = f => {
     const c = f.care ?? defaultCare(f.kind ?? 'clothes');
@@ -69,7 +69,7 @@ export function createEditWindow(H) {
     err = el('p', { class: 'error', id: 'hm-edit-err', role: 'alert' });
     const name = text('name', 'Название', { max: 80, ph: 'Например: куртка зимняя' });
     F.name.required = true; F.name.setAttribute('aria-required', 'true');
-    const kind = select('kind', 'Вид вещи', KINDS), note = el('textarea', { rows: 3, maxLength: 500 });
+    const kind = select('kind', 'Вид вещи', KINDS), note = el('textarea', { id: 'hm-f-note', rows: 3, maxLength: 500 });
     F.note = note;
     F.kind.onchange = () => { if (mode === 'add' && !careTouched) { const c = defaultCare(F.kind.value); F.how.value = c.how; F.temp.value = c.temp ?? ''; F.wears.value = c.washEveryWears ?? ''; F.days.value = c.washEveryDays ?? ''; syncCare(); } };
     const places = el('datalist', { id: 'hm-places' }, ...placesOf(H.model().items).map(p => el('option', { value: p })));
