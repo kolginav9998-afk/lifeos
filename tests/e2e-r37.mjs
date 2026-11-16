@@ -1,14 +1,14 @@
 // R3.7: озвучка слов, говорение вслух, экзамен-режим, мини-квиз, письмо и др.
 import assert from 'node:assert/strict';
 import fs from 'node:fs';
-import { launch, tab, until } from './helpers.mjs';
+import { launch, tab, until, appReady, waitToast, waitText, eventually } from './helpers.mjs';
 
 const t = await launch();
 const { page, errors } = t;
 await page.goto(t.url);
-await until(page, () => !document.getElementById('app').hidden);
+await appReady(page);
 const text = sel => page.textContent(sel);
-const toast = async re => until(page, r => new RegExp(r).test(document.getElementById('toast').textContent), re.source);
+const toast = re => waitToast(page, re);
 const evs = type => page.evaluate(async ty => (await import('./store.js')).state.events.filter(e => e.type === ty), type);
 
 // ---------- учёба: говорение вслух ----------
@@ -31,7 +31,7 @@ assert.equal(await page.locator('#speak-host').isHidden(), true);
 // запущенная сессия переживает перезапуск и дописывается, когда время вышло
 await page.evaluate(() => localStorage.setItem('lifeos.speak.run', JSON.stringify({ startedAt: Date.now() - 400000, minutes: 5, lang: 'english', topic: 'Расскажи о дне' })));
 await page.reload();
-await until(page, () => !document.getElementById('app').hidden);
+await appReady(page);
 await until(page, () => document.getElementById('speak-result'));            // экран «Учёба» открылся сам и дописал сессию
 assert.equal(await text('#speak-result'), 'Записано');
 const sp = (await evs('speak'))[0];
@@ -111,7 +111,7 @@ await page.click('#ci-m-save'); await toast(/Утро сохранено/);
 const cm = (await evs('checkin')).find(e => e.payload.slot === 'm');
 assert.equal(cm.payload.noise, true); assert.equal(cm.payload.worry, true); assert.equal('lateMeal' in cm.payload, false, 'невыбранное не записывается');
 await page.reload();
-await until(page, () => !document.getElementById('app').hidden);
+await appReady(page);
 await tab(page, 'diary');
 await page.locator('#ci-m').evaluate(d => { d.open = true; });
 await until(page, () => document.getElementById('ci-mflag-noise').checked);
@@ -127,19 +127,18 @@ await until(page, () => !document.getElementById('hint-caffeine'));
 
 // ---------- вечерний ритуал ----------
 await tab(page, 'reflect');
-assert.match(await text('#rit-progress'), /Сделано: 0 из 6/);
+await waitText(page, '#rit-progress', /Сделано: 0 из 6/);
 await page.check('#rit-screen'); await page.check('#rit-plan');
-assert.match(await text('#rit-progress'), /Сделано: 2 из 6/);
-await page.waitForFunction(() => import('./store.js').then(m => m.state.events.some(e => e.type === 'ritual' && e.payload.steps.length === 2)));    // ждём вторую отметку, а не первую запись
-assert.deepEqual((await evs('ritual'))[0].payload.steps, ['screen', 'plan']);
+await waitText(page, '#rit-progress', /Сделано: 2 из 6/);
+await eventually(() => evs('ritual'), v => { assert.equal(v.length, 1); assert.deepEqual(v[0].payload.steps, ['screen', 'plan']); });          // ждём вторую отметку, а не первую запись
 await page.reload();
-await until(page, () => !document.getElementById('app').hidden);
+await appReady(page);
 await tab(page, 'reflect');
 await until(page, () => document.getElementById('rit-screen')?.checked);
 assert.equal(await page.isChecked('#rit-plan'), true); assert.equal(await page.isChecked('#rit-prep'), false);
 await page.uncheck('#rit-screen'); await page.uncheck('#rit-plan');
-await page.waitForFunction(() => import('./store.js').then(m => !m.state.events.some(e => e.type === 'ritual')));
-assert.match(await text('#rit-progress'), /Сделано: 0 из 6/, 'без отметок запись удаляется');
+await eventually(() => evs('ritual'), v => assert.equal(v.length, 0, 'без отметок запись удаляется'));
+await waitText(page, '#rit-progress', /Сделано: 0 из 6/);
 
 // ---------- заготовки: привычки и заметка с покупками ----------
 await tab(page, 'habits');

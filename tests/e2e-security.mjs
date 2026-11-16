@@ -1,6 +1,6 @@
 import assert from 'node:assert/strict';
 import fs from 'node:fs';
-import { launch, tab, until, rawDisk, ymd } from './helpers.mjs';
+import { launch, tab, until, rawDisk, ymd, appReady, retry } from './helpers.mjs';
 
 const SECRET_TASK = 'секретная задача про зарплату';
 const SECRET_NOTE = 'пароль от сейфа 4815162342';
@@ -10,7 +10,7 @@ async function fresh(opts) {
   const t = await launch(opts);
   t.page.on('dialog', d => d.accept());
   await t.page.goto(t.url);
-  await until(t.page, () => !document.getElementById('app').hidden);
+  await appReady(t.page);
   return t;
 }
 const text = (page, sel) => page.textContent(sel);
@@ -138,7 +138,7 @@ assert.equal(await page.getAttribute('#lock-input', 'type'), 'text', 'выбор
 await page.click('#lock-reveal');
 assert.equal(await page.getAttribute('#lock-input', 'type'), 'password');
 assert.equal(await lockVisible(page), true);
-for (let i = 2; i <= 5; i++) { await until(page, () => !document.getElementById('lock-btn').disabled); await unlock(page, `неверный-пароль-${i}`); await page.waitForTimeout(150); }
+for (let i = 2; i <= 5; i++) { await until(page, () => !document.getElementById('lock-btn').disabled); await unlock(page, `неверный-пароль-${i}`); }
 await until(page, () => /Слишком много попыток/.test(document.getElementById('lock-msg').textContent), null, 10000);
 assert.equal(await page.locator('#lock-btn').isDisabled(), true, 'после 5 ошибок вход временно закрыт');
 await until(page, () => !document.getElementById('lock-btn').disabled, null, 10000);   // ждём окончания паузы
@@ -151,7 +151,7 @@ body = await page.evaluate(() => document.body.textContent);
 assert.ok(!body.includes('секретная'));
 
 await unlock(page, PW);
-await until(page, () => !document.getElementById('app').hidden);
+await appReady(page);
 await tab(page, 'today');
 await until(page, () => [...document.querySelectorAll('.item .text')].some(n => n.textContent === 'секретная задача про зарплату'));
 assert.ok([...(await page.locator('.item .text').allTextContents())].includes('ещё одна секретная затея'), 'все данные на месте после входа');
@@ -177,7 +177,7 @@ await until(page, () => !document.getElementById('lock').hidden);
 await page.evaluate(() => { Object.defineProperty(document, 'hidden', { configurable: true, get: () => false }); document.dispatchEvent(new Event('visibilitychange')); });
 assert.equal(await lockVisible(page), true, 'осталось заблокированным');
 await unlock(page, PW);
-await until(page, () => !document.getElementById('app').hidden);
+await appReady(page);
 
 // =====================================================================
 // 4. Смена пароля
@@ -196,7 +196,7 @@ await unlock(page, PW);                                                      // 
 await until(page, () => document.getElementById('lock-msg').textContent === 'Неверный пароль');
 await until(page, () => !document.getElementById('lock-btn').disabled);
 await unlock(page, 'новая-длинная-фраза');
-await until(page, () => !document.getElementById('app').hidden);
+await appReady(page);
 await tab(page, 'today');
 await until(page, () => [...document.querySelectorAll('.item .text')].some(n => n.textContent === 'секретная задача про зарплату'));
 const PW2 = 'новая-длинная-фраза';
@@ -221,7 +221,7 @@ assert.ok(fs.readFileSync(await plainDl.path(), 'utf8').includes('секретн
 // полная потеря данных
 await page.fill('#wipe-confirm', 'СТЕРЕТЬ');
 await Promise.all([page.waitForNavigation(), page.click('#wipe-btn')]);
-await until(page, () => !document.getElementById('app').hidden);
+await appReady(page);
 assert.equal(await page.locator('#lock-top').isVisible(), false, 'после стирания пароль тоже сброшен');
 assert.equal(await page.locator('.item').count(), 0);
 // восстановление
@@ -245,8 +245,10 @@ await waitCount(page, '.note', 2);
 // 6. Отключение защиты
 // =====================================================================
 await enableViaUi(page, PW);
-await page.click('#sec-box details:has(#pw-off) summary');
-await page.fill('#pw-off', 'не-тот-пароль-1');
+await retry(async () => {                                                  // после включения защиты экран ещё может перерисоваться и закрыть только что раскрытый блок
+  if (!(await page.locator('#pw-off').isVisible())) await page.click('#sec-box details:has(#pw-off) summary', { timeout: 2000 });
+  await page.fill('#pw-off', 'не-тот-пароль-1', { timeout: 2000 });
+});
 await page.click('#pw-disable');
 await expectToast(page, /Пароль неверный/);
 assert.ok(!(await diskText(page)).includes('секретная'), 'после неудачной попытки данные остались зашифрованными');
@@ -255,7 +257,7 @@ await page.click('#pw-disable');
 await until(page, () => /Защита отключена/.test(document.getElementById('toast').textContent), null, 15000);
 assert.ok((await diskText(page)).includes('секретная задача'), 'после отключения данные снова открыты');
 await page.reload();
-await until(page, () => !document.getElementById('app').hidden);
+await appReady(page);
 assert.equal(await lockVisible(page), false, 'вход по паролю больше не требуется');
 await tab(page, 'today');
 await until(page, () => [...document.querySelectorAll('.item .text')].some(n => n.textContent === 'секретная задача про зарплату'));
@@ -268,7 +270,7 @@ assert.ok((await diskText(page)).includes('секретная задача'), '�
 await page.reload();
 await until(page, () => !document.getElementById('lock').hidden);
 await unlock(page, 'прерванное-включение');
-await until(page, () => !document.getElementById('app').hidden);
+await appReady(page);
 await expectToast(page, /Дошифровано записей: \d+/);
 assert.ok(!(await diskText(page)).includes('секретная'), 'после входа шифрование доведено до конца');
 await tab(page, 'today');
@@ -294,7 +296,7 @@ const victimId = await page.evaluate(() => window.__victim);
 await page.reload();
 await until(page, () => !document.getElementById('lock').hidden);
 await unlock(page, 'прерванное-включение');
-await until(page, () => !document.getElementById('app').hidden);
+await appReady(page);
 await tab(page, 'more');
 await until(page, () => !document.getElementById('corrupt').hidden);
 assert.match(await text(page, '#corrupt'), /Не удалось прочитать записей: 1/);
@@ -317,7 +319,7 @@ assert.equal(await page.locator('#reset-btn').isDisabled(), true);
 await page.fill('#reset-confirm', 'стереть');
 assert.equal(await page.locator('#reset-btn').isDisabled(), false);
 await Promise.all([page.waitForNavigation(), page.click('#reset-btn')]);
-await until(page, () => !document.getElementById('app').hidden);
+await appReady(page);
 assert.equal(await page.locator('.item').count(), 0);
 assert.ok(!(await diskText(page)).includes('секретная'));
 await t.close();
@@ -328,7 +330,7 @@ await t.close();
 t = await launch(); ({ page, errors } = t);
 await page.clock.install();
 await page.goto(t.url);
-await until(page, () => !document.getElementById('app').hidden);
+await appReady(page);
 await page.evaluate(async () => {
   const db = await import('./db.js'); const prefs = await import('./prefs.js');
   await db.enableLock('часы-идут-пароль'); prefs.setPref('autoLockMin', 5);
@@ -341,7 +343,7 @@ assert.equal(await lockVisible(page), false, 'пока активен — не �
 await page.clock.fastForward('03:00');                                       // 6 минут без касаний
 await until(page, () => !document.getElementById('lock').hidden);
 await unlock(page, 'часы-идут-пароль');
-await until(page, () => !document.getElementById('app').hidden);
+await appReady(page);
 await page.evaluate(() => { Object.defineProperty(document, 'hidden', { configurable: true, get: () => true }); document.dispatchEvent(new Event('visibilitychange')); });
 await page.clock.fastForward('06:00');
 await page.evaluate(() => { Object.defineProperty(document, 'hidden', { configurable: true, get: () => false }); document.dispatchEvent(new Event('visibilitychange')); });

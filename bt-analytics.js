@@ -1,7 +1,7 @@
 // Аналитика результатов проверок: личная норма, отклонения, домены, связи с образом жизни, подсказки.
 // Принципы: сравнение только с самим собой; устойчивая статистика (медиана/MAD); поправка на множественные сравнения;
 // формулировки осторожные — это наблюдения, а не диагнозы и не доказанные причины.
-import { mean, median, mad, robustZ, spearmanTest, slopeCI, makeRng, round } from './stats.js';
+import { mean, median, mad, robustZ, spearmanTest, slopeCI, makeRng } from './stats.js';
 import { TESTS, TEST_BY_ID, DOMAINS, primaryShown, runsOf, fmtNum, fmtPrimary } from './bt-core.js';
 import { dailyTable } from './diary.js';
 import { addDays, todayStr } from './events.js';
@@ -262,16 +262,6 @@ export function insights(events, now = Date.now()) {
   }
   return out;
 }
-
-// ---------- итоги для экрана ----------
-export function summarize(events) {
-  const runs = runsOf(events);
-  const an = analyzeRuns(runs);
-  const last = an.perRun[an.perRun.length - 1] ?? null;
-  return { runs: runs.length, days: new Set(runs.map(r => r.date)).size, analysis: an, last };
-}
-
-export const round2 = x => round(x, 2);
 
 // Сравнение с самим собой: последний день с проверкой против предыдущего и против лучшего дня (по общему результату).
 export function selfCompare(events) {

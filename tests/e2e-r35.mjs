@@ -1,13 +1,13 @@
 // R3.5: люди и даты, цели, привычки («кем становлюсь», пересмотр), дневник мыслей, отметка питания, шаблон смены.
 import assert from 'node:assert/strict';
-import { launch, tab, until } from './helpers.mjs';
+import { launch, tab, until, appReady, waitToast } from './helpers.mjs';
 
 const t = await launch();
 const { page, errors } = t;
 await page.goto(t.url);
-await until(page, () => !document.getElementById('app').hidden);
+await appReady(page);
 const text = sel => page.textContent(sel);
-const toast = async re => until(page, r => new RegExp(r).test(document.getElementById('toast').textContent), re.source);
+const toast = re => waitToast(page, re);
 const evs = type => page.evaluate(async ty => (await import('./store.js')).state.events.filter(e => e.type === ty), type);
 const dm = n => { const d = new Date(); d.setDate(d.getDate() + n); return `${String(d.getDate()).padStart(2, '0')}.${String(d.getMonth() + 1).padStart(2, '0')}`; };
 
@@ -47,7 +47,7 @@ await page.locator('details.pp', { hasText: 'Борис' }).locator('.pp-note').
 await page.locator('details.pp', { hasText: 'Борис' }).locator('.pp-save').click();
 await toast(/Сохранено/);
 await page.reload();
-await until(page, () => !document.getElementById('app').hidden);
+await appReady(page);
 await tab(page, 'people');
 await page.locator('details.pp', { hasText: 'Борис' }).locator('summary').click();
 assert.equal(await page.locator('details.pp', { hasText: 'Борис' }).locator('.pp-note').inputValue(), 'любит шахматы, подарить книгу');
@@ -121,7 +121,7 @@ await page.click('#ci-e-save'); await toast(/Вечер сохранён/);
 const ce = (await evs('checkin')).find(e => e.payload.slot === 'e');
 assert.equal(ce.payload.veg, true); assert.equal(ce.payload.protein, true); assert.equal('sweets' in ce.payload, false, 'невыбранное не записывается');
 await page.reload();
-await until(page, () => !document.getElementById('app').hidden);
+await appReady(page);
 await tab(page, 'diary');
 await page.locator('#ci-e').evaluate(d => { d.open = true; });
 await until(page, () => document.getElementById('ci-flag-veg').checked);

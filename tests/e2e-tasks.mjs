@@ -1,6 +1,6 @@
 import assert from 'node:assert/strict';
 import fs from 'node:fs';
-import { launch, tab, until, ymd } from './helpers.mjs';
+import { launch, tab, until, ymd, waitText } from './helpers.mjs';
 
 const t = await launch();
 const { page, ctx, errors } = t;
@@ -51,7 +51,7 @@ await waitCount('ul.open .item', 4);
 assert.equal(await page.textContent('#done-count'), '1');
 await page.reload();
 await waitCount('ul.open .item', 4);
-assert.match(await page.textContent('#status'), /офлайн/);
+await waitText(page, '#status', /офлайн/);          // navigator.onLine меняется позже перезагрузки
 await ctx.setOffline(false);
 
 // ---------- экспорт открытым JSON ----------

@@ -160,9 +160,9 @@ export function englishWordProblems(text, scope, patterns) {
   return out;
 }
 
-const HEB_RUN = /[א-ת֑-ׇֽֿׁׂׅׄ]+/g;
-const HEB_LETTER = /[א-ת]/g;
-const HEB_VOWEL = /[ְ-ׇֻ]/;
+const HEB_RUN = /[\u05D0-\u05EA\u0591-\u05BD\u05BF\u05C1\u05C2\u05C4\u05C5\u05C7]+/g;
+const HEB_LETTER = /[\u05D0-\u05EA]/g;
+const HEB_VOWEL = /[\u05B0-\u05BB\u05C7]|\u05D5\u05BC/;                 // знаки гласных; шурук (вав с точкой) тоже гласная
 export function hebrewWordProblems(text, scope) {
   const out = [];
   for (const m of String(text).matchAll(HEB_RUN)) {

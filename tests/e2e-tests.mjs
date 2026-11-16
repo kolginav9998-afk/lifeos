@@ -2,12 +2,12 @@
 import assert from 'node:assert/strict';
 import fs from 'node:fs';
 import { execFileSync } from 'node:child_process';
-import { launch, tab, until } from './helpers.mjs';
+import { launch, tab, until, appReady } from './helpers.mjs';
 
 const t = await launch({ ctxOptions: { permissions: ['clipboard-read', 'clipboard-write'] } });
 const { page, errors } = t;
 await page.goto(t.url);
-await until(page, () => !document.getElementById('app').hidden);
+await appReady(page);
 const text = sel => page.textContent(sel);
 
 // ---------- меню тестов ----------

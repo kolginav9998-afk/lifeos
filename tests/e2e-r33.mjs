@@ -1,13 +1,13 @@
 // R3.3: старт-чеклист, слово дня, вопрос дня, дыхание, итоги недели, эксперименты, запрос к ИИ из урока.
 import assert from 'node:assert/strict';
-import { launch, tab, until, ymd } from './helpers.mjs';
+import { launch, tab, until, ymd, appReady, waitToast } from './helpers.mjs';
 
 const t = await launch({ ctxOptions: { permissions: ['clipboard-read', 'clipboard-write'] } });
 const { page, errors } = t;
 await page.goto(t.url);
-await until(page, () => !document.getElementById('app').hidden);
+await appReady(page);
 const text = sel => page.textContent(sel);
-const toast = async re => until(page, r => new RegExp(r).test(document.getElementById('toast').textContent), re.source);
+const toast = re => waitToast(page, re);
 const evs = type => page.evaluate(async ty => (await import('./store.js')).state.events.filter(e => e.type === ty), type);
 
 // ---------- старт: пять шагов ----------
