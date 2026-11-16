@@ -46,7 +46,11 @@ const norm = s => String(s ?? '').toLowerCase().replace(/ё/g, 'е');
 const wordsOf = s => norm(s).split(/[^a-zа-я0-9]+/).filter(Boolean);
 // «Основа» слова: отбрасываем окончание, чтобы «зарплату» находило «зарплата», «стирал» — «стирка».
 const stem = w => (w.length > 5 ? w.slice(0, w.length - 2) : w.length > 3 ? w.slice(0, w.length - 1) : w);
-const sameStem = (a, b) => a.startsWith(b) || b.startsWith(a) || (stem(a).length >= 4 && stem(a) === stem(b));
+const sameStem = (a, b) => {
+  if (a === b) return true;
+  const [s, l] = a.length <= b.length ? [a, b] : [b, a];
+  return (s.length >= 4 && l.startsWith(s)) || (stem(a).length >= 4 && stem(a) === stem(b));        // короткие слова («с», «в», «на») не считаются началом других слов
+};
 
 // Поиск по каталогу: каждое слово запроса должно найтись в названии, подсказке или ключевых словах раздела.
 // Название весит больше ключевых слов, ключевые слова больше подсказки. Возвращает разделы по убыванию совпадения.
