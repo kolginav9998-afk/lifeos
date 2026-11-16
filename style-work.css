@@ -26,7 +26,8 @@
 .k-vacation{--sc:var(--c3)}.k-sick{--sc:var(--danger)}.k-unpaid{--sc:var(--warn)}
 /* окна: тип дня, смены, готовые графики, шаги цикла */
 .work-kinds{display:grid;grid-template-columns:repeat(auto-fit,minmax(min(100%,8rem),1fr));gap:4px;background:var(--soft);padding:4px;border-radius:var(--r12)}
-.work-tabs{display:grid;grid-template-columns:repeat(auto-fit,minmax(min(100%,6.5rem),1fr));gap:4px;background:var(--soft);padding:4px;border-radius:var(--r12)}
+.work-tabs{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:4px;background:var(--soft);padding:4px;border-radius:var(--r12)}
+@media (min-width:460px){.work-tabs{grid-template-columns:repeat(4,minmax(0,1fr))}}
 .work-kinds .seg,.work-tabs .seg{min-height:44px;padding:4px 6px;overflow-wrap:anywhere}
 .work-kinds .seg[aria-pressed=true],.work-tabs .seg[aria-pressed=true]{box-shadow:inset 0 0 0 2px var(--mode-accent,var(--accent))}
 #sch-day .chips button[aria-pressed=true],#sch-wiz .chips button[aria-pressed=true]{box-shadow:inset 0 0 0 2px var(--mode-accent,var(--accent));font-weight:600}
@@ -40,3 +41,24 @@
 .work-steps,.work-strip,.work-offs{display:flex;flex-wrap:wrap;gap:6px;list-style:none;margin:0;padding:0}
 .work-shift-row{display:flex;flex-direction:column;gap:8px;min-width:0;margin:0;padding:12px;border:1px solid var(--line);border-radius:var(--r12)}
 .work-shift-row legend{padding:0 6px;font-weight:600}
+/* зарплата: итог, состав, часы, сравнение месяцев, выводы */
+.work-hero .big{font-size:var(--t32);overflow-wrap:anywhere}
+.work-dl{margin:0;display:flex;flex-direction:column}
+.work-dr{display:flex;justify-content:space-between;gap:12px;padding:8px 0;border-top:1px solid var(--line)}
+.work-dr:first-child{border-top:0}
+.work-dr dt{min-width:0;overflow-wrap:anywhere}
+.work-dr dd{margin:0;flex:none;max-width:55%;text-align:right;font-weight:600;font-variant-numeric:tabular-nums;overflow-wrap:anywhere}
+.work-dr.sum{font-weight:700;border-top-width:2px}
+.work-hours .item{flex-wrap:wrap}
+.work-hrow.future{opacity:.85}
+.work-hrow .body{min-width:min(100%,12rem)}
+.work-insights .insight{display:flex;gap:8px;align-items:flex-start;padding:10px 12px;border-radius:var(--r12)}
+.work-insights .insight svg{flex:none;margin-top:3px}
+.work-bars{list-style:none;margin:0;padding:0;display:flex;flex-direction:column;gap:10px}
+.work-bar{display:grid;grid-template-columns:4.2rem minmax(0,1fr);gap:2px 8px;align-items:center}
+.work-bar .bar{display:block;height:10px;border-radius:99px;background:var(--line);overflow:hidden}
+.work-bar .bar i{display:block;height:100%;background:var(--mode-accent,var(--accent));border-radius:99px}
+.work-bar .val{grid-column:2;font-size:var(--t14);font-variant-numeric:tabular-nums;overflow-wrap:anywhere}
+.work-bar.cur .lbl{font-weight:700}
+.work-wi{margin:0;font-weight:600;overflow-wrap:anywhere}
+input[type=range]{width:100%;min-height:44px;accent-color:var(--mode-accent,var(--accent))}
