@@ -175,7 +175,7 @@ assert.match(await page.evaluate(() => [...document.querySelectorAll('.habit')].
 
 // ---------- навыки ----------
 await tab(page, 'skills');
-assert.deepEqual(await page.locator('#subnav button').allTextContents(), ['Учёба', 'С нуля', 'Навыки', 'Тесты', 'Аналитика', 'Цели']);
+assert.deepEqual(await page.locator('#subnav button').allTextContents(), ['Учёба', 'С нуля', 'Дикция', 'Навыки', 'Тесты', 'Аналитика', 'Цели']);
 assert.match(await text('#skills-empty'), /Пока навыков нет/);
 await page.locator('#skill-new').evaluate(d => { d.open = true; });
 await page.click('#skill-add'); assert.match(await text('#skill-err'), /Напиши, что ты умеешь/);

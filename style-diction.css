@@ -1,1 +1,61 @@
-/* Курс и экран «Дикция». Подключается последним. */
+/* Курс и экран «Дикция». Подключается последним. Цвета только через токены; состояния не передаются одним цветом (жирность, подчёркивание, галочка, текст). */
+/* ===== diction ===== */
+#view-diction .dic-tabs{display:flex;flex-wrap:wrap;gap:var(--s2)}
+#view-diction .dic-tab{min-height:40px;padding:4px var(--s3);border-radius:var(--r8);font-size:var(--t14);font-weight:500;background:var(--soft);border-color:transparent}
+#view-diction .dic-tab[aria-selected=true]{background:color-mix(in srgb,var(--mode-accent) 20%,transparent);box-shadow:inset 0 0 0 2px var(--mode-accent);font-weight:700}
+#view-diction .chip[aria-pressed=true]{background:var(--tint-accent);border-color:var(--mode-accent);font-weight:700}
+#view-diction .chip[aria-pressed=true]::before{content:"✓ "}
+#view-diction .dic-safety{border-left:3px solid var(--warn);padding-left:var(--s3);margin:var(--s2) 0}
+#view-diction .dic-hint{margin:var(--s2) 0}
+#view-diction .dic-panel{display:flex;flex-direction:column;gap:var(--s3)}
+
+/* сегодня */
+.dic-stat-row{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:var(--s3);text-align:center}
+.dic-num{display:block;font-size:var(--t32);font-weight:700;line-height:1.2;font-variant-numeric:tabular-nums}
+.dic-stat .muted{display:block}
+.dic-blocks{list-style:none;margin:var(--s3) 0;padding:0;display:flex;flex-direction:column;gap:var(--s2)}
+.dic-block{display:flex;flex-wrap:wrap;gap:var(--s2) var(--s3);align-items:center;justify-content:space-between;padding:var(--s3);border-radius:var(--r12);background:var(--soft)}
+.dic-block-main{display:flex;flex-direction:column;gap:var(--s1);min-width:0;flex:1 1 12rem;overflow-wrap:anywhere}
+.dic-block-act{display:flex;align-items:center;gap:var(--s2)}
+.dic-done{font-weight:700;font-size:var(--t14)}
+.dic-twlist{display:block}
+
+/* тренажёры в окне */
+.dic-big{font-size:var(--t24);line-height:1.4;font-weight:600;text-align:center;margin:var(--s3) 0;overflow-wrap:anywhere}
+.dic-clock{font-size:var(--t40);font-weight:700;text-align:center;font-variant-numeric:tabular-nums;line-height:1.2}
+.dic-count{font-size:var(--t20);font-weight:600;text-align:center;margin:var(--s2) 0}
+.dic-result{display:flex;flex-direction:column;gap:var(--s3)}
+.dic-wpm{font-size:var(--t24);font-weight:700;margin:0}
+.dic-fb{font-size:var(--t16);margin:var(--s2) 0;min-height:1.5em}
+.dic-voice-box{display:flex;flex-direction:column;align-items:flex-start;gap:var(--s1)}
+.dic-voice-note:empty{display:none}
+
+/* скороговорки */
+.dic-tw-list{list-style:none;margin:0;padding:0;display:flex;flex-direction:column;gap:var(--s2)}
+.dic-tw-pick{display:flex;flex-direction:column;align-items:flex-start;justify-content:flex-start;text-align:left;width:100%;height:auto;padding:var(--s3) var(--s4);gap:var(--s1);border-radius:var(--r12)}
+.dic-tw-text{font-weight:600;overflow-wrap:anywhere}
+.dic-pick .muted{font-weight:400}
+
+/* ударения */
+.dic-opts{display:flex;flex-direction:column;gap:var(--s2);margin:var(--s3) 0}
+.dic-opt{justify-content:flex-start;min-height:56px;font-size:var(--t20);text-align:left;border-radius:var(--r12)}
+.dic-opt.right{border-color:var(--ok);background:var(--tint-ok)}
+.dic-opt.wrong{border-color:var(--danger);background:var(--tint-danger)}
+.dic-st{font-weight:800;text-decoration:underline;text-decoration-thickness:3px;text-underline-offset:.18em}
+
+/* чтение вслух */
+.dic-read{font-size:var(--t20);line-height:1.7;margin:var(--s2) 0}
+.dic-line{margin:0 0 var(--s2)}
+.dic-emph{font-weight:800;text-decoration:underline;text-decoration-thickness:2px;text-underline-offset:.2em}
+.dic-pause{display:inline-block;padding:0 .2em;color:var(--muted);font-weight:700}
+.dic-pause.long{letter-spacing:.1em}
+#dic-read-own{min-height:7rem}
+
+/* оценка и курс */
+.dic-rubric-row{padding:var(--s2) 0;border-top:1px solid var(--line)}
+.dic-ask{margin:var(--s1) 0 0}
+.dic-quiz{margin:var(--s3) 0;display:flex;flex-direction:column;gap:var(--s2)}
+.dic-order-line{min-height:1.5em;margin:var(--s2) 0}
+.dic-typed{max-width:16rem}
+.dic-lesson .dic-opts{margin:0}
+@media (prefers-reduced-motion: reduce){#dic-circle{transition-duration:.01s !important}}

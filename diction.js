@@ -32,6 +32,11 @@ export function filterTwisters({ group = '', sound = '', level = 0 } = {}) {
   return TWISTERS.filter(t => (!level || t.level === level) && (!sound || t.sounds.includes(sound) || (t.sounds.some(s => s.length > 1 && s.includes(sound)))) && (!group || groupsOfTwister(t).includes(group)));
 }
 
+// ---------- мелкие помощники для вывода ----------
+export const fmtClock = sec => { const s = Math.max(0, Math.round(sec)); return `${Math.floor(s / 60)}:${String(s % 60).padStart(2, '0')}`; };
+export const fmtNum = n => String(n).replace('.', ',');
+export const plural = (n, [one, few, many]) => { const a = Math.abs(n) % 100, b = a % 10; return a > 10 && a < 20 ? many : b === 1 ? one : b >= 2 && b <= 4 ? few : many; };
+
 // ---------- слоги, слова, темп речи ----------
 const VOWEL_RE = /[аеёиоуыэюя]/gi;
 export const syllables = text => (String(text ?? '').match(VOWEL_RE) ?? []).length;
