@@ -111,6 +111,7 @@ export const TEMPLATES = [
   { tid: 'c13', title: 'Сутки через трое', about: 'Смена 24 часа, потом три дня отдыха', pattern: cy('s', '-', '-', '-'), shifts: [SUTKI] },
   { tid: 'c12', title: 'Сутки через двое', about: 'Смена 24 часа, потом два дня отдыха', pattern: cy('s', '-', '-'), shifts: [SUTKI] },
   { tid: 'cdn', title: 'День, ночь, отсыпной, выходной', about: 'Цикл из четырёх дней: дневная смена, ночная, день после ночи, свободный день', pattern: cy('d', 'n', 'r', '-'), shifts: [D12, NIGHT, REST] },
+  { tid: 'wcu', title: 'По дням недели', about: 'Сам отметишь рабочие дни недели, например понедельник, среда и пятница', pattern: wk(0, 2, 4), shifts: [D()] },
   { tid: 'cus', title: 'Свой цикл', about: 'Сам выберешь, в каком порядке идут смены и выходные', pattern: cy('d', 'd', '-'), shifts: [D()] },
 ];
 export const templateById = tid => TEMPLATES.find(t => t.tid === tid) ?? null;
@@ -250,6 +251,13 @@ export function timerStop(ev, now = Date.now()) {
   const p = ev.payload, short = ms !== null && ms < 60000;
   return { event: makeWorkday({ ...p, actual: short ? null : { from: a.from, to: hhmm(now) } }, ev, now), minutes: short ? 0 : Math.max(1, Math.round((ms ?? 60000) / 60000)), discarded: short };
 }
+
+// ---------- подписи дня (для экрана и для диктора) ----------
+export function dayText(d) {
+  if (d.kind === 'work') return `рабочий день${d.key ? `, смена «${d.label}»` : ''}${d.from ? ` ${d.from}–${d.to}` : ''}${d.plannedMin ? `, ${fmtDur(d.plannedMin)}` : ''}`;
+  return d.kind === 'off' ? (d.key ? d.label.toLowerCase() : 'выходной') + (d.holiday ? ' (праздник или доп. выходной)' : '') : DAY_KINDS[d.kind].toLowerCase();
+}
+export const dayActualText = d => (d.running ? `таймер идёт с ${d.actual.from}` : d.actual ? `отмечено ${d.actual.from}–${d.actual.to}, ${fmtDur(d.actualMin)}` : '');
 
 // ---------- для экрана «Сегодня» ----------
 export function workLine(events, today) {
