@@ -216,6 +216,9 @@ test('занятия: проверка полей, минуты и секунд�
   assert.throws(() => makeDiction({ kind: 'warmup', seconds: 19 }), /20 секунд/);
   assert.equal(makeDiction({ kind: 'twister', seconds: 12, date: T }, 1).payload.seconds, 12, 'скороговорка в быстром темпе короче 20 секунд');
   assert.throws(() => makeDiction({ kind: 'twister', seconds: 2 }), /секундомер/);
+  assert.equal(makeDiction({ kind: 'stress', seconds: 6, date: T }, 1).payload.seconds, 6);
+  assert.throws(() => makeDiction({ kind: 'stress', seconds: 4 }), /5 секунд/);
+  assert.throws(() => makeDiction({ kind: 'reading', seconds: 4 }), /5 секунд/);
   assert.throws(() => makeDiction({ kind: 'dance', seconds: 90 }), /вид/);
   assert.throws(() => makeDiction({ kind: 'warmup', seconds: 99999 }), /четырёх/);
   assert.throws(() => makeDiction({ kind: 'warmup', seconds: 60, date: '2026-13-01' }), /bad date/);

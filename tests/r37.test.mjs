@@ -43,7 +43,7 @@ test('озвучка: без поддержки в среде ничего не 
   let err = null;
   assert.equal(speak('hello', 'english', e => { err = e; }), false);
   assert.equal(err, null, 'отсутствие синтеза не считается ошибкой голоса');
-  assert.deepEqual(LANG, { english: 'en-US', hebrew: 'he-IL' });
+  assert.deepEqual(LANG, { english: 'en-US', hebrew: 'he-IL', russian: 'ru-RU' });
   // с поддержкой: проверяем, что язык и скорость выставляются, а ошибки голоса доходят до обработчика
   const calls = [];
   globalThis.speechSynthesis = { cancel: () => calls.push('cancel'), speak: u => { calls.push(['speak', u.text, u.lang, u.rate]); u.onerror({ error: 'language-unavailable' }); } };

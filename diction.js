@@ -82,15 +82,17 @@ export const readingSeconds = (words, perMinute = 120) => Math.round((words / pe
 
 // ---------- записи ----------
 export const DICTION_KINDS = { warmup: 'Разминка', breath: 'Дыхание', twister: 'Скороговорки', stress: 'Ударения', reading: 'Чтение вслух' };
-export const MIN_SESSION_SEC = 20, MIN_RUN_SEC = 3, MAX_SESSION_SEC = 4 * 3600;     // скороговорка в быстром темпе занимает секунд десять, поэтому для неё порог ниже
+export const MIN_SESSION_SEC = 20, MIN_RUN_SEC = 3, MAX_SESSION_SEC = 4 * 3600;
+// Меньше этого занятие не записывается (случайное нажатие). Скороговорка в быстром темпе занимает секунд десять, а раунд ударений идёт быстро.
+export const MIN_SECONDS = { warmup: 20, breath: 20, twister: MIN_RUN_SEC, stress: 5, reading: 5 };
 const okRating = v => Number.isInteger(v) && v >= 1 && v <= 5;
 const id36 = (now, pre) => `${pre}:${Math.floor(now).toString(36)}${Math.random().toString(36).slice(2, 6)}`;
 
 // Занятие дикцией: вид, сколько секунд, сколько упражнений/слов/повторов, оценка 1–5 (по желанию), ссылка на материал, группы звуков, темп речи, темп скороговорки.
 export function makeDiction({ kind, seconds, items = 0, rating = null, date, ref = '', groups = [], wpm: pace = null, tempo = null, ok = null, miss = [], fixed = [] } = {}, now = Date.now()) {
   if (!Object.hasOwn(DICTION_KINDS, kind)) throw new Error('Выбери вид занятия');
-  const sec = Math.round(Number(seconds)), least = kind === 'twister' ? MIN_RUN_SEC : MIN_SESSION_SEC;
-  if (!Number.isFinite(sec) || sec < least) throw new Error(kind === 'twister' ? 'Слишком быстро: проверь секундомер' : 'Меньше 20 секунд не записывается');
+  const sec = Math.round(Number(seconds)), least = MIN_SECONDS[kind];
+  if (!Number.isFinite(sec) || sec < least) throw new Error(least <= MIN_RUN_SEC ? 'Слишком быстро: проверь секундомер' : `Меньше ${least} секунд не записывается`);
   if (sec > MAX_SESSION_SEC) throw new Error('Слишком долго: до четырёх часов');
   const d = date || todayStr(now);
   if (!isYmd(d)) throw new Error('bad date');
