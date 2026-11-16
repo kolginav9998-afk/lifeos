@@ -37,6 +37,10 @@ import { createInsightsView } from './view-insights.js';
 import { createSettingsView } from './view-settings.js';
 import { createAccountView } from './view-account.js';
 import { createHelpView } from './view-help.js';
+import { createMenuView } from './view-menu.js';
+import { createHomeView } from './view-home.js';
+import { createSalaryView } from './view-salary.js';
+import { createScheduleView } from './view-schedule.js';
 import { createTour, openTarget } from './view-help-tour.js';
 import { searchHelp } from './help.js';
 import * as appSync from './app-sync.js';
@@ -46,38 +50,42 @@ import { createTabGuard, tabState } from './tabguard.js';
 const DEFS = [
   { id: 'today', group: 'today', title: 'Сегодня', sub: 'Задачи', make: ctx => createTodayView(ctx) },
   { id: 'habits', group: 'today', title: 'Привычки', sub: 'Привычки', make: () => createHabitsView() },
+  { id: 'diary', group: 'today', title: 'Дневник', sub: 'Дневник', make: () => createDiaryView() },
+  { id: 'health', group: 'today', title: 'Здоровье', sub: 'Здоровье', make: () => createHealthView() },
+  { id: 'workouts', group: 'today', title: 'Тренировки', sub: 'Тренировки', make: () => createWorkoutsView() },
+  { id: 'notes', group: 'today', title: 'Заметки', sub: 'Заметки', make: () => createNotesView() },
+  { id: 'reflect', group: 'today', title: 'Рефлексия', sub: 'Итоги', make: () => createReflectView() },
   { id: 'people', group: 'today', title: 'Люди', sub: 'Люди', make: () => createPeopleView() },
-  { id: 'diary', group: 'diary', title: 'Дневник', sub: 'Дневник', make: () => createDiaryView() },
-  { id: 'health', group: 'diary', title: 'Здоровье', sub: 'Здоровье', make: () => createHealthView() },
-  { id: 'workouts', group: 'diary', title: 'Тренировки', sub: 'Тренировки', make: () => createWorkoutsView() },
-  { id: 'notes', group: 'diary', title: 'Заметки', sub: 'Заметки', make: () => createNotesView() },
-  { id: 'reflect', group: 'diary', title: 'Рефлексия', sub: 'Рефлексия', make: () => createReflectView() },
-  { id: 'learn', group: 'grow', title: 'Учёба', sub: 'Учёба', make: ctx => createLearnView(ctx) },
+  { id: 'home', group: 'home', title: 'Дом', sub: 'Вещи', make: ctx => createHomeView(ctx) },
+  { id: 'money', group: 'money', title: 'Деньги', sub: 'Расходы', make: ctx => createMoneyView(ctx) },
+  { id: 'salary', group: 'money', title: 'Зарплата', sub: 'Зарплата', make: ctx => createSalaryView(ctx) },
+  { id: 'schedule', group: 'money', title: 'График работы', sub: 'График', make: ctx => createScheduleView(ctx) },
+  { id: 'plans', group: 'money', title: 'Планы', sub: 'Планы', make: () => createPlansView() },
+  { id: 'learn', group: 'grow', title: 'Учёба', sub: 'Курсы', make: ctx => createLearnView(ctx) },
   { id: 'zero', group: 'grow', title: 'С нуля', sub: 'С нуля', make: () => createZeroView() },
   { id: 'diction', group: 'grow', title: 'Дикция', sub: 'Дикция', make: ctx => createDictionView(ctx) },
   { id: 'skills', group: 'grow', title: 'Навыки', sub: 'Навыки', make: () => createSkillsView() },
-  { id: 'tests', group: 'grow', title: 'Проверка', sub: 'Тесты', make: () => createTestsView() },
-  { id: 'insights', group: 'grow', title: 'Аналитика', sub: 'Аналитика', make: () => createInsightsView() },
+  { id: 'tests', group: 'grow', title: 'Тесты и проверки', sub: 'Тесты', make: () => createTestsView() },
   { id: 'okr', group: 'grow', title: 'Цели', sub: 'Цели', make: () => createOkrView() },
-  { id: 'money', group: 'money', title: 'Деньги', sub: 'Деньги', make: ctx => createMoneyView(ctx) },
-  { id: 'plans', group: 'money', title: 'Планы', sub: 'Планы', make: () => createPlansView() },
-  { id: 'more', group: 'more', title: 'Настройки', sub: 'Настройки', make: ctx => createSettingsView(ctx) },
+  { id: 'insights', group: 'grow', title: 'Аналитика', sub: 'Аналитика', make: () => createInsightsView() },
+  { id: 'menu', group: 'more', title: 'Меню', sub: 'Все разделы', make: ctx => createMenuView(ctx) },
   { id: 'account', group: 'more', title: 'Профиль', sub: 'Профиль', make: ctx => createAccountView(ctx) },
+  { id: 'more', group: 'more', title: 'Настройки', sub: 'Настройки', make: ctx => createSettingsView(ctx) },
   { id: 'help', group: 'more', title: 'Справка', sub: 'Справка', make: ctx => createHelpView(ctx) },
 ];
 const GROUPS = [
   { id: 'today', label: 'Сегодня', icon: 'tasks' },
-  { id: 'diary', label: 'Дневник', icon: 'diary' },
-  { id: 'grow', label: 'Развитие', icon: 'growth' },
+  { id: 'home', label: 'Дом', icon: 'home' },
   { id: 'money', label: 'Деньги', icon: 'money' },
-  { id: 'more', label: 'Ещё', icon: 'more' },
+  { id: 'grow', label: 'Учёба', icon: 'growth' },
+  { id: 'more', label: 'Меню', icon: 'more' },
 ];
 // Режимы оформления (--mode-accent в style.css): у учёбы, денег, аналитики и безопасности свой акцент, у остальных — основной.
-const MODE_OF = { learn: 'learn', tests: 'learn', skills: 'learn', zero: 'learn', diction: 'learn', money: 'finance', insights: 'analytics', okr: 'analytics', plans: 'analytics', reflect: 'analytics', account: 'security', more: 'security', help: 'security' };
+const MODE_OF = { learn: 'learn', tests: 'learn', skills: 'learn', zero: 'learn', diction: 'learn', money: 'finance', salary: 'finance', schedule: 'finance', insights: 'analytics', okr: 'analytics', plans: 'analytics', reflect: 'analytics', account: 'security', more: 'security', help: 'security' };
 const FOCUS_TAB = { task: 'today', habit: 'habits', expense: 'money', note: 'notes', diary: 'diary', measure: 'health' };
 
 // Простой режим: меньше вкладок и экранов, только самое нужное. Остальные экраны по-прежнему открываются из чипов и поиска.
-const SIMPLE_VIEWS = new Set(['today', 'habits', 'diary', 'health', 'notes', 'more', 'account', 'help', 'zero', 'diction']);
+const SIMPLE_VIEWS = new Set(['today', 'habits', 'diary', 'health', 'notes', 'menu', 'home', 'more', 'account', 'help', 'zero', 'diction']);
 const visibleDefs = () => (getPref('simple') ? DEFS.filter(d => SIMPLE_VIEWS.has(d.id)) : DEFS);
 
 // ---------- тема ----------

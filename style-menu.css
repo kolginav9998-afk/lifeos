@@ -1,0 +1,10 @@
+/* Меню «Куда зайти»: крупные плитки по смыслу. Подключается после style-diction.css (см. index.html). */
+.menu-sec{margin-top:var(--s5,24px)}
+.menu-sec-h{display:flex;align-items:center;gap:var(--s2,8px);margin:0 0 var(--s3,12px);font-size:var(--t16,1rem)}
+.menu-sec-h .ic{color:var(--mode-accent,var(--accent))}
+.menu-grid{display:grid;grid-template-columns:repeat(auto-fit,minmax(min(100%,220px),1fr));gap:var(--s3,12px)}
+.menu-tile{display:flex;flex-direction:column;align-items:flex-start;gap:4px;text-align:left;min-height:64px;padding:var(--s3,12px) var(--s4,16px);width:100%;height:auto;border-radius:var(--r12,12px);background:var(--card);border:1px solid var(--line);color:var(--text)}
+.menu-tile strong{font-size:var(--t16,1rem)}
+.menu-tile .muted{font-weight:400;font-size:var(--t14,.875rem);overflow-wrap:anywhere}
+.menu-tile:hover{border-color:var(--mode-accent,var(--accent))}
+#menu-results{margin-top:var(--s3,12px)}

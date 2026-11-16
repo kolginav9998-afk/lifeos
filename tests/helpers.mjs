@@ -87,8 +87,8 @@ export async function launch({ viewport = { width: 390, height: 844 }, ctxOption
 
 export const ymd = (off = 0) => { const d = new Date(); d.setDate(d.getDate() + off); return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`; };
 // Нижняя панель — группы вкладок; экраны внутри группы переключаются второй строкой.
-const GROUP_OF = { today: 'today', habits: 'today', people: 'today', diary: 'diary', health: 'diary', workouts: 'diary', notes: 'diary', reflect: 'diary', learn: 'grow', zero: 'grow', diction: 'grow', skills: 'grow', tests: 'grow', insights: 'grow', okr: 'grow', money: 'money', plans: 'money', more: 'more', account: 'more', help: 'more' };
-const FIRST_OF = { today: 'today', diary: 'diary', grow: 'learn', money: 'money', more: 'more' };
+const GROUP_OF = { today: 'today', habits: 'today', diary: 'today', health: 'today', workouts: 'today', notes: 'today', reflect: 'today', people: 'today', home: 'home', money: 'money', salary: 'money', schedule: 'money', plans: 'money', learn: 'grow', zero: 'grow', diction: 'grow', skills: 'grow', tests: 'grow', okr: 'grow', insights: 'grow', menu: 'more', account: 'more', more: 'more', help: 'more' };
+const FIRST_OF = { today: 'today', home: 'home', money: 'money', grow: 'learn', more: 'menu' };
 export async function tab(page, id) {
   const g = GROUP_OF[id] ?? id;
   await page.click(`#tabs button[data-tab="${g}"]`);
