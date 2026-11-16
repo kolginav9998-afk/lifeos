@@ -32,6 +32,7 @@ erDiagram
   day ||--o{ medlog : "date"
   day ||--o{ habit_log : "date"
   day ||--o{ lesson : "date"
+  day ||--o{ workday : "date"
 ```
 
 ## Связи по идентификатору
@@ -46,7 +47,7 @@ erDiagram
 
 ## Записи по дням
 
-Эти типы привязаны к дню полем `date`: `checkin`, `diary`, `measure`, `workout`, `focus`, `thought`, `intention`, `dayreview`, `joy`, `ritual`, `parked`, `speak`, `breath`, `diction`, `dictself`, `testrun`, `expense`, `income`, `medlog`, `habit_log`, `lesson`. Узел «day» условный: отдельной записи «день» нет, день — это просто дата.
+Эти типы привязаны к дню полем `date`: `checkin`, `diary`, `measure`, `workout`, `focus`, `thought`, `intention`, `dayreview`, `joy`, `ritual`, `parked`, `speak`, `breath`, `diction`, `dictself`, `testrun`, `expense`, `income`, `medlog`, `habit_log`, `lesson`, `workday`. Узел «day» условный: отдельной записи «день» нет, день — это просто дата.
 
 ## Внутри записи (не отдельные типы)
 
