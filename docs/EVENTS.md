@@ -4,7 +4,7 @@ _Файл создан из `registry.js` и сверяется с ним тес
 
 Все данные Life OS — журнал событий `{id, type, ts, payload, source, confidence, evidence}`. Новые типы только добавляются; записи прошлых версий читаются всегда, а незнакомые типы сохраняются и не мешают.
 
-Всего типов: 49. «В выгрузке» — попадают ли данные этой записи в ZIP для аналитики (числа и отметки, названия привычек и упражнений). Тексты дневника, заметок, мыслей и решений, а также деньги в выгрузку не входят.
+Всего типов: 53. «В выгрузке» — попадают ли данные этой записи в ZIP для аналитики (числа и отметки, названия привычек и упражнений). Тексты дневника, заметок, мыслей и решений, а также деньги в выгрузку не входят.
 
 ## Дела
 
@@ -104,4 +104,18 @@ _Файл создан из `registry.js` и сверяется с ним тес
 | `ritual` | Вечерний ритуал | date, steps | числа и отметки | нет | `reflect.js` |
 | `joy` | Радость | date, text | личный текст | нет | `reflect.js` |
 | `charger` | Что заряжает | text | личный текст | нет | `reflect.js` |
+
+## График работы
+
+| Тип | Что это | Поля | Приватность | В выгрузке | Модуль |
+|---|---|---|---|---|---|
+| `workcfg` | График работы (настройки) | pattern{kind, week[]|cycle[], start}, shifts[{key, name, letter, from, to, breakMin, color, night}], normMode, normHours, normByMonth{}, extraOff[], maxStreak, minRestH, tplId | числа и отметки | да | `schedule.js` |
+| `workday` | День графика (отметка) | date, kind (work|off|vacation|sick|unpaid), shift, planned{from, to}, actual{from, to, startedAt}, breakMin, note | числа и отметки | да | `schedule.js` |
+
+## Зарплата
+
+| Тип | Что это | Поля | Приватность | В выгрузке | Модуль |
+|---|---|---|---|---|---|
+| `paycfg` | Настройки зарплаты | mode (salary|hourly), baseMinor, currency, hourlyMinor, ot{basis, multMille, tier1Min, tier1MultMille, roundMin, roundDir}, tax{kind, rateBp, basis, brackets[]}, taxFreeMinor, allowances[], deductions[], leavePct{}, nightPct, advance{day, pct}, salaryDay | деньги | нет | `salary.js` |
+| `paymonth` | Итог месяца по зарплате | ym, computed{grossMinor, taxMinor, netMinor, taxableMinor, overtimeMin, overtimeMinor, workedMin}, actualNetMinor, extras[{name, amountMinor, taxable}], note | деньги | нет | `salary.js` |
 
