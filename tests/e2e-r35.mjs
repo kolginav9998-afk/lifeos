@@ -14,7 +14,7 @@ const dm = n => { const d = new Date(); d.setDate(d.getDate() + n); return `${St
 // ---------- люди ----------
 await tab(page, 'people');
 assert.equal(await text('#title'), 'Люди');
-assert.deepEqual(await page.locator('#subnav button').allTextContents(), ['Задачи', 'Привычки', 'Люди']);
+assert.deepEqual(await page.locator('#subnav button').allTextContents(), ['Задачи', 'Привычки', 'Дневник', 'Здоровье', 'Тренировки', 'Заметки', 'Итоги', 'Люди']);
 assert.match(await text('#pp-soon'), /нет/);
 await page.click('#pp-new summary');
 await page.click('#pp-add');
@@ -57,7 +57,7 @@ assert.ok(bor.payload.lastContact && bor.payload.lastContact > '2025');
 // ---------- цели ----------
 await tab(page, 'okr');
 assert.equal(await text('#title'), 'Цели');
-assert.deepEqual(await page.locator('#subnav button').allTextContents(), ['Учёба', 'С нуля', 'Дикция', 'Навыки', 'Тесты', 'Аналитика', 'Цели']);
+assert.deepEqual(await page.locator('#subnav button').allTextContents(), ['Курсы', 'С нуля', 'Дикция', 'Навыки', 'Тесты', 'Цели', 'Аналитика']);
 assert.match(await text('#view-okr h3'), /Цели · \d-й квартал \d{4}/);
 await page.click('#okr-new summary');
 assert.match(await page.inputValue('#okr-due'), /^\d{4}-\d{2}-\d{2}$/, 'срок по умолчанию — конец квартала');
