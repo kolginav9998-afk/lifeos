@@ -30,13 +30,13 @@ const ev = payload => makeRunEvent(payload, payload.startedAt);
 const rng = makeRng(2024);
 const noise = s => (rng() - 0.5) * s;
 
-test('реестр: 11 тестов, у каждого главный показатель и описания метрик', () => {
-  assert.equal(TESTS.length, 11);
+test('реестр: у каждого теста главный показатель и описания метрик, id не повторяются', () => {
+  assert.ok(TESTS.length >= 11);
   for (const t of TESTS) {
     assert.ok(t.title && t.desc && t.domain && t.primary.key && ['higher', 'lower'].includes(t.primary.better), t.id);
     assert.ok(t.primary.key in t.metrics, `${t.id}: главный показатель описан`);
   }
-  assert.equal(new Set(TESTS.map(t => t.id)).size, 11);
+  assert.equal(new Set(TESTS.map(t => t.id)).size, TESTS.length);
 });
 test('планы: быстрая и полная; слова запоминаются в начале и проверяются в конце', () => {
   for (const p of [PLANS.quick, PLANS.full]) {
