@@ -39,18 +39,19 @@ export function createLaundryTab(H) {
 
   function render(m) {
     const { due, soon } = laundryOf(m);
-    rows = [...due.map(r => ({ ...r, due: true })), ...soon.map(r => ({ ...r, due: false }))];
+    const dueRows = due.map(r => ({ ...r, due: true })), soonRows = soon.map(r => ({ ...r, due: false }));
+    rows = [...dueRows, ...soonRows];
     const all = el('button', { type: 'button', id: 'hm-wash-all', class: 'chip', textContent: rows.every(picked) ? 'Снять все галочки' : 'Выбрать все', dataset: { fk: 'wash-all' }, onclick: () => H.keep(() => {
       if (rows.every(picked)) { off.clear(); for (const r of rows) if (r.due) off.add(r.item.id); on.clear(); } else { off.clear(); for (const r of rows) if (!r.due) on.add(r.item.id); }
       render(H.model());
     }) });
     const parts = [];
-    if (due.length) parts.push(el('div', { class: 'hm-sec' }, el('h2', { class: 'hm-h', textContent: `Пора стирать: ${due.length} ${plural(due.length, 'вещь', 'вещи', 'вещей')}` }), rows.length > 1 ? all : null, ...groups(due)));
+    if (due.length) parts.push(el('div', { class: 'hm-sec' }, el('h2', { class: 'hm-h', textContent: `Пора стирать: ${due.length} ${plural(due.length, 'вещь', 'вещи', 'вещей')}` }), rows.length > 1 ? all : null, ...groups(dueRows)));
     else if (!soon.length) parts.push(emptyState({ art: 'home', title: 'Стирать пока нечего', text: 'Когда вещь надета столько раз, сколько указано в её правилах, она появится здесь. Правила стирки задаются в параметрах вещи.' }));
     else parts.push(el('p', { class: 'hm-ok', textContent: 'Пока ничего не просится в стирку.' }));
     if (soon.length) {
       const d = el('details', { class: 'card hm-soon', open: soonOpen ?? !due.length }, el('summary', { textContent: `Носили, но ещё не пора (${soon.length})` }),
-        el('p', { class: 'muted', textContent: 'Можно постирать раньше срока: поставь галочку.' }), ...groups(soon));
+        el('p', { class: 'muted', textContent: 'Можно постирать раньше срока: поставь галочку.' }), ...groups(soonRows));
       d.addEventListener('toggle', () => { soonOpen = d.open; });
       parts.push(d);
     }

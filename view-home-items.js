@@ -54,7 +54,7 @@ export function createItemsTab(H) {
     const m = last ?? H.model();
     const base = m.items.filter(i => passStatus(state.show, i.payload.status));
     const shown = ordered(base.filter(i => (!state.kind || i.payload.kind === state.kind) && (!state.place || i.payload.place === state.place)), m);
-    count.textContent = !m.items.length ? '' : shown.length === m.items.length ? `Вещей: ${shown.length}` : `Показано: ${shown.length} из ${m.items.length}`;
+    count.textContent = !m.items.length ? '' : shown.length === base.length ? `Вещей: ${shown.length}` : `Показано: ${shown.length} из ${base.length}`;
     if (shown.length) { fill(box, ...shown.map(i => card(i, m.stats.get(i.id), m.today))); return; }
     const none = !m.items.length
       ? emptyState({ art: 'home', title: 'Здесь пока пусто', text: 'Добавь первую вещь: куртку, чайник, комплект белья. Нужны только название и вид.', action: { label: 'Добавить вещь', icon: 'plus', onClick: () => H.openEdit(null) } })

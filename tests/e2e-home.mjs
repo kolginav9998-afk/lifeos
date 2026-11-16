@@ -117,15 +117,18 @@ await waitVisible(page, '#hm-detail');
 await waitText(page, '#hm-detail .hm-title', 'Куртка зимняя');
 assert.equal(await page.evaluate(() => document.activeElement.className.includes('hm-title')), true, 'фокус на названии вещи');
 assert.match(await page.textContent('#hm-detail .hm-lines'), /Надето 2 раза · Стирано 2 раза/);
-await page.click('#hm-detail [data-fk$="|edit"]');
-await waitVisible(page, '#hm-edit');
+await page.click('#hm-detail [data-fk$="|edit"]');                                        // подробности закрываются, открывается правка
+await waitVisible(page, '#hm-edit'); await waitVisible(page, '#hm-detail', false);
 await waitValue(page, '#hm-f-name', 'Куртка зимняя');
+await eventually(() => page.evaluate(() => document.activeElement.id), id => assert.equal(id, 'hm-f-name'), 2000);
 assert.equal(await page.locator('#hm-more').evaluate(d => d.open), true, 'при правке параметры раскрыты');
 await page.fill('#hm-f-place', 'Шкаф в прихожей'); await page.fill('#hm-f-brand', 'Columbia'); await page.fill('#hm-f-price', '12 500,50'); await page.fill('#hm-f-bought', '2026-01-10'); await page.fill('#hm-f-tags', 'зима, пуховик');
 await page.fill('#hm-f-wears', '0'); await page.click('#hm-save');
 await waitText(page, '#hm-edit-err', /Стирать после/);                                  // ошибка проверки показана, окно не закрылось
 await page.fill('#hm-f-wears', '20'); await page.click('#hm-save');
 await waitVisible(page, '#hm-edit', false);
+await waitToast(page, /Сохранено/);
+await card('Куртка').locator('.hm-open').click(); await waitVisible(page, '#hm-detail');
 await waitText(page, '#hm-detail .hm-dl', /Где лежит\s*Шкаф в прихожей/);
 {
   const dl = await page.textContent('#hm-detail .hm-dl');
@@ -152,7 +155,6 @@ await waitVisible(page, '#hm-edit'); await waitValue(page, '#hm-f-name', 'Кур
 assert.match(await page.textContent('#hm-edit .sess-top strong'), /Копия вещи/);
 await page.fill('#hm-f-name', 'Куртка летняя'); await page.click('#hm-save'); await waitVisible(page, '#hm-edit', false);
 await waitToast(page, /Добавлено: «Куртка летняя»/);
-await page.click('#hm-detail-close'); await waitVisible(page, '#hm-detail', false);
 await waitCount(page, '#hm-list .hm-card', 4);
 assert.equal(await page.evaluate(() => document.activeElement.id.startsWith('hm-o-')), true, 'фокус вернулся на карточку, с которой открыли подробности');
 await card('Куртка летняя').locator('.hm-open').click(); await waitVisible(page, '#hm-detail');
@@ -178,7 +180,8 @@ await addItem('Чайник', { kind: 'kitchen', more: { place: 'Кухня', br
 await waitCount(page, '#hm-list .hm-card', 5);
 await page.fill('#hm-q', 'кроссовок'); await waitCount(page, '#hm-list .hm-card', 1); await waitText(page, '#hm-list .hm-name', 'Кроссовки белые');
 await waitText(page, '#hm-count', 'Показано: 1 из 5');
-await page.fill('#hm-q', 'ботинки'); await waitText(page, '#hm-list .empty-t', 'Ничего не нашлось');
+await page.fill('#hm-q', 'ботинки'); await waitText(page, '#hm-list .hm-name', 'Кроссовки белые');      // «ботинки» — слово вида «Обувь»
+await page.fill('#hm-q', 'самолёт'); await waitText(page, '#hm-list .empty-t', 'Ничего не нашлось');
 await page.click('#hm-list .empty-a'); await waitValue(page, '#hm-q', ''); await waitCount(page, '#hm-list .hm-card', 5);
 await page.fill('#hm-q', 'кухня'); await waitText(page, '#hm-list .hm-name', 'Чайник'); await page.fill('#hm-q', '');
 await waitCount(page, '#hm-kinds .hm-kind', 5);                                          // «Все» и четыре вида
@@ -190,7 +193,7 @@ await page.selectOption('#hm-place', 'Кухня'); await waitCount(page, '#hm-l
 await page.selectOption('#hm-sort', 'worn'); await eventually(names, n => assert.equal(n[0], 'Куртка зимняя'));
 await page.selectOption('#hm-sort', 'name'); await eventually(names, n => assert.deepEqual(n, [...n].sort((a, b) => a.localeCompare(b, 'ru'))));
 await page.click('#search-btn'); await page.fill('#search-input', 'Columbia');           // общий поиск находит вещь
-await waitCount(page, '#search-results .result:not(.course)', 1); assert.match(await page.textContent('#search-results'), /Вещь/);
+await waitCount(page, '#search-results .result:not(.course)', 2); assert.match(await page.textContent('#search-results'), /Вещь/);          // зимняя куртка и её копия
 await page.click('#search-results .result'); await waitText(page, '#title', 'Дом');
 
 // ---------- итоги ----------
@@ -265,7 +268,7 @@ for (const cfg of [{ w: 320, h: 640, fs: 1.3 }, { w: 320, h: 640, fs: 1 }]) {
       const r = e.getBoundingClientRect();
       if (!r.width) continue;
       if (r.right > vw + 0.5 || r.left < -0.5) bad.push(`за краем: ${e.tagName.toLowerCase()}.${e.className} [${Math.round(r.left)}..${Math.round(r.right)}] «${(e.textContent || '').trim().slice(0, 24)}»`);
-      if (!e.children.length && e.textContent.trim() && !/^(INPUT|TEXTAREA|SELECT|OPTION)$/.test(e.tagName) && e.clientWidth > 0 && e.scrollWidth > e.clientWidth + 2 && getComputedStyle(e).display !== 'inline') bad.push(`текст шире рамки: ${e.className} ${e.scrollWidth}>${e.clientWidth} «${e.textContent.trim().slice(0, 24)}»`);
+      if (!e.children.length && e.textContent.trim() && !/^(INPUT|TEXTAREA|SELECT|OPTION|SUMMARY)$/.test(e.tagName) && e.clientWidth > 0 && e.scrollWidth > e.clientWidth + 2 && getComputedStyle(e).display !== 'inline') bad.push(`текст шире рамки: ${e.className} ${e.scrollWidth}>${e.clientWidth} «${e.textContent.trim().slice(0, 24)}»`);
     }
     return bad;
   });
@@ -277,7 +280,7 @@ for (const cfg of [{ w: 320, h: 640, fs: 1.3 }, { w: 320, h: 640, fs: 1 }]) {
   await p.click('#hm-add'); await waitVisible(p, '#hm-edit'); await p.click('#hm-more summary'); await check('окно «Новая вещь»'); await p.click('#hm-edit-close'); await waitVisible(p, '#hm-edit', false);
   await p.locator('#hm-list .hm-open').first().click(); await waitVisible(p, '#hm-detail'); await p.click('#hm-addlog summary'); await check('окно подробностей');
   await p.click('#hm-detail [data-fk$="|edit"]'); await waitVisible(p, '#hm-edit'); await check('окно «Изменить вещь»');
-  await p.click('#hm-edit-close'); await p.click('#hm-detail-close');
+  await p.click('#hm-edit-close'); await waitVisible(p, '#hm-edit', false);
   const e2 = L.errors.filter(e => !/Failed to load resource/.test(e));
   assert.deepEqual(e2, [], 'нет ошибок в консоли:\n' + e2.join('\n'));
   await L.close();

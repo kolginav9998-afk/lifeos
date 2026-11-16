@@ -20,16 +20,16 @@ export function createHomeView() {
   async function mark(list, kind) {
     if (!list.length) return;
     const now = Date.now(), logs = list.map(item => { let t = now; while (store.get(newLogId(item.id, t))) t++; return makeLog(item, kind, {}, t); });
+    const one = list.length === 1 ? list[0] : null, name = one?.payload.name, total = (model.stats.get(one?.id)?.wears ?? 0) + 1;      // счёт до записи: после неё экран уже обновится
     await store.saveMany(logs);
-    const one = list.length === 1 ? list[0] : null, name = one?.payload.name;
     const msg = !one ? `Стирка отмечена: ${list.length} ${plural(list.length, 'вещь', 'вещи', 'вещей')}`
       : kind === 'wash' ? `«${name}»: ${one.payload.kind === 'shoes' ? 'чистка' : 'стирка'} отмечена`
-        : `«${name}»: ${kind === 'wear' ? 'надето' : 'использовано'} ${timesText((model.stats.get(one.id)?.wears ?? 0) + 1)}`;
+        : `«${name}»: ${kind === 'wear' ? 'надето' : 'использовано'} ${timesText(total)}`;
     toast(msg, { actionLabel: 'Отменить', onAction: async () => { await store.removeMany(logs.map(l => l.id)); toast('Отметка отменена'); } });
   }
   const H = {
     model: () => model, mark, keep, setTab: key => { tab = key; render(); },
-    openDetail: id => detail.open(id), openEdit: (item, preset) => edit.open(item, preset), closeDetail: () => detail.close(),
+    openDetail: id => detail.open(id), openEdit: (item, preset) => { detail.close(); edit.open(item, preset); },     // два окна подряд: подробности закрываются, правка открывается (менеджер окон не любит два открытых сразу)
   };
   const tabs = { items: createItemsTab(H), laundry: createLaundryTab(H), totals: createTotalsTab(H) };
   const edit = createEditWindow(H), detail = createDetailWindow(H);

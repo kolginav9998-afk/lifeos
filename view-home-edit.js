@@ -94,6 +94,7 @@ export function createEditWindow(H) {
     host.scrollTop = 0;
     host.hidden = false;
     F.name.focus({ preventScroll: true });
+    queueMicrotask(() => { F.name?.focus({ preventScroll: true }); });         // менеджер окон только что вернул фокус закрывшимся подробностям
     if (existing) F.name.select?.();
   }
   return { root: host, open, close };
