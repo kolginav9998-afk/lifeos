@@ -9,7 +9,7 @@ const OWN = 'own';
 export function markupNode(markup, marks = true) {
   return el('div', { class: 'dic-read', lang: 'ru' }, ...parseMarkup(markup).map(line => el('p', { class: 'dic-line' }, ...line.flatMap((t, i) => [
     t.pause ? (marks ? el('span', { class: `dic-pause${t.pause > 1 ? ' long' : ''}`, 'aria-hidden': 'true', textContent: t.pause > 1 ? '//' : '/' }) : null) : el('span', { class: t.stress && marks ? 'dic-emph' : 'dic-w', textContent: t.w }),
-    i < line.length - 1 ? ' ' : null])).filter(Boolean)));
+    i < line.length - 1 ? ' ' : null]).filter(Boolean))));
 }
 
 export function createReadingTab(k) {

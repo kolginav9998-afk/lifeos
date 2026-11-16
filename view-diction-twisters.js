@@ -4,7 +4,7 @@ import { TWISTERS, SOUND_GROUPS, REPS, TEMPOS, filterTwisters, groupsOfTwister, 
 
 const PAGE = 24;
 const LETTERS = [...new Set(TWISTERS.flatMap(t => t.sounds).filter(s => s.length === 1))];
-const bestText = b => (b ? `рекорд: ${tempoById(b.tempo).title.toLowerCase()}, чёткость ${b.rating} из 5, ${fmtNum(b.seconds)} с` : '');
+const bestText = b => `${tempoById(b.tempo).title.toLowerCase()}, чёткость ${b.rating} из 5, ${fmtNum(b.seconds)} с`;
 
 export function createTwistersTab(k) {
   let group = '', sound = '', level = 0, shown = PAGE;
@@ -23,7 +23,7 @@ export function createTwistersTab(k) {
     const levels = el('div', { id: 'dic-tw-levels', class: 'chips', role: 'group', 'aria-label': 'Уровень' }, ...[0, 1, 2, 3].map(l => chip(l ? `Уровень ${l}` : 'Любой уровень', level === l, () => { level = l; shown = PAGE; draw(); }, { dataset: { level: String(l) } })));
     const items = found.slice(0, shown).map(t => el('li', { class: 'dic-tw-item' }, el('button', { type: 'button', class: 'dic-tw-pick', dataset: { id: t.id }, onclick: () => train(t.id, []) },
       el('span', { class: 'dic-tw-text', textContent: t.text }),
-      el('span', { class: 'muted', textContent: `Уровень ${t.level} · звуки: ${t.sounds.join(', ')}${bests[t.id] ? ` · ${bestText(bests[t.id])}` : ''}` }))));
+      el('span', { class: 'muted', textContent: `Уровень ${t.level} · звуки: ${t.sounds.join(', ')}${bests[t.id] ? ` · рекорд: ${bestText(bests[t.id])}` : ''}` }))));
     fill(panel,
       el('div', { class: 'card' },
         el('h3', { textContent: 'Скороговорки' }),
@@ -73,7 +73,7 @@ export function createTwistersTab(k) {
         save.disabled = true;
         await k.save(ev);
         const nb = twisterBest(k.events, id), improved = nb && (!best || nb.tempo > best.tempo || (nb.tempo === best.tempo && nb.seconds < best.seconds));
-        const note = rating >= 4 ? (improved ? `Новый личный рекорд: ${bestText(nb)}.` : `Записано. ${nb ? bestText(nb) : ''}`) : 'Записано. Чёткость ниже четырёх: потренируйся ещё в медленном темпе.';
+        const note = rating >= 4 ? (improved ? `Новый личный рекорд: ${bestText(nb)}.` : `Записано.${nb ? ` Рекорд: ${bestText(nb)}.` : ''}`) : 'Записано. Чёткость ниже четырёх: потренируйся ещё в медленном темпе.';
         fill(result, el('p', { id: 'dic-tw-saved', class: 'ok', textContent: note }), queue.length ? el('button', { type: 'button', id: 'dic-tw-next', class: 'primary', textContent: 'Следующая скороговорка', onclick: () => train(queue[0], queue.slice(1)) }) : null);
         announce(note);
       }
@@ -81,7 +81,7 @@ export function createTwistersTab(k) {
         k.top('Скороговорка', 'dic-t-close', 'Закрыть', () => api.close()),
         el('div', { class: 'card bt-intro' },
           el('p', { id: 'dic-tw-text', class: 'dic-big', lang: 'ru', textContent: t.text }),
-          el('p', { class: 'muted', textContent: `Уровень ${t.level} · звуки: ${t.sounds.join(', ')}${best ? ` · ${bestText(best)}` : ' · рекорда пока нет'}` }),
+          el('p', { class: 'muted', textContent: `Уровень ${t.level} · звуки: ${t.sounds.join(', ')}${best ? ` · рекорд: ${bestText(best)}` : ' · рекорда пока нет'}` }),
           tempos, target, k.voice(() => t.text, () => tempoById(tempo).voice), clock, go, result, k.safety()));
       paint();
     });
