@@ -232,7 +232,7 @@ export function pickWarmup(budgetSec, { weak = [], seed = 1 } = {}) {
   return { ids: chosen.map(e => e.id), seconds: used };
 }
 // Готовые наборы для плеера разминки.
-export const WARMUP_SETS = [{ id: 'quick', title: 'Быстрая, 3 минуты', sec: 180 }, { id: 'full', title: 'Полная, 6 минут', sec: 360 }, ...Object.entries(WARMUP_GROUPS).map(([id, title]) => ({ id, title, group: id }))];
+export const WARMUP_SETS = [{ id: 'min3', title: 'Быстрая, 3 минуты', sec: 180 }, { id: 'min6', title: 'Полная, 6 минут', sec: 360 }, ...Object.entries(WARMUP_GROUPS).map(([id, title]) => ({ id, title, group: id }))];
 export function warmupSet(setId, { weak = [], seed = 1 } = {}) {
   const s = WARMUP_SETS.find(x => x.id === setId);
   if (!s) return null;

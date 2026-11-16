@@ -166,7 +166,7 @@ test('программа дня: при десяти минутах четыре
   assert.deepEqual(pickWarmup(180, { seed: 2 }), pickWarmup(180, { seed: 2 }));
   assert.equal(warmupSet('nope'), null);
   assert.ok(warmupSet('tongue').ids.every(id => WARMUP.find(e => e.id === id).group === 'tongue'));
-  assert.ok(warmupSet('quick', { seed: 1 }).ids.length >= 3);
+  assert.ok(warmupSet('min3', { seed: 1 }).ids.length >= 3);
   assert.equal(pickTwisters(3, { weak: ['r', 'l'], level: 2, seed: 1 }).length, 3);
 });
 
