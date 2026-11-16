@@ -69,8 +69,10 @@ test('экраны не импортируют друг друга (кроме �
 });
 
 test('файлы курсов c-*.js — чистые данные: ни от чего не зависят', () => {
-  // курсы «с нуля» c-zero-XX.js вправе брать конструкторы заданий из чистого zero-kit.js и свои части zero-XX-*.js; части — только zero-kit.js и друг друга
+  // курсы «с нуля» c-zero-XX.js вправе брать конструкторы заданий из чистого zero-kit.js и свои части zero-XX-*.js; курс дикции c-diction.js — zero-kit.js и свои части diction-les-*.js; части — только zero-kit.js и друг друга
   const zeroOk = (f, d) => d === 'zero-kit.js' || d.startsWith(`zero-${f.match(/^(?:c-zero|zero)-([a-z]+)/)?.[1]}-`);
-  for (const f of files.filter(x => x.startsWith('c-'))) assert.deepEqual(graph.get(f).filter(d => !(f.startsWith('c-zero-') && zeroOk(f, d))), [], f);
+  const dictionOk = d => d === 'zero-kit.js' || d.startsWith('diction-les-');
+  for (const f of files.filter(x => x.startsWith('c-'))) assert.deepEqual(graph.get(f).filter(d => !((f.startsWith('c-zero-') && zeroOk(f, d)) || (f === 'c-diction.js' && dictionOk(d)))), [], f);
   for (const f of files.filter(x => /^zero-[a-z]+-/.test(x))) assert.deepEqual(graph.get(f).filter(d => !zeroOk(f, d)), [], f);
+  for (const f of files.filter(x => /^diction-les-/.test(x))) assert.deepEqual(graph.get(f).filter(d => !dictionOk(d)), [], f);
 });
