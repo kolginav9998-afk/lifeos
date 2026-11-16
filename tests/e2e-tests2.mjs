@@ -14,7 +14,7 @@ const SAVED = () => page.evaluate(async () => (await import('./store.js')).state
 // ---------- список: группы, пояснения, 320 px без горизонтальной прокрутки ----------
 const ids = await page.evaluate(async () => (await import('./bt-core.js')).TESTS.map(x => x.id));
 await waitCount(page, '.test-row', ids.length);
-for (const id of ['matrices', 'seq12']) assert.ok(ids.includes(id), `в реестре есть ${id}`);
+for (const id of ['matrices', 'seq12', 'verbal']) assert.ok(ids.includes(id), `в реестре есть ${id}`);
 assert.ok(await page.locator('.tg-title').count() >= 4, 'тесты разбиты на группы');
 assert.match(await text('[data-group="logic"]'), /Матрицы/);
 assert.match(await text('.tg-note'), /не настоящий IQ-тест/, 'честная подпись у группы «Логика»');
@@ -106,6 +106,31 @@ await page.click('#bt-done');
   assert.ok(m.ok && m.metrics.n === 12 && m.metrics.correct === 10 && m.metrics.typed === 1, JSON.stringify(m.metrics));
   assert.equal(m.metrics.maxScore, 78); assert.equal(m.metrics.score, 78 - 3 - 8);
   assert.ok(m.trials.some(x => x.typed === 1), 'ответ, введённый цифрами, помечен');
+}
+
+// ---------- 3. Слова и логика: 15 заданий ----------
+await startSingle('verbal');
+await page.click('#bt-go');
+for (let i = 0; i < 15; i++) {
+  await until(page, k => document.getElementById('vb-item')?.dataset.i === String(k), i);
+  const { seed, id } = await page.evaluate(() => ({ ...document.getElementById('vb-item').dataset }));
+  const item = await page.evaluate(async ([s, k]) => (await import('./iq-verbal.js')).makeVerbalSet(Number(s)).find((x, j) => j === Number(k)), [seed, i]);
+  assert.equal(item.id, id, 'разметка и генератор показывают одно и то же задание');
+  if (i === 0) {
+    assert.ok(await noScroll(), 'слова и логика: без горизонтальной прокрутки при 320 px');
+    assert.ok(await page.locator('.iq-tag').isVisible(), 'вид задания подписан словами');
+    assert.equal(await page.locator('#vb-item h3').evaluate(n => document.activeElement === n), true, 'фокус на заголовке задания (для диктора)');
+  }
+  if (i === 4) await page.click('#vb-idk');
+  else await page.click(`#vb-item .series-opt[data-i="${i === 9 ? (item.correct + 1) % item.options.length : item.correct}"]`);
+}
+await finish();
+assert.match(await text('#bt-result .res-row[data-test="verbal"]'), /13/, 'верно 13 из 15');
+await page.click('#bt-done');
+{
+  const m = (await lastRun()).tests.verbal;
+  assert.ok(m.ok && m.metrics.n === 15 && m.metrics.correct === 13, JSON.stringify(m.metrics));
+  assert.equal(m.trials.length, 15); assert.ok(m.extra.seed > 0);
 }
 
 // ---------- пропуск зрительного теста ----------

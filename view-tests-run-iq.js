@@ -3,6 +3,7 @@
 import { el, focusNode } from './ui.js';
 import { makeMatrixSet, layoutCell, describeMatrix, describeOption } from './iq-matrices.js';
 import { makeSeriesSet } from './iq-series.js';
+import { makeVerbalSet, KIND_LABEL } from './iq-verbal.js';
 import { scoreItems } from './iq-core.js';
 
 const NS = 'http://www.w3.org/2000/svg';
@@ -115,5 +116,28 @@ export function iqRunners(api) {
     return { metrics: { ...scoreItems(trials), typed: trials.filter(t => t.typed).length }, trials, extra: { seed } };
   }
 
-  return { matrices, seq12 };
+  async function verbal({ n = 15 }) {
+    const go = await intro('verbal', 'Слова и логика', [`${n} коротких заданий: аналогии, лишнее слово, рассуждения и порядок. Они идут от лёгких к трудным.`, 'Время не ограничено. В рассуждениях опирайся только на то, что сказано в условии, а не на то, что знаешь из жизни.', 'Если не знаешь, нажми «Не знаю».'], 'Начать');
+    if (go === 'skip') return { skipped: 'пропущено по желанию' };
+    const seed = rng.int(1, 2 ** 30), items = makeVerbalSet(seed, n), trials = [];
+    for (let i = 0; i < items.length; i++) {
+      const item = items[i], t0 = now();
+      const r = await waitFor((done, h) => {
+        const heading = el('h3', { id: 'vb-pos', tabIndex: -1, textContent: `Задание ${i + 1} из ${items.length}` });
+        const opts = item.options.map((o, k) => el('button', { type: 'button', class: 'series-opt wide', dataset: { i: String(k) }, textContent: o }));
+        opts.forEach((b, k) => h.on(b, 'click', () => done({ choice: k, rt: now() - t0 })));
+        const idk = el('button', { type: 'button', id: 'vb-idk', class: 'link', textContent: 'Не знаю' });
+        h.on(idk, 'click', () => done({ choice: null, rt: now() - t0 }));
+        set('verbal', 'run', el('div', { id: 'vb-item', class: 'iq-item', dataset: { seed: String(item.seed), i: String(i), id: item.id, level: String(item.level), kind: item.kind } }, heading,
+          el('span', { class: 'iq-tag', textContent: KIND_LABEL[item.kind] }), item.text ? el('p', { class: 'iq-q', id: 'vb-text', textContent: item.text }) : null,
+          el('p', { class: 'iq-q', id: 'vb-q', textContent: item.q }), item.hint ? el('p', { class: 'muted', textContent: item.hint }) : null,
+          el('div', { class: 'series-opts one-col', role: 'group', 'aria-label': 'Варианты ответа' }, ...opts), el('div', { class: 'row mx-actions' }, idk)));
+        focusNode(heading);
+      });
+      trials.push({ i, id: item.id, level: item.level, correct: r.choice === item.correct, rt: r.rt, choice: r.choice });
+    }
+    return { metrics: scoreItems(trials), trials, extra: { seed } };
+  }
+
+  return { matrices, seq12, verbal };
 }
