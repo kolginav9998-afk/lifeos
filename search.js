@@ -33,6 +33,7 @@ function searchable(e) {
     case 'skill': return { kind: 'Навык', title: p.title, text: [p.title, p.area, p.note, p.evidence].join(' ') };
     case 'parked': return { kind: 'Отложено', title: p.text, text: p.text };
     case 'wish': return { kind: 'Хочу купить', title: p.text, text: p.text };
+    case 'item': return { kind: 'Вещь', title: p.name, text: [p.name, p.place, p.brand, p.color, p.size, p.material, ...(p.tags ?? []), p.note].join(' ') };
     case 'debt': return { kind: 'Долг', title: `${p.who}${p.note ? ' — ' + p.note : ''}`, text: [p.who, p.note].join(' ') };
     case 'joy': return { kind: 'Радость', title: p.text, text: p.text };
     case 'checkin': return p.note ? { kind: p.slot === 'm' ? 'Утро' : 'Вечер', title: p.note, text: [p.note, p.date].join(' ') } : null;
@@ -42,7 +43,7 @@ function searchable(e) {
 // Коротко: что это за запись (для списка «чем отличается» при загрузке архива).
 export function describeEvent(e) { const s = searchable(e); return s ? { kind: s.kind, title: String(s.title ?? '').slice(0, 60) } : { kind: e.type, title: '' }; }
 
-export const TAB_OF = { task: 'today', note: 'notes', habit: 'habits', expense: 'money', income: 'money', diary: 'diary', measure: 'health', checkin: 'diary', ucard: 'learn', skill: 'skills', workout: 'workouts', goal: 'plans', sub: 'plans', experiment: 'insights', focus: 'today', person: 'people', okr: 'okr', thought: 'health', intention: 'today', dayreview: 'reflect', weekreflect: 'reflect', decision: 'reflect', joy: 'reflect', parked: 'reflect', wish: 'plans', debt: 'plans', lessonnote: 'learn' };
+export const TAB_OF = { task: 'today', note: 'notes', habit: 'habits', expense: 'money', income: 'money', diary: 'diary', measure: 'health', checkin: 'diary', ucard: 'learn', skill: 'skills', workout: 'workouts', goal: 'plans', sub: 'plans', experiment: 'insights', focus: 'today', person: 'people', okr: 'okr', thought: 'health', intention: 'today', dayreview: 'reflect', weekreflect: 'reflect', decision: 'reflect', joy: 'reflect', parked: 'reflect', wish: 'plans', debt: 'plans', lessonnote: 'learn', item: 'home' };
 
 export function searchEvents(events, query, limit = 50) {
   const tokens = normalize(query).split(/\s+/).filter(Boolean);

@@ -15,6 +15,7 @@ import { practiceBy } from './practice.js';
 import { focusMinutes } from './focus.js';
 import { doneWorkouts } from './workouts.js';
 import { dayMood } from './diary.js';
+import { laundryCount } from './home.js';
 
 const plural = (n, one, few, many) => { const a = Math.abs(n) % 100, b = a % 10; return a > 10 && a < 20 ? many : b > 1 && b < 5 ? few : b === 1 ? one : many; };
 const f1 = v => String(Math.round(v * 10) / 10).replace('.', ',');
@@ -44,6 +45,7 @@ export function dayBrief(events, today, { tasks = 3 } = {}) {
     checkups: checkupsDue(events, today).length,
     decisions: decisionsDue(events, today).length,
     parked: parkedDue(events, today).length,
+    laundry: laundryCount(events, today),
   };
 }
 export function briefText(b) {
@@ -58,6 +60,7 @@ export function briefText(b) {
   if (b.meds.length) L.push(`Лекарства и добавки: ${b.meds.map(m => `${m.name} (${WHEN[m.when] ?? m.when})`).join(', ')}`);
   if (b.birthdays.length) L.push(`День рождения: ${b.birthdays.map(x => `${x.name} (${x.inDays === 0 ? 'сегодня' : 'завтра'})`).join(', ')}`);
   if (b.contacts.length) L.push(`Давно не общались: ${b.contacts.join(', ')}`);
+  if (b.laundry) L.push(`Стирка: ${b.laundry} ${plural(b.laundry, 'вещь', 'вещи', 'вещей')} пора стирать`);
   const more = [b.checkups && `проверки здоровья: ${b.checkups}`, b.decisions && `решения, которые пора оценить: ${b.decisions}`, b.parked && `отложенные мысли: ${b.parked}`].filter(Boolean);
   if (more.length) L.push(`Не забыть: ${more.join('; ')}`);
   return L.join('\n');
