@@ -16,7 +16,7 @@ await until(p, () => !document.getElementById('app').hidden);
 
 await tab(p, 'help');
 assert.equal(await p.textContent('#title'), 'Справка');
-assert.deepEqual(await p.locator('#subnav button').allTextContents(), ['Настройки', 'Профиль', 'Справка'], 'Справка рядом с Настройками и Профилем');
+assert.deepEqual(await p.locator('#subnav button').allTextContents(), ['Все разделы', 'Профиль', 'Настройки', 'Справка'], 'Справка рядом с Настройками и Профилем');
 assert.ok(await p.locator('#help-list .help-item').count() >= 14, 'в списке все вопросы');
 assert.match(await p.textContent('#help-list .help-item >> nth=0'), /С чего начать/);
 

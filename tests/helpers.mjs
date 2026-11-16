@@ -92,7 +92,7 @@ const FIRST_OF = { today: 'today', home: 'home', money: 'money', grow: 'learn', 
 export async function tab(page, id) {
   const g = GROUP_OF[id] ?? id;
   await page.click(`#tabs button[data-tab="${g}"]`);
-  if (id !== FIRST_OF[g] && id !== g) await page.click(`#subnav button[data-view="${id}"]`);
+  if (id !== FIRST_OF[g]) await page.click(`#subnav button[data-view="${id}"]`);
 }
 
 // ---------- ожидания ----------

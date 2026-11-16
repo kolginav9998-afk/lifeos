@@ -57,7 +57,7 @@ await until(page, () => document.getElementById('minimum').hidden);
 // ---------- «Рефлексия»: вечерний обзор ----------
 await tab(page, 'reflect');
 assert.equal(await text('#title'), 'Рефлексия');
-assert.deepEqual(await page.locator('#subnav button').allTextContents(), ['Дневник', 'Здоровье', 'Тренировки', 'Заметки', 'Рефлексия']);
+assert.deepEqual(await page.locator('#subnav button').allTextContents(), ['Задачи', 'Привычки', 'Дневник', 'Здоровье', 'Тренировки', 'Заметки', 'Итоги', 'Люди']);
 assert.equal(await page.locator('#lowmood').isHidden(), true, 'отложенное предупреждение не повторяется');
 await page.click('#rv-save'); await toast(/хотя бы на один/);
 await page.fill('#rv-win', 'Закрыл отчёт'); await page.fill('#rv-learn', 'Начинать с трудного');
@@ -259,30 +259,28 @@ assert.match(await text('#stats'), /всего записей: \d+/);
 assert.equal(await page.locator('#tabs button').count(), 5);
 await page.check('#simple-mode');
 await until(page, () => document.querySelectorAll('#tabs button').length === 4);
-assert.deepEqual(await page.locator('#tabs button span').allTextContents(), ['Сегодня', 'Дневник', 'Развитие', 'Ещё']);
+assert.deepEqual(await page.locator('#tabs button span').allTextContents(), ['Сегодня', 'Дом', 'Учёба', 'Меню']);
 assert.equal(await text('#title'), 'Настройки', 'остаёмся на настройках');
 await page.click('#tabs button[data-tab="today"]');
 await until(page, () => !document.getElementById('view-today').hidden);
-assert.deepEqual(await page.locator('#subnav button').allTextContents(), ['Задачи', 'Привычки']);
+assert.deepEqual(await page.locator('#subnav button').allTextContents(), ['Задачи', 'Привычки', 'Дневник', 'Здоровье', 'Заметки']);
 for (const id of ['focus-chip', 'learn-chip', 'test-chip', 'okr-chip']) assert.equal(await page.locator(`#${id}`).count(), 0, `${id} скрыт в простом режиме`);
 assert.equal(await page.locator('#heavy-chip').count(), 1, '«Тяжёлый день» остаётся');
 assert.equal(await page.locator('#review').isHidden(), true); assert.equal(await page.locator('#journal').isHidden(), true);
-await page.click('#tabs button[data-tab="diary"]');
-assert.deepEqual(await page.locator('#subnav button').allTextContents(), ['Дневник', 'Здоровье', 'Заметки']);
-await page.click('#tabs button[data-tab="more"]');
+await tab(page, 'more');
 await page.uncheck('#simple-mode');
 await until(page, () => document.querySelectorAll('#tabs button').length === 5);
 await page.click('#tabs button[data-tab="today"]');
 assert.equal(await page.locator('#focus-chip').count(), 1, 'после выключения всё вернулось');
 // выключаем простой режим, находясь на скрытом экране: приложение само уходит на «Сегодня»
-await page.click('#tabs button[data-tab="more"]'); await page.check('#simple-mode');
+await tab(page, 'more'); await page.check('#simple-mode');
 await until(page, () => document.querySelectorAll('#tabs button').length === 4);
 await page.evaluate(async () => { document.querySelector('#search-btn').click(); });
 await page.fill('#search-input', 'сменный');
 await until(page, () => document.querySelector('.result'));
 await page.click('.result');
 assert.equal(await text('#title'), 'Рефлексия', 'из поиска можно открыть и скрытый экран');
-await page.click('#tabs button[data-tab="more"]'); await page.uncheck('#simple-mode');
+await tab(page, 'more'); await page.uncheck('#simple-mode');
 await until(page, () => document.querySelectorAll('#tabs button').length === 5);
 
 // ---------- поиск находит новые записи ----------
