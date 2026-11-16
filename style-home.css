@@ -1,1 +1,93 @@
-/* Экран «Дом». Подключается после style-diction.css (см. index.html). */
+/* Экран «Дом»: вещи, стирка, итоги и окна «Добавить вещь» и «Подробности». Подключается после style-diction.css (см. index.html). Цвета только из токенов. */
+
+/* вкладки внутри экрана */
+#view-home .hm-tabs{grid-template-columns:repeat(3,minmax(0,1fr))}
+#view-home .hm-tabs .seg{min-height:44px;padding:4px 6px;font-size:var(--t14);line-height:1.2;overflow-wrap:anywhere}
+#view-home .hm-body,#view-home .hm-items,#view-home .hm-laundry,#view-home .hm-totals{display:flex;flex-direction:column;gap:var(--s4);min-width:0}
+
+/* «Вещи»: кнопка добавления, поиск, фильтры */
+#view-home .hm-add{width:100%;min-height:54px;gap:var(--s2);font-size:var(--t16)}
+#view-home .hm-kinds{gap:var(--s2)}
+#view-home .hm-kind{min-height:40px}
+#view-home .hm-kind[aria-pressed=true]{background:var(--tint-accent);border-color:var(--mode-accent);font-weight:700}
+#view-home .hm-kind[aria-pressed=true]::before{content:"✓ "}
+#view-home .hm-filters{display:grid;grid-template-columns:repeat(auto-fit,minmax(min(100%,150px),1fr));gap:var(--s3)}
+#view-home .hm-sel{margin-top:0;min-width:0}
+#view-home .hm-sel select{min-width:0}
+#view-home .hm-count{margin:0}
+
+/* карточки вещей */
+#view-home .hm-list{list-style:none;margin:0;padding:0;display:flex;flex-direction:column;gap:var(--s3)}
+#view-home .hm-card{display:flex;flex-direction:column;gap:var(--s3);padding:var(--s3);cursor:pointer;box-shadow:var(--shadow-sm)}
+#view-home .hm-open{display:flex;flex-direction:column;align-items:flex-start;justify-content:flex-start;gap:2px;width:100%;min-height:56px;padding:2px;border:0;background:none;text-align:left;color:var(--text);font-weight:400;border-radius:var(--r8)}
+#view-home .hm-name,#hm-detail .hm-name{font-size:var(--t16);font-weight:700;overflow-wrap:anywhere}
+#view-home .hm-where,#view-home .hm-stat{font-size:var(--t14);line-height:1.4;color:var(--muted);overflow-wrap:anywhere}
+.hm-badges{display:flex;flex-wrap:wrap;gap:6px;margin-top:6px}
+.hm-badge{display:inline-flex;align-items:center;gap:4px;padding:2px 8px;border-radius:var(--r8);font-size:var(--t12);font-weight:600;line-height:1.3;background:var(--soft);color:var(--text)}
+.hm-badge.warn{background:var(--tint-warn)}.hm-badge.warn svg{color:var(--warn)}
+.hm-quick{display:grid;grid-template-columns:repeat(auto-fit,minmax(min(100%,120px),1fr));gap:var(--s2)}
+.hm-q{min-height:48px;gap:var(--s2);font-size:var(--t16);font-weight:600;border-radius:var(--r12)}
+.hm-q.hm-due{background:var(--tint-warn);box-shadow:inset 0 0 0 2px var(--warn);color:var(--text)}
+
+/* «Стирка» */
+#view-home .hm-help,#view-home .hm-ok{margin:0}
+#view-home .hm-ok{font-weight:600}
+#view-home .hm-ok::before{content:"✓ ";color:var(--ok)}
+#view-home .hm-sec{display:flex;flex-direction:column;gap:var(--s3)}
+#view-home .hm-h,#hm-detail .hm-h{font-size:var(--t16);font-weight:700;text-transform:none;letter-spacing:0;color:var(--text);margin:0 0 var(--s2)}
+#view-home .hm-sec>.hm-h{margin:0}
+#view-home .hm-gh{font-size:var(--t14);color:var(--muted);margin:var(--s2) 0 0}
+#view-home .hm-rows,#hm-detail .hm-hist{list-style:none;margin:0;padding:0;display:flex;flex-direction:column;gap:var(--s2)}
+#view-home .hm-row{display:grid;gap:4px;padding:var(--s3);border-radius:var(--r12);background:var(--card);border:1px solid var(--line);box-shadow:var(--shadow-sm)}
+#view-home .hm-pick{display:flex;align-items:center;gap:var(--s3);min-height:44px;cursor:pointer}
+#view-home .hm-rname{font-weight:600;overflow-wrap:anywhere}
+#view-home .hm-rcare{overflow-wrap:anywhere}
+#view-home .hm-mtext{font-size:var(--t14)}
+#view-home .hm-row .progress,#hm-detail .hm-lines .progress{margin:2px 0}
+#view-home .hm-soon{padding:2px var(--s4) var(--s4)}
+#view-home .hm-soon>.hm-gh{margin-top:var(--s3)}
+#view-home .hm-washbar{position:sticky;bottom:calc(72px + env(safe-area-inset-bottom));z-index:3;padding:var(--s2) 0;background:linear-gradient(180deg,transparent,var(--bg) 40%)}
+#view-home .hm-go{width:100%;min-height:54px;font-size:var(--t16)}
+
+/* «Итоги» */
+#view-home .hm-card-t{display:flex;flex-direction:column;gap:var(--s2)}
+#view-home .hm-big3 p{margin:0 0 var(--s2);overflow-wrap:anywhere}
+#view-home .hm-big3 .big{font-size:var(--t32)}
+#view-home .hm-top{list-style:decimal;margin:0;padding-left:1.5em;display:flex;flex-direction:column;gap:var(--s1)}
+#view-home .hm-top li{padding-left:2px}
+#view-home .hm-top li::marker{color:var(--muted);font-weight:600}
+#view-home .hm-val{display:block;color:var(--muted);font-size:var(--t14);overflow-wrap:anywhere}
+.hm-link{min-height:40px;padding:6px 4px;text-align:left;overflow-wrap:anywhere}
+#view-home .hm-seg{margin-bottom:var(--s2)}
+#view-home .hm-bars{margin-top:var(--s3)}
+#view-home .cat{margin:var(--s2) 0}
+#view-home .cat-row span{overflow-wrap:anywhere}
+
+/* окна: добавить, изменить, подробности */
+#hm-edit .hm-form{gap:var(--s3)}
+#hm-edit .field{margin-top:0}
+#hm-edit .hm-grid,#hm-detail .hm-grid{display:grid;grid-template-columns:repeat(auto-fit,minmax(min(100%,150px),1fr));gap:var(--s3);margin:var(--s3) 0}
+#hm-edit .hm-more{padding:2px var(--s4) var(--s4);display:block}
+#hm-edit .hm-more>.field{margin-top:var(--s3)}
+#hm-edit .hm-care{min-width:0;margin:var(--s3) 0;padding:var(--s3);border:1px solid var(--line);border-radius:var(--r12)}
+#hm-edit .hm-care legend{padding:0 6px;font-size:var(--t14);font-weight:600}
+#hm-edit .hm-care .grid,#hm-edit .hm-care .hm-grid{margin-bottom:0}
+#hm-edit .hm-tpl p{margin:0 0 var(--s2)}
+#hm-edit .big-btn{width:100%}
+#hm-edit input:disabled{opacity:.5}
+#hm-detail .hm-title{font-size:var(--t24);line-height:1.2;margin:0;overflow-wrap:anywhere}
+#hm-detail .hm-title:focus{outline:none}
+#hm-detail .hm-lines p{margin:0 0 var(--s1);overflow-wrap:anywhere}
+#hm-detail .hm-dl{display:grid;grid-template-columns:minmax(0,38%) minmax(0,1fr);gap:var(--s2) var(--s3);margin:0}
+#hm-detail .hm-dl dt{color:var(--muted);font-size:var(--t14)}
+#hm-detail .hm-dl dd{margin:0;overflow-wrap:anywhere}
+#hm-detail .hm-hrow{display:grid;grid-template-columns:auto minmax(0,1fr) auto;align-items:center;gap:var(--s3);padding:var(--s1) 0;border-top:1px solid var(--line)}
+#hm-detail .hm-hd{color:var(--muted);font-size:var(--t14);white-space:nowrap}
+#hm-detail .hm-hk{overflow-wrap:anywhere}
+#hm-detail .hm-hist+.chip,#hm-detail .hm-hist~.chip{margin-top:var(--s2)}
+#hm-detail .hm-actions{display:grid;grid-template-columns:repeat(auto-fit,minmax(min(100%,140px),1fr));gap:var(--s2)}
+#hm-detail .hm-actions button{min-height:48px}
+#hm-detail .hm-confirm{border-color:var(--danger)}
+#hm-detail .hm-confirm p{margin:0 0 var(--s3)}
+#hm-detail .hm-quick{margin:0}
+@media (max-width:360px){#hm-detail .hm-dl{grid-template-columns:minmax(0,1fr)}#hm-detail .hm-dl dd{margin-bottom:var(--s2)}}

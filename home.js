@@ -14,7 +14,8 @@ export const HOW_LABEL = { machine: 'Машинная стирка', hand: 'Ру
 export const LOG_NOUN = { wear: 'Надевание', wash: 'Стирка', use: 'Использование', repair: 'Ремонт', move: 'Перемещение', note: 'Заметка' };
 const QUICK = { clothes: ['wear', 'wash'], shoes: ['wear', 'wash'], underwear: ['wear', 'wash'], towels: ['use', 'wash'], bedding: ['wash'], electronics: ['use'], kitchen: ['use'], tools: ['use'], furniture: [], documents: [], other: ['use'] };
 export const quickLogs = kind => QUICK[kind] ?? ['use'];
-export const logButton = (log, kind) => (log === 'wear' ? 'Надел' : log === 'use' ? 'Использовал' : log === 'wash' ? (kind === 'shoes' ? 'Почистил' : 'Постирал') : LOG_NOUN[log]);
+const BUTTON = { wear: 'Надел', use: 'Использовал', repair: 'Починил', move: 'Переложил', note: 'Заметка' };
+export const logButton = (log, kind) => (log === 'wash' ? (kind === 'shoes' ? 'Почистил' : 'Постирал') : BUTTON[log] ?? LOG_NOUN[log]);
 const KIND_WORDS = { clothes: 'одежда вещи гардероб', shoes: 'обувь ботинки', underwear: 'нижнее белье трусы', bedding: 'постель простыня одеяло наволочка', towels: 'полотенце', electronics: 'электроника гаджет', kitchen: 'посуда', tools: 'инструмент', furniture: 'интерьер', documents: 'бумаги', other: '' };
 const TRACKED = new Set(['clothes', 'shoes', 'underwear', 'bedding', 'towels', 'electronics', 'kitchen', 'tools', 'other']);   // у мебели и документов «использование» не отмечают
 const USE = new Set(['wear', 'use']);
@@ -127,9 +128,9 @@ export function makeLog(itemRef, kind, { date, note = '', place = '' } = {}, now
   return { id: newLogId(item, now), type: 'itemlog', ts: now, payload, source: 'manual', confidence: 1, evidence: [] };
 }
 // Переложил: новое место в вещи и запись в истории (что было раньше).
-export function moveItem(ev, place, now = Date.now()) {
+export function moveItem(ev, place, now = Date.now(), { date, note = '' } = {}) {
   const was = ev.payload.place;
-  return { item: updateItem(ev, { place }, now), log: makeLog(ev, 'move', { place, note: was ? `было: ${was}` : '' }, now) };
+  return { item: updateItem(ev, { place }, now), log: makeLog(ev, 'move', { date, place, note: [was ? `было: ${was}` : '', cleanText(note, 100)].filter(Boolean).join('; ') }, now) };
 }
 
 // ---------- чтение ----------
@@ -215,8 +216,9 @@ export function washProgress(item, s) {
 }
 
 // ---------- итоги ----------
-export function summary(events, today = todayStr(), { months = 6 } = {}) {
-  const m = homeModel(events, today);
+export const summary = (events, today = todayStr(), opts) => summaryOf(homeModel(events, today), opts);
+export function summaryOf(m, { months = 6 } = {}) {
+  const today = m.today;
   const own = m.items.filter(i => i.payload.status === 'active' || i.payload.status === 'stored');
   const ranked = (rows, key, dir = -1) => rows.sort((a, b) => dir * (key(a) - key(b)) || byName(a.item, b.item));
   const kinds = new Map();
