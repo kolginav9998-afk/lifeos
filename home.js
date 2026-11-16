@@ -83,7 +83,7 @@ const tagsOf = v => {
 };
 
 // Приводит поля формы к записи: обрезает, проверяет, подставляет умолчания. Бросает Error с понятным текстом.
-export function itemPayload(f, now = Date.now()) {
+function itemPayload(f, now = Date.now()) {
   const name = clean(f.name, 80);
   if (!name) throw new Error('Напиши название вещи');
   if (!KIND_LABEL[f.kind]) throw new Error('Выбери вид вещи');
