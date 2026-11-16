@@ -61,3 +61,6 @@
 .dic-typed{max-width:16rem}
 .dic-lesson .dic-opts{margin:0}
 @media (prefers-reduced-motion: reduce){#dic-circle{transition-duration:.01s !important}}
+/* заголовок упражнения и число повторов переносятся на вторую строку (узкий экран и крупный шрифт) */
+.dic-ex>summary{flex-wrap:wrap;column-gap:4px}
+.dic-ex>summary .muted{min-width:0;white-space:normal}

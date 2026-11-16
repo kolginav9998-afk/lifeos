@@ -116,7 +116,7 @@ await page.click('#zero-close');
   assert.equal(await page.locator('#search-results .result.course').filter({ hasText: closed.title }).count(), 0, 'закрытый урок в поиске не светится');
   await page.click('#search-btn');
   await tab(page, 'learn');
-  assert.equal(await page.locator('.track-card').count(), 9, 'курсы «с нуля» не перечислены как обычные курсы');
+  assert.equal(await page.locator('.track-card').count(), 10, 'курсы «с нуля» не перечислены как обычные курсы (9 курсов и свои карточки)');
   assert.match(await text('#learn-zero'), /Курсы с нуля/);
   await page.click('.track-card[data-track="hebrew"]');
   assert.match(await text('#learn-zero-banner'), /Начинаешь с нуля/);

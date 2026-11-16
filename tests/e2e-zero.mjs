@@ -111,7 +111,7 @@ assert.equal(await text('.zero-progress-card h3'), en.title);
 
 // ---------- 2. «Учёба»: карточка вместо списка уроков, поиск не раскрывает закрытое ----------
 await tab(page, 'learn');
-assert.equal(await page.locator('.track-card').count(), 9, 'три маршрута «с нуля» не перечислены как обычные курсы');
+assert.equal(await page.locator('.track-card').count(), 10, 'три маршрута «с нуля» не перечислены как обычные курсы (9 курсов и свои карточки)');
 assert.match(await text('#learn-zero'), /Курсы с нуля/);
 await page.click('.track-card[data-track="english"]');
 assert.match(await text('#learn-zero-banner'), /Начинаешь с нуля/, 'мягкая подсказка на старом курсе');

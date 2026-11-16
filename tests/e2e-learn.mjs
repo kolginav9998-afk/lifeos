@@ -11,7 +11,7 @@ const toast = re => waitToast(page, re);
 // ---------- главная «Учёбы» ----------
 await tab(page, 'learn');
 assert.equal(await text('#title'), 'Учёба');
-assert.equal(await page.locator('.track-card').count(), 9, '8 курсов и свои карточки');
+assert.equal(await page.locator('.track-card').count(), 10, '9 курсов (включая дикцию) и свои карточки; маршруты «с нуля» не перечислены');
 assert.equal(await text('#learn-count'), '0');
 assert.equal(await page.locator('#learn-start').count(), 0, 'пока нечего повторять');
 assert.equal(await page.locator('#tabs button').count(), 5);
