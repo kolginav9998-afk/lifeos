@@ -264,7 +264,7 @@ for (const cfg of [{ w: 320, h: 640, fs: 1.3 }, { w: 320, h: 640, fs: 1 }]) {
     const scope = [...document.querySelectorAll('#view-home, #view-home *, .overlay:not([hidden]), .overlay:not([hidden]) *')];
     const shown = e => { for (let n = e; n && n !== document.body; n = n.parentElement) if (n.hidden || getComputedStyle(n).display === 'none' || getComputedStyle(n).visibility === 'hidden') return false; return true; };
     for (const e of scope) {
-      if (!shown(e) || e.closest('svg') || e.closest('[hidden]') || getComputedStyle(e).position === 'fixed' && !e.classList.contains('overlay')) continue;
+      if (!shown(e) || e.closest('svg') || e.closest('[hidden]') || e.closest('.hm-kinds') || getComputedStyle(e).position === 'fixed' && !e.classList.contains('overlay')) continue;       // полоса видов прокручивается по горизонтали
       const r = e.getBoundingClientRect();
       if (!r.width) continue;
       if (r.right > vw + 0.5 || r.left < -0.5) bad.push(`за краем: ${e.tagName.toLowerCase()}.${e.className} [${Math.round(r.left)}..${Math.round(r.right)}] «${(e.textContent || '').trim().slice(0, 24)}»`);

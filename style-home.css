@@ -7,7 +7,9 @@
 
 /* «Вещи»: кнопка добавления, поиск, фильтры */
 #view-home .hm-add{width:100%;min-height:54px;gap:var(--s2);font-size:var(--t16)}
-#view-home .hm-kinds{gap:var(--s2)}
+#view-home .hm-kinds{flex-wrap:nowrap;gap:var(--s2);overflow-x:auto;margin:0 -16px;padding:2px 16px 6px;scroll-snap-type:x proximity;scroll-padding:0 16px;scrollbar-width:none;-webkit-mask-image:linear-gradient(90deg,transparent,#000 14px,#000 calc(100% - 30px),transparent);mask-image:linear-gradient(90deg,transparent,#000 14px,#000 calc(100% - 30px),transparent)}
+#view-home .hm-kinds::-webkit-scrollbar{display:none}
+#view-home .hm-kinds>*{flex:none;scroll-snap-align:start}
 #view-home .hm-kind{min-height:40px}
 #view-home .hm-kind[aria-pressed=true]{background:var(--tint-accent);border-color:var(--mode-accent);font-weight:700}
 #view-home .hm-kind[aria-pressed=true]::before{content:"✓ "}
@@ -50,6 +52,7 @@
 #view-home .hm-soon>.hm-gh{margin-top:var(--s3)}
 #view-home .hm-washbar{position:sticky;bottom:calc(72px + env(safe-area-inset-bottom));z-index:3;padding:var(--s2) 0;background:linear-gradient(180deg,transparent,var(--bg) 40%)}
 #view-home .hm-go{width:100%;min-height:54px;font-size:var(--t16)}
+@media (max-height:700px){#view-home .hm-washbar{position:static;background:none}}
 
 /* «Итоги» */
 #view-home .hm-card-t{display:flex;flex-direction:column;gap:var(--s2)}

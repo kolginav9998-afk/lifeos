@@ -6,7 +6,7 @@ export function createLaundryTab(H) {
   const off = new Set(), on = new Set();                 // снятые человеком из «пора стирать» и добавленные из «носили, но ещё не пора»
   let rows = [], soonOpen = null;
   const picked = r => (r.due ? !off.has(r.item.id) : on.has(r.item.id));
-  const intro = el('p', { class: 'muted hm-help', textContent: 'Здесь вещи, которые пора стирать по твоим правилам. Загрузил(а) в машину — нажми кнопку внизу, и счётчики начнутся заново.' });
+  const intro = el('p', { class: 'muted hm-help', textContent: 'Вещи, которые пора стирать по правилам. Загрузил(а) в машину — нажми кнопку внизу.' });
   const box = el('div', { id: 'hm-wash-list', class: 'hm-wash' });
   const go = el('button', { type: 'button', id: 'hm-wash-go', class: 'primary big-btn hm-go' });
   const bar = el('div', { class: 'hm-washbar' }, go);

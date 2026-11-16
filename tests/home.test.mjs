@@ -2,6 +2,7 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
 import { REGISTRY } from '../registry.js';
+import { dayBrief, briefText } from '../daycards.js';
 import {
   KINDS, TEMPLATES, templateFields, defaultCare, careOf, makeItem, updateItem, fieldsOf, makeLog, moveItem, parsePrice, itemsOf, logsOf, lastLog, statsOf, homeModel, laundryOf, laundryGroups, laundryCount,
   summary, searchItems, placesOf, quickLogs, logButton, statsLine, washProgress, careText, ageText, plural, timesText, NEVER_USED_DAYS,
@@ -237,4 +238,14 @@ test('места, подписи и тексты: подсказки мест, �
   assert.equal(careText({ how: 'dry', temp: null, washEveryWears: null, washEveryDays: 21 }), 'Химчистка, стирать раз в 21 день'); assert.equal(careText({ how: 'none' }), 'Не стирается');
   assert.equal(parsePrice(' 1 250,50 '), 125050); assert.equal(parsePrice(''), null); assert.equal(parsePrice('0'), 0); assert.equal(parsePrice('0,00'), 0); assert.throws(() => parsePrice('много'), /Сумма/);
   assert.equal(KINDS.length, 11);
+});
+
+test('«Сегодня»: в брифе одна строка про стирку, только когда есть что стирать', () => {
+  const shirt = mk({ name: 'Рубашка', care: { how: 'machine', washEveryWears: 1 } }), evs = [shirt, log(shirt, 'wear', '2026-11-10')];
+  assert.match(briefText(dayBrief(evs, TODAY)), /\nСтирка: 1 вещь пора стирать/);
+  const two = [...evs, mk({ name: 'Брюки', care: { how: 'machine', washEveryWears: 1 } }), mk({ name: 'Шарф', care: { how: 'hand', washEveryWears: 1 } })];
+  two.push(log(two[2], 'wear', '2026-11-11'), log(two[3], 'wear', '2026-11-12'));
+  assert.match(briefText(dayBrief(two, TODAY)), /Стирка: 3 вещи пора стирать/);
+  assert.doesNotMatch(briefText(dayBrief([shirt], TODAY)), /Стирка/); assert.doesNotMatch(briefText(dayBrief([], TODAY)), /Стирка/);
+  assert.doesNotMatch(briefText(dayBrief([...evs, log(shirt, 'wash', '2026-11-11')], TODAY)), /Стирка/, 'после стирки строки нет');
 });
