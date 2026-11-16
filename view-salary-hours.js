@@ -50,7 +50,7 @@ export function createHoursPanel({ events }) {
         editable ? el('button', { type: 'button', class: 'chip', textContent: 'Изменить', 'aria-label': `Изменить часы: ${dateLong(d.date)}`, onclick: () => open(d.date) }) : null);
     }));
     const m = s.res.month, rec = days.filter(d => d.recorded);
-    totals.textContent = `План: ${fmtDur(days.reduce((a, d) => a + d.plannedMin, 0))} · отмечено: ${fmtDur(rec.reduce((a, d) => a + d.actualMin, 0))} (дней: ${rec.length}) · переработка к оплате: ${fmtDur(m.overtime.min)} (${m.overtime.min} мин)`;
+    totals.textContent = `План: ${fmtDur(days.reduce((a, d) => a + d.plannedMin, 0))} · отмечено: ${fmtDur(rec.reduce((a, d) => a + d.actualMin, 0))} (дней: ${rec.length}) · переработка к оплате: ${m.overtime.min >= 60 ? `${fmtDur(m.overtime.min)} (${m.overtime.min} мин)` : `${m.overtime.min} мин`}`;
     hiddenNote.textContent = days.length - show.length ? `Выходные без отметок не показываю: ${days.length - show.length}.` : '';
     if (pendingFocus) { list.querySelector(`[data-date="${pendingFocus}"] button`)?.focus(); pendingFocus = ''; }
   }

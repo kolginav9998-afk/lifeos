@@ -12,7 +12,7 @@ export function createWizard({ events }) {
     el('strong', { textContent: t.title }), el('span', { class: 'muted', textContent: t.about })));
   const startIn = el('input', { id: 'sch-wiz-start', type: 'date', value: start, onchange: () => { start = startIn.value || todayStr(); paint(); } });
   const startBox = el('label', { class: 'work-f' }, el('span', { class: 'muted', textContent: 'Дата первого дня цикла (например, твой первый рабочий день)' }), startIn);
-  const weekBtns = WEEKDAYS_SHORT.map((w, i) => el('button', { type: 'button', class: 'chip', textContent: w, 'aria-label': `Рабочий день: ${WEEKDAYS_LONG[i]}`, onclick: () => { week[i] = !week[i]; paint(); announce(`${WEEKDAYS_LONG[i]}: ${week[i] ? 'рабочий' : 'выходной'}`); } }));
+  const weekBtns = WEEKDAYS_SHORT.map((w, i) => el('button', { type: 'button', class: 'chip', textContent: w, 'aria-label': `${w} (${WEEKDAYS_LONG[i]}): рабочий день`, onclick: () => { week[i] = !week[i]; paint(); announce(`${WEEKDAYS_LONG[i]}: ${week[i] ? 'рабочий' : 'выходной'}`); } }));
   const weekBox = el('div', { class: 'form-stack' }, el('strong', { textContent: 'Рабочие дни недели' }), el('div', { class: 'chips', role: 'group', 'aria-label': 'Рабочие дни недели' }, ...weekBtns));
   const stepList = el('ol', { id: 'sch-wiz-steps', class: 'work-steps', 'aria-label': 'Порядок дней в цикле' }), adders = el('div', { class: 'chips', role: 'group', 'aria-label': 'Добавить день в цикл' });
   const cycleBox = el('div', { class: 'form-stack' }, el('strong', { textContent: 'Порядок дней в цикле' }), stepList, adders);

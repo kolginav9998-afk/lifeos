@@ -29,7 +29,7 @@ function listEditor({ id, title, hint, pctText, withWhen }) {
     add.disabled = rows.length >= 12;
     fill(box, rows.map((r, i) => {
       const inp = (key, props) => el('input', { ...props, value: r[key], autocomplete: 'off', oninput: e => { r[key] = e.target.value; } });
-      const unit = el('select', { onchange: e => { r.unit = e.target.value; } }, el('option', { value: 'rub', textContent: 'в деньгах', selected: r.unit === 'rub' }), el('option', { value: 'pct', textContent: pctText, selected: r.unit === 'pct' }));
+      const unit = el('select', { 'aria-label': 'Сумма в деньгах или в процентах', onchange: e => { r.unit = e.target.value; } }, el('option', { value: 'rub', textContent: 'в деньгах', selected: r.unit === 'rub' }), el('option', { value: 'pct', textContent: pctText, selected: r.unit === 'pct' }));
       const extra = withWhen ? el('select', { 'aria-label': 'Когда удерживается', onchange: e => { r.when = e.target.value; } }, el('option', { value: 'after', textContent: 'после налога', selected: r.when === 'after' }), el('option', { value: 'before', textContent: 'до налога: уменьшает налог', selected: r.when === 'before' }))
         : el('label', { class: 'check-label' }, el('input', { type: 'checkbox', checked: r.taxable, onchange: e => { r.taxable = e.target.checked; } }), ' Облагается налогом');
       return el('fieldset', { class: 'work-shift-row' }, el('legend', { textContent: `${title}: строка ${i + 1}` }), el('div', { class: 'two' }, lab('Название', inp('name', { type: 'text', maxLength: 40 })), lab('Сумма или процент', inp('value', { type: 'text', inputMode: 'decimal' }))), unit, extra,

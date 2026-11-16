@@ -14,6 +14,7 @@ import { createAnalyticsPanel } from './view-salary-analytics.js';
 
 const TABS = [['calc', 'Расчёт'], ['hours', 'Часы'], ['settings', 'Настройки'], ['analytics', 'Аналитика']];
 const lab = (text, input) => el('label', { class: 'work-f' }, el('span', { class: 'muted', textContent: text }), input);
+const mins = n => (n >= 60 ? `${fmtDur(n)} (${n} мин)` : `${n} мин`);
 
 export function createSalaryView(ctx = {}) {
   let events = [], ym = todayStr().slice(0, 7), tab = 'calc', st = null;
@@ -77,12 +78,12 @@ export function createSalaryView(ctx = {}) {
     fill(hero, el('p', { class: 'muted', textContent: `${monthLabel(ym)}: на руки за месяц (оценка)` }), el('p', { id: 'sal-net', class: 'big', textContent: money(t.net) }),
       el('p', { id: 'sal-hero-sub', textContent: `Начислено до налога: ${money(t.gross)} · налог: ${money(t.tax)} (${fmtPercent(t.taxBp)})${t.preDed + t.postDed ? ` · удержания: ${money(t.preDed + t.postDed)}` : ''}` }),
       now && res.share < 1 ? el('p', { id: 'sal-accrued', class: 'muted', textContent: `К сегодняшнему дню: начислено ${money(a.gross)}, на руки ${money(a.net)}.` }) : null);
-    fill(brk, el('h3', { textContent: 'Из чего складывается' }), el('dl', { id: 'sal-dl', class: 'work-dl' }, row(pay.mode === 'hourly' ? `Работа по ставке (${fmtDur(t.workedMin - o.raw)})` : 'Оклад за месяц', money(t.base)),
-      o.min ? row(`Переработки: ${fmtDur(o.min)}`, money(o.pay), 'ot') : null, t.night ? row(`Ночные доплаты (${fmtDur(t.nightMin)})`, money(t.night)) : null, t.allowances ? row('Надбавки и премии', money(t.allowances)) : null,
-      row('Начислено до налога', money(t.gross), 'sum'), t.preDed ? row('Удержания до налога', `−${money(t.preDed)}`) : null, row(`Налог: ${describeTax(pay.tax).toLowerCase()}`, `−${money(t.tax)}`), t.postDed ? row('Удержания после налога', `−${money(t.postDed)}`) : null,
-      row('На руки', money(t.net), 'sum')));
+    fill(brk, el('h3', { textContent: 'Из чего складывается' }), el('dl', { id: 'sal-dl', class: 'work-dl' }, row(pay.mode === 'hourly' ? `Работа по ставке (${fmtDur(t.workedMin - o.raw)})` : 'Оклад за месяц', money(t.base), 'base'),
+      o.min ? row(`Переработки: ${fmtDur(o.min)}`, money(o.pay), 'ot') : null, t.night ? row(`Ночные доплаты (${fmtDur(t.nightMin)})`, money(t.night), 'night') : null, t.allowances ? row('Надбавки и премии', money(t.allowances), 'allow') : null,
+      row('Начислено до налога', money(t.gross), 'sum gross'), t.preDed ? row('Удержания до налога', `−${money(t.preDed)}`, 'pre') : null, row(`Налог: ${describeTax(pay.tax).toLowerCase()}`, `−${money(t.tax)}`, 'tax'), t.postDed ? row('Удержания после налога', `−${money(t.postDed)}`, 'post') : null,
+      row('На руки', money(t.net), 'sum net')));
     const tier = pay.ot.tier1Min > 0 ? `, первые ${pay.ot.tier1Min} мин ${fmtMult(pay.ot.tier1MultMille)}` : '', rnd = ROUNDING.find(r => r.rid === roundingId(pay.ot)).label.toLowerCase();
-    fill(otCard, el('h3', { textContent: 'Переработки по минутам' }), o.min ? el('p', { id: 'sal-ot-line', textContent: `Сверх ${pay.ot.basis === 'day' ? 'плановой смены каждого дня' : 'нормы месяца'}: ${o.min} мин (${fmtDur(o.min)}). ${o.t1 ? `Первые ${o.t1} мин ${fmtMult(pay.ot.tier1MultMille)}, остальные ${o.t2} мин ${fmtMult(mult)}.` : `Каждая минута ${fmtMult(mult)}.`} Итого ${money(o.pay)}.` })
+    fill(otCard, el('h3', { textContent: 'Переработки по минутам' }), o.min ? el('p', { id: 'sal-ot-line', textContent: `Сверх ${pay.ot.basis === 'day' ? 'плановой смены каждого дня' : 'нормы месяца'}: ${mins(o.min)}. ${o.t1 ? `Первые ${o.t1} мин ${fmtMult(pay.ot.tier1MultMille)}, остальные ${o.t2} мин ${fmtMult(mult)}.` : `Каждая минута ${fmtMult(mult)}.`} Итого ${money(o.pay)}.` })
       : el('p', { id: 'sal-ot-line', textContent: 'В этом месяце переработок нет. Отмечай время прихода и ухода в «Графике» (или на вкладке «Часы»): минуты сверх смены посчитаются сами.' }),
     el('p', { class: 'muted', textContent: `Правило: минуты сверх ${pay.ot.basis === 'day' ? 'плановой смены каждого дня' : 'нормы часов месяца'}, коэффициент ${fmtMult(mult)}${tier}, округление: ${rnd}. Час по ставке: ${money(res.perHourMinor)}${pay.mode === 'salary' && !pay.hourlyMinor ? ` (оклад ÷ норма ${fmtDur(res.normMin)})` : ''}, минута переработки: ${money(Math.round(res.perHourMinor * mult / 60))}.` }),
     res.zeroNorm ? el('p', { class: 'warn', textContent: 'Норма часов этого месяца равна нулю, поэтому ставку за час вывести нельзя и переработки не считаются. Проверь график и норму часов.' }) : null);

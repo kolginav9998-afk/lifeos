@@ -54,6 +54,7 @@ export function createScheduleView(ctx = {}) {
     const had = timerBox.contains(document.activeElement), run = runningTimer(events), td = dayPlan(today, c, ov.get(today));
     elapsedEl = null;
     const kids = [el('h3', { textContent: 'Рабочий таймер' })];
+    if (!run) { clearInterval(ticker); ticker = 0; } else if (!ticker) ticker = setInterval(tick, 15000);          // обновление «Прошло: …» идёт, только пока таймер включён
     if (run) {
       const rp = dayPlan(run.payload.date, c, run.payload), n = elapsedMin(run);
       elapsedEl = el('p', { id: 'sch-elapsed', class: 'work-clock', textContent: `Прошло: ${fmtDur(n)}` });
@@ -101,7 +102,7 @@ export function createScheduleView(ctx = {}) {
     const lab = `${dateLong(d.date)}. ${d.date === today ? 'Сегодня. ' : ''}${cap(dayText(d))}${d.actual ? `. ${cap(dayActualText(d))}` : ''}${d.overridden && !d.actual ? '. Изменён вручную' : ''}.`;
     return el('button', { type: 'button', class: `cal-day ${d.color ? `sc${d.color}` : `k-${d.kind}`}${d.date === today ? ' today' : ''}${d.overridden ? ' ov' : ''}`, id: `sch-d-${d.date}`, dataset: { date: d.date }, tabIndex: d.date === fd ? 0 : -1, 'aria-label': lab, 'aria-current': d.date === today ? 'date' : false,
       onclick: () => { fd = d.date; dayWin.open(d.date); } },
-    el('span', { class: 'cal-n', textContent: String(+d.date.slice(8)) }), el('span', { class: 'cal-l', textContent: d.letter }), el('span', { class: 'cal-mk', 'aria-hidden': 'true', textContent: d.actual?.to ? '✓' : d.running ? '…' : '' }));
+    el('span', { class: 'cal-n', 'aria-hidden': 'true', textContent: String(+d.date.slice(8)) }), el('span', { class: 'cal-l', 'aria-hidden': 'true', dataset: { l: d.letter } }), el('span', { class: 'cal-mk', 'aria-hidden': 'true', textContent: d.actual?.to ? '✓' : d.running ? '…' : '' }));
   }
   function renderGrid(c, ov, today) {
     const g = monthGrid(ym, c, ov);
@@ -144,7 +145,6 @@ export function createScheduleView(ctx = {}) {
     label.textContent = monthLabel(ym); nowBtn.hidden = ym === today.slice(0, 7);
     renderStats(c, ov, today); renderTimer(c, ov, today); renderWarn(c, ov); renderGrid(c, ov, today); renderLegend(c); renderOffs(c, ov, today);
     shiftEd.sync(c); normEd.sync(c);
-    if (!ticker) ticker = setInterval(tick, 15000);
   }
   return { root, update(evs) { events = evs; if (!root.hidden) render(); }, show() { render(); } };
 }

@@ -28,7 +28,7 @@ export function createShiftEditor({ events, cfg }) {
         s.off ? null : el('div', { class: 'two' }, lab('Начало', inp('from', { type: 'time' })), lab('Конец', inp('to', { type: 'time' }))),
         el('div', { class: 'two' }, s.off ? null : lab('Перерыв, минут', inp('breakMin', { type: 'number', min: 0, max: 600, step: 5, inputMode: 'numeric' })), lab('Цвет', color)),
         s.off ? null : chk('night', 'Ночная смена'), chk('off', 'Нерабочий день (например, отсыпной)'),
-        el('button', { type: 'button', class: 'chip danger', textContent: 'Удалить этот тип', 'aria-label': `Удалить тип смены ${s.name || i + 1}`, disabled: draft.length < 2, onclick: () => { draft.splice(i, 1); rows(); announce('Тип смены удалён из списка. Нажми «Сохранить типы смен»'); } }));
+        el('button', { type: 'button', class: 'chip danger', textContent: 'Удалить тип', 'aria-label': `Удалить тип смены ${s.name || i + 1}`, disabled: draft.length < 2, onclick: () => { draft.splice(i, 1); rows(); announce('Тип смены удалён из списка. Нажми «Сохранить типы смен»'); } }));
     }));
   }
   function addShift() {
