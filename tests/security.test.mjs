@@ -68,7 +68,8 @@ test('манифест настоящей debug-сборки разобран в
   assert.ok(r.errors.some(e => /usesCleartextTraffic/.test(e)));
   assert.ok(r.errors.some(e => /networkSecurityConfig/.test(e)) && r.errors.some(e => /dataExtractionRules/.test(e)));
   assert.ok(r.warnings.some(w => /WAKE_LOCK/.test(w)) && r.warnings.some(w => /ProfileInstallReceiver/.test(w)), 'терпимое даёт предупреждение, а не ошибку');
-  assert.ok(!r.errors.some(e => /exported|разрешение/.test(e)), 'остальное в образце в порядке: ' + r.errors.join(' | '));
+  assert.ok(r.errors.some(e => /не хватает разрешения android\.permission\.USE_BIOMETRIC/.test(e)), 'в образце старой сборки нет разрешения быстрого входа: проверка это замечает');
+  assert.ok(!r.errors.some(e => /exported|неожиданное разрешение/.test(e)), 'остальное в образце в порядке: ' + r.errors.join(' | '));
 });
 
 test('политика: «правильный» release проходит, любое отступление — ошибка', () => {
@@ -76,8 +77,9 @@ test('политика: «правильный» release проходит, лю�
     const s = structuredClone(summarize(decodeAxml(fixture)));
     delete s.app['android:debuggable'];
     Object.assign(s.app, { 'android:usesCleartextTraffic': false, 'android:networkSecurityConfig': '@0x7f130001', 'android:dataExtractionRules': '@0x7f130002', 'android:fullBackupContent': '@0x7f130003' });
-    s.permissions = s.permissions.filter(p => !/WAKE_LOCK/.test(p));
-    s.components = s.components.filter(c => !/ProfileInstallReceiver/.test(c.name)).map(c => (c.kind === 'receiver' && !c.hasFilter ? { ...c, exported: false } : c));
+    s.permissions = s.permissions.filter(p => !/WAKE_LOCK/.test(p)).concat('android.permission.USE_BIOMETRIC');
+    s.components = s.components.filter(c => !/ProfileInstallReceiver/.test(c.name)).map(c => (c.kind === 'receiver' && !c.hasFilter ? { ...c, exported: false } : c))
+      .concat([{ kind: 'activity', name: 'ee.forgr.biometric.AuthActivity', exported: false, hasFilter: false }, { kind: 'activity', name: 'androidx.biometric.DeviceCredentialHandlerActivity', exported: false, hasFilter: false }]);
     return s;
   };
   assert.deepEqual(audit(good()), { errors: [], warnings: [] });
@@ -89,6 +91,12 @@ test('политика: «правильный» release проходит, лю�
   bad(s => { delete s.app['android:dataExtractionRules']; }, /dataExtractionRules/);
   bad(s => { s.permissions.push('android.permission.RECORD_AUDIO'); }, /RECORD_AUDIO/);
   bad(s => { s.permissions.push('android.permission.CAMERA'); }, /CAMERA/);
+  // быстрый вход по отпечатку: разрешение обязательно, старое USE_FINGERPRINT допустимо, окна отпечатка наружу не открыты
+  bad(s => { s.permissions = s.permissions.filter(p => !/USE_BIOMETRIC/.test(p)); }, /не хватает.*USE_BIOMETRIC/);
+  bad(s => { s.components.find(c => /AuthActivity/.test(c.name)).exported = true; }, /AuthActivity.*exported=true/);
+  bad(s => { s.components.find(c => /DeviceCredentialHandlerActivity/.test(c.name)).exported = true; }, /DeviceCredentialHandlerActivity.*exported=true/);
+  const withFingerprint = good(); withFingerprint.permissions.push('android.permission.USE_FINGERPRINT');
+  assert.deepEqual(audit(withFingerprint), { errors: [], warnings: [] }, 'USE_FINGERPRINT (его может принести androidx.biometric) допустимо и не обязательно');
   bad(s => { s.permissions.push('android.permission.ACCESS_FINE_LOCATION'); }, /ACCESS_FINE_LOCATION/);
   bad(s => { s.permissions = s.permissions.filter(p => !/INTERNET/.test(p)); }, /не хватает.*INTERNET/);
   bad(s => { s.components.push({ kind: 'receiver', name: 'x.Evil', exported: true, hasFilter: true }); }, /x\.Evil.*exported=true/);
@@ -98,11 +106,15 @@ test('политика: «правильный» release проходит, лю�
   bad(s => { s.customPermissions.push({ name: 'x.PERM', level: '0x0' }); }, /x\.PERM/);
   assert.ok(POLICY.permissions.every(p => /^android\.permission\./.test(p)), 'в списке разрешённых нет микрофона, камеры и геолокации');
   assert.ok(!POLICY.permissions.some(p => /RECORD_AUDIO|CAMERA|LOCATION|CONTACTS|SMS|STORAGE/.test(p)));
+  assert.ok(POLICY.permissions.includes('android.permission.USE_BIOMETRIC') && !POLICY.permissions.includes('android.permission.USE_FINGERPRINT'), 'отпечаток: обязательное USE_BIOMETRIC, необязательное USE_FINGERPRINT');
+  assert.deepEqual(POLICY.optionalPermissions, ['android.permission.USE_FINGERPRINT']);
 });
 
 // ---------- правки проекта Android на настоящем проекте от `cap add android` ----------
 const capCli = path.join(root, 'node_modules/@capacitor/cli/bin/capacitor');
 const havePython = spawnSync('python3', ['--version']).status === 0;
+// `cap sync` останавливается, если пакет из package.json не стоит в node_modules (так бывает после обновления кода без `npm ci`): тогда проверку пропускаем с понятной причиной.
+const missingDeps = Object.keys(JSON.parse(read('package.json')).dependencies ?? {}).filter(d => !fs.existsSync(path.join(root, 'node_modules', d, 'package.json')));
 function snapshot(dir, base = dir, out = {}) {
   for (const e of fs.readdirSync(dir, { withFileTypes: true })) {
     const p = path.join(dir, e.name);
@@ -110,7 +122,7 @@ function snapshot(dir, base = dir, out = {}) {
   }
   return out;
 }
-test('patch-android.py: настоящий проект Capacitor правится верно и повторный запуск ничего не меняет', { skip: !fs.existsSync(capCli) || !havePython }, () => {
+test('patch-android.py: настоящий проект Capacitor правится верно и повторный запуск ничего не меняет', { skip: !fs.existsSync(capCli) || !havePython ? 'нет Capacitor CLI или python3' : missingDeps.length ? `не установлены пакеты: ${missingDeps.join(', ')} (выполни npm ci)` : false }, () => {
   const tmp = fs.mkdtempSync(path.join(os.tmpdir(), 'lifeos-cap-'));
   try {
     for (const f of ['package.json', 'capacitor.config.json']) fs.copyFileSync(path.join(root, f), path.join(tmp, f));
@@ -130,6 +142,12 @@ test('patch-android.py: настоящий проект Capacitor правитс
     for (const a of ['android:allowBackup="false"', 'android:usesCleartextTraffic="false"', 'android:networkSecurityConfig="@xml/network_security_config"', 'android:dataExtractionRules="@xml/data_extraction_rules"', 'android:fullBackupContent="@xml/backup_rules"',
       'xmlns:tools=', '<uses-permission android:name="android.permission.WAKE_LOCK" tools:node="remove" />', 'ProfileInstallReceiver" tools:node="remove"']) assert.ok(man.includes(a), a);
     assert.equal((man.match(/android:exported="true"/g) || []).length, 1, 'открыто ровно одно окно');
+    // быстрый вход по отпечатку: разрешение и два окна, закрытые явно; плагин подключён к проекту
+    assert.ok(man.includes('<uses-permission android:name="android.permission.USE_BIOMETRIC" />'), 'разрешение быстрого входа');
+    for (const w of ['ee.forgr.biometric.AuthActivity', 'androidx.biometric.DeviceCredentialHandlerActivity']) assert.ok(man.includes(`<activity android:name="${w}" android:exported="false" tools:replace="android:exported" />`), `окно ${w} закрыто явно`);
+    assert.equal((man.match(/USE_BIOMETRIC/g) || []).length, 1, 'разрешение записано один раз (повторный запуск не дублирует)');
+    assert.match(f('capacitor.settings.gradle'), /capgo-capacitor-native-biometric/, 'плагин отпечатка подключён к проекту Android');
+    assert.match(f('app/capacitor.build.gradle'), /capgo-capacitor-native-biometric/);
     assert.match(g, /release \{\s*\/\/ lifeos:begin release\s*signingConfig signingConfigs\.debug\s*debuggable false/);
     assert.match(g, /checkReleaseBuilds = false/); assert.match(g, /storeFile file\("\.\.\/\.\.\/signing\/debug\.keystore"\)/); assert.match(g, /versionCode 77/);
     assert.match(f('app/src/main/res/xml/network_security_config.xml'), /cleartextTrafficPermitted="false"/);
