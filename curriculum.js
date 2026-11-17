@@ -2,8 +2,9 @@
 // Чистая логика: журнал записей → числа и списки; ни интерфейса, ни хранилища. Отдельно ничего не хранится:
 // статус урока считается из записей `lesson` (прочитано) и `zcheck` (попытки проверки). Правила: docs/CURRICULUM_ENGINE.md, разделы 5 и 6.
 import { TRACKS } from './academy.js';
-import { checkOf, pickCheckItems, gradeDrill, lessonIndex, CHECK_DEFAULT } from './zero-kit.js';
+import { checkOf, pickCheckItems, gradeDrill, lessonIndex, CHECK_DEFAULT, GRADED, shuffled, SPIRAL_MAX } from './zero-kit.js';
 import { todayStr } from './events.js';
+import { makeRng } from './stats.js';
 
 export const STATUS_LABEL = { seen: 'Просмотрено', mastered: 'Освоено', confirmed: 'Подтверждено', review: 'Пора повторить', locked: 'Закрыто', new: 'Новый' };
 export const STATUS_ORDER = ['locked', 'new', 'seen', 'mastered', 'confirmed', 'review'];
@@ -14,6 +15,9 @@ export const DAY_MS = 86400000;
 export const MIN_N = 5;                                                      // освоение доказывают проверкой хотя бы из пяти заданий
 export const SURPRISE_MIN_N = 3;                                             // неожиданная проверка короче: три или четыре вопроса
 export const MASTERY_EVIDENCE = { quiz: 'проверка', surprise: 'проверка', placement: 'входная проверка' };
+export const KIND_LABEL = { choose: 'выбор варианта', listen: 'на слух', typed: 'вписать слово', order: 'собрать из плиток', match: 'соединить пары' };
+// Слабый вид задания: по нему есть хотя бы столько ответов и доля ошибок выше этой границы (см. weakKinds).
+export const WEAK_MIN_N = 3, WEAK_ERR = 0.3;
 
 let cachedIndex = null;
 const defaultIndex = () => (cachedIndex ??= lessonIndex(TRACKS));
@@ -146,27 +150,87 @@ export function placementTarget(lessonId, events, now = Date.now(), index = defa
 
 // ---------- проверки ----------
 // Проверка урока: набор заданий зависит от зерна (одно зерно — один набор). quiz и placement — не меньше пяти заданий, surprise — три или четыре.
-export function makeCheck(lesson, kind = 'quiz', seed = 0) {
+// opts.spiral — задания из ранее освоенных уроков того же этапа (см. spiralPool): подмешивается немного, «спиральная проверка».
+// opts.weak — слабые виды заданий (см. weakKinds): их виды получают небольшой приоритет (вес 1 + доля ошибок). Выбор детерминирован зерном.
+export function makeCheck(lesson, kind = 'quiz', seed = 0, opts = {}) {
   if (!CHECK_KINDS.includes(kind)) throw new Error('Неизвестный вид проверки');
   const ck = checkOf(lesson), s = Math.abs(Math.floor(Number(seed) || 0));
   const want = kind === 'surprise' ? SURPRISE_MIN_N + (s % 2) : Math.max(MIN_N, ck.n);
-  const items = pickCheckItems(lesson, s, want);
+  const weak = (Array.isArray(opts.weak) ? opts.weak : []).filter(x => GRADED.has(x?.kind) && Number.isFinite(x?.err));
+  const items = weak.length ? pickWeighted(lesson, s, want, weak, opts.spiral) : pickCheckItems(lesson, s, want, { spiral: opts.spiral });
   return { kind, lesson: lesson.id, seed: s, n: items.length, pass: ck.pass, minN: kind === 'surprise' ? SURPRISE_MIN_N : MIN_N, items };
+}
+
+// Взвешенный отбор: вид задания с большей долей ошибок чаще попадает в проверку. То же зерно и те же веса — тот же набор.
+function pickWeighted(lesson, seed, n, weak, spiral) {
+  const w = new Map(weak.map(x => [x.kind, 1 + x.err]));
+  const r = makeRng(seed);
+  const clean = (Array.isArray(spiral) ? spiral : []).filter(d => d && GRADED.has(d.t));
+  const take = Math.min(SPIRAL_MAX, Math.floor(n / 3), clean.length);
+  const pool = shuffled((lesson.drills ?? []).filter(d => GRADED.has(d.t)), seed);
+  const byKind = new Map();
+  for (const d of pool) { if (!byKind.has(d.t)) byKind.set(d.t, []); byKind.get(d.t).push(d); }
+  const mine = [], need = n - take;
+  while (mine.length < need && [...byKind.values()].some(v => v.length)) {
+    const open = [...byKind.entries()].filter(([, v]) => v.length);
+    const total = open.reduce((sum, [k]) => sum + (w.get(k) ?? 1), 0);
+    let x = r() * total, chosen = open.at(-1);
+    for (const kv of open) { x -= (w.get(kv[0]) ?? 1); if (x <= 0) { chosen = kv; break; } }
+    mine.push(chosen[1].shift());
+  }
+  if (!take) return mine;
+  return shuffled([...mine, ...shuffled(clean, seed).slice(0, take)], seed);
+}
+
+// Задания для «спиральной» подмеши: проверяемые задания из ранее освоенных уроков того же этапа того же маршрута.
+// Их содержимое уже выучено, поэтому оно внутри области допуска. Сам урок, не освоенные и другие этапы не входят.
+export function spiralPool(lesson, events, now = Date.now(), index = defaultIndex()) {
+  const me = index.get(lesson?.id);
+  if (!me) return [];
+  const r = resolver(events, now, index), out = [];
+  for (const l of me.track.lessons) {
+    if (l.id === lesson.id || l.stage !== lesson.stage) continue;
+    if (!SATISFIED.has(r.full(l.id).status)) continue;
+    out.push(...(l.drills ?? []).filter(d => GRADED.has(d.t)));
+  }
+  return out;
+}
+
+// Слабые виды заданий по записям zcheck (чистая функция): вид слабый, если по нему есть хотя бы WEAK_MIN_N ответов
+// и доля ошибок больше WEAK_ERR. → [{ kind, ok, n, err }] по убыванию доли ошибок. Записи без byKind пропускаются.
+export function weakKinds(zchecks) {
+  const agg = new Map();
+  for (const e of zchecks ?? []) {
+    const bk = e?.payload?.byKind;
+    if (!bk || typeof bk !== 'object') continue;
+    for (const [k, v] of Object.entries(bk)) {
+      if (!GRADED.has(k) || !v || !Number.isInteger(v.n) || !Number.isInteger(v.ok) || v.n <= 0 || v.ok < 0 || v.ok > v.n) continue;
+      const a = agg.get(k) ?? { ok: 0, n: 0 };
+      a.ok += v.ok; a.n += v.n; agg.set(k, a);
+    }
+  }
+  return [...agg.entries()]
+    .map(([kind, a]) => ({ kind, ok: a.ok, n: a.n, err: 1 - a.ok / a.n }))
+    .filter(x => x.n >= WEAK_MIN_N && x.err > WEAK_ERR)
+    .sort((x, y) => y.err - x.err || x.kind.localeCompare(y.kind));
 }
 
 const hintAt = (hints, i) => (hints instanceof Set ? hints.has(i) : !!hints?.[i]);
 // answers[i] — ответ на items[i] (как в gradeDrill); hints — массив отметок «подсказкой пользовались» или Set номеров.
-// Ответ с подсказкой не засчитывается. → { n, ok (верных без подсказок), hints (сколько раз брали подсказку), passed, detail[] }
+// Ответ с подсказкой не засчитывается. → { n, ok (верных без подсказок), hints (сколько раз брали подсказку), passed, detail[],
+// byKind: разбивка по видам заданий { choose: { ok, n }, … } — только встретившиеся проверяемые виды (идёт в запись zcheck).
 export function gradeCheck(items, answers = [], hints = [], { pass = CHECK_DEFAULT.pass, minN = MIN_N } = {}) {
   let ok = 0, used = 0;
+  const byKind = {};
   const detail = items.map((d, i) => {
     const right = gradeDrill(d, answers?.[i]) === true, hinted = hintAt(hints, i);
     if (hinted) used++;
     const counts = right && !hinted;
     if (counts) ok++;
+    if (GRADED.has(d.t)) { const b = byKind[d.t] ??= { ok: 0, n: 0 }; b.n++; if (counts) b.ok++; }
     return { right, hinted, counts };
   });
-  return { n: items.length, ok, hints: used, passed: items.length >= minN && enough(ok, items.length, pass), detail };
+  return { n: items.length, ok, hints: used, passed: items.length >= minN && enough(ok, items.length, pass), detail, byKind };
 }
 
 // Неожиданная проверка (раздел 5): не чаще одной в сутки, 3–4 вопроса из уже освоенного урока (освоен не меньше суток назад), сначала те, что «пора повторить».
@@ -186,20 +250,31 @@ export function pickSurprise(events, now = Date.now(), seed = 0, index = default
   const due = cands.filter(c => c.st.status === 'review').sort((a, b) => a.st.dueAt - b.st.dueAt || a.lesson.id.localeCompare(b.lesson.id));
   const pool = due.length ? due : cands.sort((a, b) => a.lesson.id.localeCompare(b.lesson.id));
   const s = Math.abs(Math.floor(Number(seed) || 0));
+  // Слабые виды заданий маршрута получают небольшой приоритет (считается один раз на маршрут, выбор детерминирован зерном).
+  const zc = (events ?? []).filter(e => e?.type === 'zcheck'), weakOf = new Map();
+  const weakFor = tid => { if (!weakOf.has(tid)) weakOf.set(tid, weakKinds(zc.filter(e => e.payload?.track === tid))); return weakOf.get(tid); };
   for (let k = 0; k < pool.length; k++) {
     const pick = due.length ? pool[k] : pool[(s + k) % pool.length];
-    const chk = makeCheck(pick.lesson, 'surprise', s);
+    const chk = makeCheck(pick.lesson, 'surprise', s, { weak: weakFor(pick.track.id) });
     if (chk.n >= SURPRISE_MIN_N) return { ...chk, track: pick.track, lessonRef: pick.lesson, reason: due.length ? 'review' : 'random' };
   }
   return null;
 }
 
 // Запись о попытке (раздел 6): source = вид, confidence = доля верных без подсказок, evidence — результат теста. track/lesson — объекты или id.
-export function makeZcheckEvent(track, lesson, kind, { n, ok, hints = 0 }, now = Date.now()) {
+// byKind (необязательно, ADR-10: поле только добавлено) — разбивка результата по видам заданий { choose: { ok, n }, … };
+// принимаются только проверяемые виды с целыми 0 ≤ ok ≤ n, остальное отбрасывается.
+export function makeZcheckEvent(track, lesson, kind, { n, ok, hints = 0, byKind = null }, now = Date.now()) {
   const trackId = typeof track === 'string' ? track : track.id, lessonId = typeof lesson === 'string' ? lesson : lesson.id;
   if (!CHECK_KINDS.includes(kind)) throw new Error('Неизвестный вид проверки');
   if (!(Number.isInteger(n) && n >= 1 && Number.isInteger(ok) && ok >= 0 && ok <= n && Number.isInteger(hints) && hints >= 0 && hints <= n)) throw new Error('Результат проверки указан неверно');
-  return { id: `zc:${lessonId}:${now.toString(36)}`, type: 'zcheck', ts: now, payload: { track: trackId, lesson: lessonId, kind, n, ok, hints, date: todayStr(now) },
+  const payload = { track: trackId, lesson: lessonId, kind, n, ok, hints, date: todayStr(now) };
+  const clean = {};
+  if (byKind && typeof byKind === 'object') for (const [k, v] of Object.entries(byKind)) {
+    if (GRADED.has(k) && v && Number.isInteger(v.n) && v.n > 0 && Number.isInteger(v.ok) && v.ok >= 0 && v.ok <= v.n) clean[k] = { ok: v.ok, n: v.n };
+  }
+  if (Object.keys(clean).length) payload.byKind = clean;
+  return { id: `zc:${lessonId}:${now.toString(36)}`, type: 'zcheck', ts: now, payload,
     source: kind, confidence: ok / n, evidence: [{ kind: 'test_result', ref: `${lessonId}:${ok}/${n}` }] };
 }
 
