@@ -147,7 +147,7 @@ function checkLock(store, key, now) {
   if (wait > 0) throw new HttpError(429, 'locked', { retryAfterMs: wait });
 }
 const failedAttempt = (store, key, now) => { store.addFail(`ip:${key}`, now); store.addFail('all', now); };
-const clearAttempts = (store, key) => store.clearFails(`ip:${key}`);
+const clearAttempts = (store, key) => { store.clearFails(`ip:${key}`); store.clearFails('all'); };
 
 // ---------- сессии ----------
 async function newSession(store, now) {

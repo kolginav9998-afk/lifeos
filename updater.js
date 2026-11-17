@@ -118,6 +118,7 @@ export async function downloadAndInstall({ plugin, release, onProgress = () => {
   if (!file || !file.path) throw new Error('Файл обновления не скачался');
   if (file.size > MAX_APK_BYTES) throw new Error('Файл обновления слишком большой: обновление не установлено');
   if (release.size && file.size !== release.size) throw new Error('Файл скачался не полностью, попробуй ещё раз');
+  if (!release.sha256 && file.sha256) throw new Error('В сведениях о выпуске нет контрольной суммы: обновление не установлено');
   if (release.sha256 && file.sha256 !== release.sha256) throw new Error('Контрольная сумма файла не совпала: обновление не установлено');
   const r = await plugin.install({ path: file.path });
   if (r && r.needsPermission) {

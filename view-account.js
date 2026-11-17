@@ -20,6 +20,19 @@ const STATE_TEXT = {
   off: 'Не подключено', idle: 'Всё синхронизировано', syncing: 'Синхронизация…', offline: 'Нет связи: изменения сохранены и отправятся позже',
   error: 'Ошибка синхронизации', 'needs-login': 'Нужно войти заново', locked: 'Приложение заблокировано',
 };
+// Понятные тексты для известных кодов ошибок синхронизации; сам код показываем мелким в строке диагностики.
+const SYNC_ERROR_TEXT = {
+  not_encrypted: 'нашлись незашифрованные записи, на сервер они не отправляются. Включи пароль заново.',
+  too_many_pages: 'изменений накопилось слишком много. Попробуй синхронизировать ещё раз.',
+  bad_response: 'сервер ответил что-то непонятное. Попробуй ещё раз чуть позже.',
+  timeout: 'сервер долго не отвечает. Проверь связь и попробуй ещё раз.',
+  network: 'нет связи с сервером. Изменения сохранены и отправятся позже.',
+  locked: 'слишком много попыток входа. Подожди немного.',
+  bad_credentials: 'пароль не подошёл. Войди заново.',
+  unauthorized: 'сессия закончилась. Войди заново.',
+  no_account: 'аккаунт на сервере не найден.',
+};
+const syncErrorText = code => SYNC_ERROR_TEXT[code] || 'не получилось синхронизировать. Попробуй ещё раз.';
 const field = (id, props) => el('input', { id, autocomplete: 'off', ...props });
 const when = ts => (ts ? new Date(ts).toLocaleString('ru') : 'ещё не было');
 
@@ -303,9 +316,9 @@ export function createAccountView({ go, onVaultChange = () => {}, gate = false, 
     const paint = s => {
       // форма «Войти заново» появляется/исчезает только при окончательной смене состояния (промежуточная «синхронизация» ввод не стирает)
       if (s.state !== 'syncing' && (s.state === 'needs-login') !== showsRelogin) { queueMicrotask(render); return; }
-      line.textContent = (STATE_TEXT[s.state] || s.state) + (s.state === 'error' && s.error ? ` (${s.error})` : '');
+      line.textContent = (STATE_TEXT[s.state] || s.state) + (s.state === 'error' && s.error ? `: ${syncErrorText(s.error)}` : '');
       line.className = s.state === 'idle' ? 'ok' : s.state === 'error' || s.state === 'needs-login' ? 'warn' : 'muted';
-      detail.textContent = `Последняя синхронизация: ${when(s.lastSyncAt)} · ждут отправки: ${s.pending ?? 0}` + (s.bad ? ` · не удалось прочитать: ${s.bad}` : '');
+      detail.textContent = `Последняя синхронизация: ${when(s.lastSyncAt)} · ждут отправки: ${s.pending ?? 0}` + (s.bad ? ` · не удалось прочитать: ${s.bad}` : '') + (s.state === 'error' && s.error ? ` · код: ${s.error}` : '');
     };
     unsub?.(); unsub = sync.onStatus(paint);
     const now = el('button', { id: 'acc-sync-now', type: 'button', class: 'primary', textContent: 'Синхронизировать сейчас', onclick: async e => { await guard(e.currentTarget, 'Синхронизирую…', async () => { const r = await sync.syncNow(); if (!r.ok && sync.status.state !== 'error' && sync.status.state !== 'offline') toast('Синхронизация не запущена'); }); } });

@@ -10,7 +10,7 @@ import path from 'node:path';
 import zlib from 'node:zlib';
 import { execFileSync, spawnSync } from 'node:child_process';
 import { makeZip } from '../zip.js';
-import { readZipEntry, decodeAxml, summarize, audit, POLICY } from '../scripts/check-apk.mjs';
+import { readZipEntry, decodeAxml, summarize, audit, checkApk, POLICY } from '../scripts/check-apk.mjs';
 
 const root = path.resolve(import.meta.dirname, '..');
 const read = f => fs.readFileSync(path.join(root, f), 'utf8');
@@ -44,12 +44,14 @@ test('ZIP: файл достаётся и из несжатого, и из сж�
   const deflated = Buffer.concat([lh, nm, comp, cd, nm, end]);
   assert.ok(readZipEntry(deflated, 'AndroidManifest.xml').equals(fixture));
   assert.throws(() => readZipEntry(Buffer.from('не архив, просто текст достаточной длины для проверки'), 'x'), /ZIP/);
-  // CLI: debug-манифест обязан провалить проверку (положительный контроль), код выхода 1
+  // положительный контроль: debug-манифест обязан провалить проверку.
+  // Через экспорт checkApk, а не через запуск CLI: в check-apk.mjs блок CLI сравнивает import.meta.url с
+  // `file://${process.argv[1]}`, что на Windows не срабатывает (обратные слеши), и скрипт молча завершается с кодом 0.
   const tmp = fs.mkdtempSync(path.join(os.tmpdir(), 'lifeos-apk-'));
   fs.writeFileSync(path.join(tmp, 'debug.apk'), deflated);
-  // Запускаем тем же Node, что и тесты: на Windows в PATH может не быть исполняемого 'node'.
-  const r = spawnSync(process.execPath, [path.join(root, 'scripts/check-apk.mjs'), path.join(tmp, 'debug.apk')], { encoding: 'utf8', env: { ...process.env, ANDROID_HOME: tmp, ANDROID_SDK_ROOT: tmp } });
-  assert.equal(r.status, 1); assert.match(r.stdout, /отлаживаем/); assert.match(r.stdout, /Отлаживаемое: ДА/);
+  const r = checkApk(path.join(tmp, 'debug.apk'));
+  assert.equal(r.sum.app?.['android:debuggable'], true);
+  assert.ok(r.errors.some(e => /отлаживаем/i.test(e)), r.errors.join(' · '));
   fs.rmSync(tmp, { recursive: true, force: true });
 });
 
