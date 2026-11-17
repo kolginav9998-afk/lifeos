@@ -66,9 +66,9 @@ export function createTodayView({ go }) {
     const steps = [
       ['task', 'Добавь первую задачу', has('task'), () => input.focus()],
       ['checkin', 'Сделай отметку дня (Дневник)', has('checkin'), () => go('diary')],
-      ['lesson', 'Пройди первый урок (Развитие → Учёба)', has('lesson'), () => go('learn')],
-      ['test', 'Пройди первую проверку (Развитие → Тесты)', has('testrun'), () => go('tests')],
-      ['lock', 'Включи защиту паролем (Ещё)', vault.hasVault(), () => go('more')],
+      ['lesson', 'Пройди первый урок («Учёба» → «Курсы»)', has('lesson'), () => go('learn')],
+      ['test', 'Пройди первую проверку («Учёба» → «Тесты»)', has('testrun'), () => go('tests')],
+      ['lock', 'Включи защиту паролем («Меню» → «Настройки»)', vault.hasVault(), () => go('more')],
     ];
     const left = steps.filter(s => !s[2]).length;
     onboarding.hidden = getPref('onboardingDone') || left === 0 || !!getPref('simple');
@@ -192,7 +192,7 @@ export function createTodayView({ go }) {
   }
 
   // ----- форма добавления -----
-  const input = el('input', { id: 'add-input', type: 'text', placeholder: 'Задача, расход или замер…', enterKeyHint: 'done', maxLength: 500, required: true, autocomplete: 'off' });
+  const input = el('input', { id: 'add-input', type: 'text', placeholder: 'Что сделать? Пойму и «завтра», и «потратил 350»', enterKeyHint: 'done', maxLength: 500, required: true, autocomplete: 'off' });
   const addBtn = el('button', { type: 'submit', 'aria-label': 'Добавить' }, icon('plus', 24));
   const due = el('input', { id: 'add-due', type: 'date' });
   const rep = repeatSelect('', ''); rep.id = 'add-repeat';
@@ -289,7 +289,7 @@ export function createTodayView({ go }) {
   const minimum = el('div', { id: 'minimum', class: 'card', hidden: true }, el('div', { class: 'mini-head' }, el('h3', { textContent: 'Минимум на сегодня' }),
     el('button', { type: 'button', id: 'heavy-off', class: 'chip', textContent: 'Выйти из режима', onclick: () => { setPref('heavyDay', false); render(); } })),
     el('p', { class: 'muted', textContent: 'Тяжёлый день: только самое важное. Три дела, остальное подождёт. Привычки — в минимальной версии.' }), minList);
-  const empty = emptyState({ id: 'empty', art: 'tasks', title: 'Пока пусто', text: 'Добавь первую задачу: она появится здесь, а кольцо выше начнёт заполняться.', action: { label: 'Добавить задачу', icon: 'plus', onClick: () => input.focus() } });
+  const empty = emptyState({ id: 'empty', art: 'tasks', title: 'Задач пока нет', text: 'Здесь будет список дел: на сегодня, с датой и без срока. Напиши первую задачу в строку выше — кольцо начнёт заполняться.', action: { label: 'Добавить задачу', icon: 'plus', onClick: () => input.focus() } });
   empty.hidden = true;
   const doneList = el('ul', { id: 'done-list', class: 'list' });
   const doneCount = el('span', { id: 'done-count', textContent: '0' });
