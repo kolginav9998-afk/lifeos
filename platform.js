@@ -10,6 +10,17 @@ function plugin(name) {
   return C?.Plugins?.[name] || C?.registerPlugin?.(name);
 }
 
+// Скачать текст по https: в приложении через встроенный нативный HTTP (обходит ограничения CORS у чужих сайтов), на сайте обычным fetch.
+// Возвращает объект как у fetch: { ok, text() }. Нужен календарю праздников (calendar-ru.js); ошибки пробрасываются, вызывающий их ловит.
+export async function httpFetch(url, init) {
+  const http = isNative ? plugin('CapacitorHttp') : null;
+  if (http?.get) {
+    const r = await http.get({ url, readTimeout: 8000, connectTimeout: 8000, responseType: 'text' });
+    return { ok: r.status >= 200 && r.status < 300, text: async () => String(r.data ?? '') };
+  }
+  return fetch(url, init);
+}
+
 // Нативный плагин по имени (null на сайте).
 export const nativePlugin = name => (isNative ? plugin(name) : null);
 

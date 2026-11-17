@@ -22,6 +22,7 @@ if server and not (server.startswith('https://') or server.startswith('http://lo
     raise SystemExit('Адрес сервера в config/sync.json должен начинаться с https://')
 # Если сервер известен — разрешаем обращения только к нему; иначе к любому https-адресу (его вводят вручную).
 connect = "'self' " + (server if server else 'https:')
+connect += ' https://isdayoff.ru'                                   # производственный календарь РФ для графика «5 через 2» (передаётся только год)
 extra = os.environ.get('LIFEOS_CSP_CONNECT', '').strip()          # только для автотестов
 if extra: connect += ' ' + extra
 CSP = ("default-src 'self'; script-src 'self'; style-src 'self'; img-src 'self' data: blob:; "

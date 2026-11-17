@@ -17,10 +17,11 @@ test('в коде приложения нет опасных конструкц�
   }
 });
 
-test('сетевых запросов нет нигде, кроме офлайн-кэша (sw.js) и клиента сервера синхронизации (api.js)', () => {
+test('сетевых запросов нет нигде, кроме офлайн-кэша (sw.js), клиента сервера синхронизации (api.js) и одной обёртки httpFetch в platform.js', () => {
   for (const f of appJs) {
     const code = read(f).replace(/\/\/.*$/gm, '');
     if (f === 'sw.js' || f === 'api.js') continue;
+    if (f === 'platform.js') { assert.equal((code.match(/\bfetch\s*\(/g) ?? []).length, 1, 'platform.js: ровно один вызов fetch (в httpFetch, для календаря праздников)'); continue; }
     assert.ok(!/\bfetch\s*\(|XMLHttpRequest|WebSocket|sendBeacon|EventSource/.test(code), `${f}: сетевой вызов`);
   }
   const sw = read('sw.js');

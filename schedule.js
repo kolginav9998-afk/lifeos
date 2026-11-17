@@ -3,6 +3,7 @@
 // Запись workcfg (одна, id 'workcfg') — рисунок графика, типы смен, норма и доп. выходные; запись workday (id 'wd:<дата>') — правка одного дня:
 // тип дня, смена, плановое и фактическое время. Поле payload.kind (а не type): ключ type в этом коде занят типом записи.
 import { isYmd, addDays, daysBetween } from './events.js';
+import { withCalendar } from './calendar-ru.js';          // праздники и сокращённые дни из производственного календаря (только для графиков по дням недели)
 
 export const WORKCFG_ID = 'workcfg';
 export const wdId = date => `wd:${date}`;
@@ -67,7 +68,7 @@ export function normalizeCfg(raw) {
   const normByMonth = {};
   if (r.normByMonth && typeof r.normByMonth === 'object') for (const [k, v] of Object.entries(r.normByMonth)) if (isYm(k) && v !== '' && v !== null && Number.isFinite(Number(v)) && v >= 0 && v <= 744) normByMonth[k] = Math.round(v * 4) / 4;
   return { pattern: cleanPattern(r.pattern, keys), shifts, normMode: r.normMode === 'manual' && okNh ? 'manual' : 'auto', normHours: okNh ? Math.round(nh * 4) / 4 : 0, normByMonth,
-    extraOff: [...new Set((Array.isArray(r.extraOff) ? r.extraOff : []).filter(isYmd))].sort().slice(0, 400), maxStreak: intIn(r.maxStreak, 2, 14, 6), minRestH: intIn(r.minRestH, 0, 24, 11), tplId: String(r.tplId ?? '').slice(0, 12) };
+    extraOff: [...new Set((Array.isArray(r.extraOff) ? r.extraOff : []).filter(isYmd))].sort().slice(0, 400), maxStreak: intIn(r.maxStreak, 2, 14, 6), minRestH: intIn(r.minRestH, 0, 24, 11), tplId: String(r.tplId ?? '').slice(0, 12), calRu: r.calRu !== false };
 }
 // Проверка того, что ввёл человек (понятные сообщения); normalizeCfg потом приводит всё к единому виду.
 export function checkCfg(raw) {
@@ -92,8 +93,13 @@ export function makeWorkcfg(raw, prev = null, now = Date.now()) {
   checkCfg(raw);
   return { id: WORKCFG_ID, type: 'workcfg', ts: prev?.ts ?? now, payload: { ...normalizeCfg(raw), ...(prev ? { editedAt: now } : {}) }, source: 'manual', confidence: 1, evidence: [] };
 }
-export const cfgOf = events => { const e = events.find(x => x.type === 'workcfg' && x.id === WORKCFG_ID); return e ? normalizeCfg(e.payload) : null; };
+// Настройки графика вместе с подсказками календаря (autoOff, autoOn, shortDays). Эти поля не сохраняются: normalizeCfg отбрасывает всё лишнее.
+export const cfgOf = events => { const e = events.find(x => x.type === 'workcfg' && x.id === WORKCFG_ID); return e ? withCalendar(normalizeCfg(e.payload)) : null; };
 export const cfgEvent = events => events.find(x => x.type === 'workcfg' && x.id === WORKCFG_ID) ?? null;
+// График «5 через 2» по умолчанию: ставится сам при первом открытии «Графика» или «Зарплаты» (источник 'auto'), человек только исправляет отличия.
+// Любое сохранение настроек (мастер, редакторы, «Всё верно») делает запись обычной (source 'manual'), и подсказка про автоматический график пропадает.
+export const autoWorkcfg = (today, now = Date.now()) => ({ ...makeWorkcfg(cfgFromTemplate('w52', today), null, now), source: 'auto', confidence: 0.6 });
+export const isAutoCfg = events => cfgEvent(events)?.source === 'auto';
 
 // ---------- готовые графики ----------
 const D = (o = {}) => ({ key: 'd', name: 'День', letter: 'Д', from: '09:00', to: '18:00', breakMin: 60, color: 1, night: false, off: false, ...o });
@@ -134,16 +140,21 @@ export const cycleLetters = cfg => (cfg.pattern.kind === 'cycle' ? cfg.pattern.c
 function baseKey(date, cfg) {
   if (cfg.extraOff.includes(date)) return '';
   const p = cfg.pattern;
-  if (p.kind === 'week') return p.week[dowMon(date)] || '';
+  if (p.kind === 'week') {
+    if (cfg.autoOff?.includes(date)) return '';                                       // праздник по производственному календарю
+    const k = p.week[dowMon(date)] || '';
+    return !k && cfg.autoOn?.includes(date) ? (p.week.find(Boolean) || '') : k;      // рабочая суббота по переносу (только пятидневка)
+  }
   const n = p.cycle.length;
   return p.cycle[(((daysBetween(p.start, date) % n) + n) % n)] || '';
 }
 const hasTimes = o => o && toMin(o.from) !== null && toMin(o.to) !== null;
 // Что на этот день: по рисунку графика, с учётом правки (workday: payload). Всё выводится из настроек, ничего не хранится заранее.
 export function dayPlan(date, cfg, ov = null) {
-  const holiday = cfg.extraOff.includes(date), sh0 = shiftOf(cfg, baseKey(date, cfg)), works0 = !!sh0 && !sh0.off;
-  const patternMin = works0 ? netMin(sh0.from, sh0.to, sh0.breakMin) : 0;
-  let kind = works0 ? 'work' : 'off', sh = sh0, from = works0 ? sh0.from : null, to = works0 ? sh0.to : null, brk = sh0?.breakMin ?? 0;
+  const holiday = cfg.extraOff.includes(date) || (cfg.pattern.kind === 'week' && !!cfg.autoOff?.includes(date) && dowMon(date) < 5), sh0 = shiftOf(cfg, baseKey(date, cfg)), works0 = !!sh0 && !sh0.off;
+  const full = works0 ? netMin(sh0.from, sh0.to, sh0.breakMin) : 0, cut = works0 && cfg.shortDays?.includes(date) ? Math.min(60, full) : 0;      // сокращённый предпраздничный день: на час короче
+  const patternMin = full - cut;
+  let kind = works0 ? 'work' : 'off', sh = sh0, from = works0 ? sh0.from : null, to = works0 ? (cut ? fmtTime((toMin(sh0.to) - cut + 1440) % 1440) : sh0.to) : null, brk = sh0?.breakMin ?? 0;
   const over = !!ov && !!DAY_KINDS[ov.kind];
   if (over) {
     kind = ov.kind;
@@ -177,7 +188,11 @@ export function normMinutes(ym, cfg) {
 export function monthSummary(ym, cfg, ov, today) {
   const days = monthDays(ym, cfg, ov), work = days.filter(d => d.kind === 'work' && d.plannedMin > 0), cnt = k => days.filter(d => d.kind === k).length;
   const rec = days.filter(d => d.actualMin !== null);
+  // «Отработано»: прошедшие рабочие дни считаются по плану сами; человек правит только то, что было иначе (отметил часы, отпуск, больничный).
+  const assumedDays = days.filter(d => d.kind === 'work' && d.plannedMin > 0 && d.actualMin === null && !d.running && d.date < today);
+  const workedMin = sum(rec, d => d.actualMin) + sum(assumedDays, d => d.plannedMin);
   return { ym, days, workdays: work.length, plannedMin: sum(days, d => d.plannedMin), patternMin: sum(days, d => d.patternMin), normMin: normMinutes(ym, cfg), actualMin: sum(rec, d => d.actualMin), recorded: rec.length,
+    workedMin, assumed: assumedDays.length, corrected: rec.filter(d => d.actualMin !== d.plannedMin).length,
     off: cnt('off'), vacation: cnt('vacation'), sick: cnt('sick'), unpaid: cnt('unpaid'), left: work.filter(d => d.date > today || (d.date === today && d.actualMin === null)).length };
 }
 

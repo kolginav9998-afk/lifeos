@@ -116,7 +116,7 @@ _Файл создан из `registry.js` и сверяется с ним тес
 
 | Тип | Что это | Поля | Приватность | В выгрузке | Модуль |
 |---|---|---|---|---|---|
-| `workcfg` | График работы (настройки) | pattern{kind, week[]|cycle[], start}, shifts[{key, name, letter, from, to, breakMin, color, night}], normMode, normHours, normByMonth{}, extraOff[], maxStreak, minRestH, tplId | числа и отметки | да | `schedule.js` |
+| `workcfg` | График работы (настройки) | pattern{kind, week[]|cycle[], start}, shifts[{key, name, letter, from, to, breakMin, color, night}], normMode, normHours, normByMonth{}, extraOff[], maxStreak, minRestH, tplId, calRu (подставлять праздники по производственному календарю) | числа и отметки | да | `schedule.js` |
 | `workday` | День графика (отметка) | date, kind (work|off|vacation|sick|unpaid), shift, planned{from, to}, actual{from, to, startedAt}, breakMin, note | числа и отметки | да | `schedule.js` |
 
 ## Зарплата

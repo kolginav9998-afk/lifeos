@@ -14,10 +14,26 @@ const evs = type => page.evaluate(async ty => (await import('./store.js')).state
 const today = ymd(0);
 const attr = (sel, name) => page.getAttribute(sel, name);
 
-// ---------- график: пустое состояние и мастер ----------
+// ---------- календарь РФ: подставной ответ isdayoff.ru (первая среда месяца — праздник) ----------
+const monthStart = today.slice(0, 7);
+let holiday = null;
+for (let d = 1; d <= 7 && !holiday; d++) { const k = `${monthStart}-${String(d).padStart(2, '0')}`; if (new Date(`${k}T12:00:00`).getDay() === 3) holiday = k; }
+const codesFor = year => {
+  let out = '';
+  for (let i = 0; i < ((year % 4 === 0 && year % 100 !== 0) || year % 400 === 0 ? 366 : 365); i++) { const dt = new Date(Date.UTC(year, 0, 1 + i)), dow = dt.getUTCDay(); out += dt.toISOString().slice(0, 10) === holiday || dow === 0 || dow === 6 ? '1' : '0'; }
+  return out;
+};
+await page.context().route('https://isdayoff.ru/**', r => r.fulfill({ status: 200, contentType: 'text/plain', headers: { 'access-control-allow-origin': '*' }, body: codesFor(Number(new URL(r.request().url()).searchParams.get('year'))) }));
+
+// ---------- график: «5 через 2» ставится сам, человек только исправляет; потом мастер ----------
 await tab(page, 'schedule');
-await waitVisible(page, '#sch-empty');
-await page.click('#sch-empty button.primary');
+await waitVisible(page, '#sch-auto');                                              // подсказка: график поставлен сам
+await waitCount(page, '#sch-grid .cal-day', { min: 28 });
+await waitText(page, '#sch-pattern', /5 через 2/);
+await waitText(page, '#sch-stats', /Отработано/);
+await waitText(page, '#sch-cal', /подставлены по производственному календарю/);   // календарь пришёл из подставного ответа
+assert.equal((await attr(`#sch-d-${holiday}`, 'aria-label')).includes('выходной'), true, 'праздничная среда стала выходным без ручной отметки');
+await page.click('#sch-auto-change');
 await waitVisible(page, '#sch-wiz');
 await waitAttr(page, '#sch-wiz-tpls button[data-tpl="w52"]', 'aria-pressed', 'true');
 await page.click('#sch-wiz-tpls button[data-tpl="c22"]');                         // цикл: нужна дата первого дня
@@ -32,6 +48,7 @@ await page.click('#sch-wiz-tpls button[data-tpl="w52"]');
 await waitVisible(page, '#sch-wiz-start', false);
 await page.click('#sch-wiz-apply');
 await waitVisible(page, '#sch-wiz', false);
+await waitVisible(page, '#sch-auto', false);                                           // сохранение в мастере делает график обычным: подсказка исчезла
 await waitCount(page, '#sch-grid .cal-day', { min: 28, max: 31 });
 const cfgs = await eventually(() => evs('workcfg'), r => assert.equal(r.length, 1));
 assert.equal(cfgs[0].id, 'workcfg'); assert.equal(cfgs[0].payload.pattern.kind, 'week'); assert.deepEqual(cfgs[0].payload.pattern.week, ['d', 'd', 'd', 'd', 'd', '', '']);

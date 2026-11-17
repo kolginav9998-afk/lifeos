@@ -53,8 +53,10 @@ export function createNormEditor({ events, cfg, month }) {
   const streak = el('input', { id: 'sch-max-streak', type: 'number', min: 2, max: 14, inputMode: 'numeric' }), rest = el('input', { id: 'sch-min-rest', type: 'number', min: 0, max: 24, inputMode: 'numeric' });
   const offDate = el('input', { id: 'sch-off-date', type: 'date', value: todayStr(), 'aria-label': 'Дата дополнительного выходного' }), offList = el('ul', { id: 'sch-off-list', class: 'chips work-offs' });
   const err = el('p', { id: 'sch-norm-err', class: 'error' });
+  const calOn = el('input', { id: 'sch-cal-on', type: 'checkbox', onchange: async () => { await saveCfg(events, cfg, { calRu: calOn.checked }); announce(calOn.checked ? 'Праздники подставляются по производственному календарю' : 'Праздники по календарю выключены'); } });
   const root = el('details', { id: 'sch-norm', class: 'card' }, el('summary', { textContent: 'Норма часов, праздники и отдых' }),
     el('div', { class: 'form-stack' },
+      el('label', { class: 'row', for: 'sch-cal-on' }, calOn, el('span', { textContent: 'Подставлять праздники и сокращённые дни по производственному календарю РФ (для графика по дням недели)' })),
       lab('Норма часов в месяц', mode), hoursBox, el('label', { class: 'work-f' }, byLab, byMonth),
       el('p', { class: 'muted', textContent: 'Норма нужна для расчёта зарплаты: из неё получается ставка за час, а «сверх нормы» считаются переработки. По графику норма = плановые часы рабочих дней месяца без праздников.' }),
       el('strong', { textContent: 'Праздники и дополнительные выходные' }), el('div', { class: 'row' }, offDate, el('button', { type: 'button', id: 'sch-off-add', class: 'chip', textContent: 'Добавить выходной', onclick: () => addOff() })), offList,
@@ -86,9 +88,9 @@ export function createNormEditor({ events, cfg, month }) {
   return {
     root,
     sync(c) {
-      const ym = month(), sig = JSON.stringify([c.normMode, c.normHours, c.normByMonth, c.maxStreak, c.minRestH, ym]);
+      const ym = month(), sig = JSON.stringify([c.normMode, c.normHours, c.normByMonth, c.maxStreak, c.minRestH, ym, c.calRu]);
       byLab.textContent = `Норма только для месяца «${monthLabel(ym).toLowerCase()}», часов (пусто — как обычно)`;
-      if (sig !== lastSig) { lastSig = sig; mode.value = c.normMode; hours.value = c.normHours || ''; byMonth.value = c.normByMonth[ym] ?? ''; streak.value = c.maxStreak; rest.value = c.minRestH; paint(); }
+      if (sig !== lastSig) { lastSig = sig; mode.value = c.normMode; hours.value = c.normHours || ''; byMonth.value = c.normByMonth[ym] ?? ''; streak.value = c.maxStreak; rest.value = c.minRestH; calOn.checked = c.calRu !== false; paint(); }
       offs(c);
     },
   };

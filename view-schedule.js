@@ -4,7 +4,9 @@ import { el, fill, icon, toast, announce, emptyState } from './ui.js';
 import { todayStr, addDays } from './events.js';
 import * as store from './store.js';
 import { monthLabel } from './money.js';
-import { cfgOf, workdaysOf, monthGrid, monthSummary, restWarnings, nextOffDays, dayPlan, dayText, dayActualText, runningTimer, timerStart, timerStop, isNoop, fmtDur, dateLong, dayMonthText, shiftYm, daysIn, dowMon, patternText, WEEKDAYS_SHORT, WEEKDAYS_LONG } from './schedule.js';
+import { cfgOf, cfgEvent, autoWorkcfg, isAutoCfg, makeWorkcfg, workdaysOf, monthGrid, monthSummary, restWarnings, nextOffDays, dayPlan, dayText, dayActualText, runningTimer, timerStart, timerStop, isNoop, fmtDur, dateLong, dayMonthText, shiftYm, daysIn, dowMon, patternText, WEEKDAYS_SHORT, WEEKDAYS_LONG } from './schedule.js';
+import { ensureCalendar, hasYear } from './calendar-ru.js';
+import { httpFetch } from './platform.js';
 import { createDayWindow } from './view-schedule-day.js';
 import { createWizard } from './view-schedule-wizard.js';
 import { createShiftEditor, createNormEditor } from './view-schedule-editors.js';
@@ -28,11 +30,12 @@ export function createScheduleView(ctx = {}) {
   // ----- блоки -----
   const stats = el('div', { id: 'sch-stats', class: 'work-stats' }), leaveLine = el('p', { id: 'sch-leave', class: 'muted' });
   const patLine = el('p', { id: 'sch-pattern', class: 'muted' });
+  const autoBox = el('section', { id: 'sch-auto', class: 'card form-stack', 'aria-labelledby': 'sch-auto-h' }), calLine = el('p', { id: 'sch-cal', class: 'muted' });
   const timerBox = el('div', { id: 'sch-timer', class: 'card form-stack' }), warnBox = el('div', { id: 'sch-warn', class: 'card' });
   const gridEl = el('div', { id: 'sch-grid', class: 'cal', role: 'grid' }), legend = el('ul', { id: 'sch-legend', class: 'chips' }), offLine = el('p', { id: 'sch-offs', class: 'muted' });
-  const main = el('div', { id: 'sch-main', class: 'view' }, nav, el('div', { class: 'row' }, nowBtn), el('div', { class: 'card form-stack' }, stats, leaveLine, patLine,
+  const main = el('div', { id: 'sch-main', class: 'view' }, autoBox, nav, el('div', { class: 'row' }, nowBtn), el('div', { class: 'card form-stack' }, stats, leaveLine, patLine,
     el('button', { type: 'button', id: 'sch-wiz-open', class: 'chip', textContent: 'Изменить график', onclick: () => wiz.open() })), timerBox, warnBox,
-  el('div', { class: 'card form-stack' }, el('h3', { textContent: 'Календарь' }), gridEl, legend, offLine, el('p', { class: 'muted', textContent: 'Нажми на день, чтобы поменять его: отпуск, больничный, другая смена, свои часы. Стрелки на клавиатуре двигают по дням.' })), shiftEd.root, normEd.root);
+  el('div', { class: 'card form-stack' }, el('h3', { textContent: 'Календарь' }), gridEl, legend, offLine, calLine, el('p', { class: 'muted', textContent: 'Нажми на день, чтобы поменять его: отпуск, больничный, другая смена, свои часы. Стрелки на клавиатуре двигают по дням.' })), shiftEd.root, normEd.root);
   const empty = emptyState({ art: 'calendar', id: 'sch-empty', title: 'График ещё не выбран', text: 'Выбери готовый график (например, пять через два или сутки через трое): я покажу рабочие дни на календаре и помогу считать часы и зарплату.', action: { label: 'Выбрать график', icon: 'calendar', onClick: () => wiz.open() } });
   root.append(empty, main, dayWin.root, wiz.root);
 
@@ -41,7 +44,7 @@ export function createScheduleView(ctx = {}) {
     const s = monthSummary(ym, c, ov, today), diff = s.plannedMin - s.normMin;
     const stat = (t, v, sub) => el('div', { class: 'work-stat' }, el('span', { class: 'muted', textContent: t }), el('strong', { textContent: v }), el('span', { class: 'muted', textContent: sub }));
     fill(stats, stat('План на месяц', fmtDur(s.plannedMin), `Норма: ${fmtDur(s.normMin)}${diff ? ` (план ${diff > 0 ? 'больше' : 'меньше'} на ${fmtDur(Math.abs(diff))})` : ''}`),
-      stat('Отмечено часов', fmtDur(s.actualMin), s.recorded ? `дней с отметкой: ${s.recorded}` : 'пока нет отметок'), stat('Рабочих дней осталось', String(s.left), `всего в месяце: ${s.workdays}`));
+      stat('Отработано', fmtDur(s.workedMin), `по плану: ${s.assumed} дн.${s.recorded ? `, поправлено вручную: ${s.recorded} дн.` : ''}`), stat('Рабочих дней осталось', String(s.left), `всего в месяце: ${s.workdays}`));
     const leave = [s.vacation && `отпуск: ${s.vacation} дн.`, s.sick && `больничный: ${s.sick} дн.`, s.unpaid && `за свой счёт: ${s.unpaid} дн.`].filter(Boolean);
     leaveLine.hidden = !leave.length; leaveLine.textContent = cap(leave.join(', '));
     patLine.textContent = `Мой график: ${patternText(c)}`;
@@ -137,14 +140,39 @@ export function createScheduleView(ctx = {}) {
     if (!to.startsWith(ym)) { ym = to.slice(0, 7); pendingFocus = to; render(); announce(monthLabel(ym)); } else gridEl.querySelector(`[data-date="${to}"]`)?.focus();
   });
 
+  // ----- график по умолчанию и календарь -----
+  let creating = false;
+  async function autoDefault() {
+    if (creating || cfg()) return;
+    creating = true;
+    try { await store.save(autoWorkcfg(todayStr())); announce('Поставил график «5 через 2». Исправляй только то, что было иначе.'); }
+    catch (e) { console.error(e); } finally { creating = false; }
+  }
+  async function begin() { if (!cfg()) await autoDefault(); const c = cfg(); if (c) ensureCalendar(c, { fetchImpl: httpFetch }); }
+  async function confirmAuto() { await store.save(makeWorkcfg(cfg(), cfgEvent(events))); toast('График подтверждён'); announce('График подтверждён'); }
+  function renderAuto() {
+    autoBox.hidden = !isAutoCfg(events);
+    if (autoBox.hidden) return;
+    fill(autoBox, el('h3', { id: 'sch-auto-h', textContent: 'График «5 через 2» поставлен сам' }),
+      el('p', { textContent: 'Понедельник–пятница, с 9:00 до 18:00, обед час. Прошедшие рабочие дни считаются отработанными по плану: исправляй только то, что было иначе. Нажми на день, чтобы поставить отпуск, больничный или свои часы.' }),
+      el('div', { class: 'row' }, el('button', { type: 'button', id: 'sch-auto-ok', class: 'primary', textContent: 'Всё верно', onclick: () => confirmAuto() }),
+        el('button', { type: 'button', id: 'sch-auto-change', class: 'chip', textContent: 'У меня другой график', onclick: () => wiz.open() })));
+  }
+  function renderCal(c) {
+    const on = c.pattern.kind === 'week' && c.calRu !== false;
+    calLine.hidden = !on;
+    if (on) calLine.textContent = hasYear(Number(ym.slice(0, 4))) ? 'Праздники, сокращённые и рабочие по переносу дни подставлены по производственному календарю РФ.' : 'Праздники пока не подставлены: один раз нужен интернет, они появятся сами. Свои выходные можно добавить внизу.';
+  }
+  addEventListener('lifeos:calendar', () => { if (!root.hidden) render(); });
+
   function render() {
     const c = cfg(), today = todayStr();
     empty.hidden = !!c; main.hidden = !c;
     if (!c) return;
     const ov = workdaysOf(events);
     label.textContent = monthLabel(ym); nowBtn.hidden = ym === today.slice(0, 7);
-    renderStats(c, ov, today); renderTimer(c, ov, today); renderWarn(c, ov); renderGrid(c, ov, today); renderLegend(c); renderOffs(c, ov, today);
+    renderAuto(); renderCal(c); renderStats(c, ov, today); renderTimer(c, ov, today); renderWarn(c, ov); renderGrid(c, ov, today); renderLegend(c); renderOffs(c, ov, today);
     shiftEd.sync(c); normEd.sync(c);
   }
-  return { root, update(evs) { events = evs; if (!root.hidden) render(); }, show() { render(); } };
+  return { root, update(evs) { events = evs; if (!root.hidden) render(); }, show() { begin(); render(); } };
 }

@@ -5,7 +5,9 @@ import { todayStr } from './events.js';
 import { getPref } from './prefs.js';
 import * as store from './store.js';
 import { monthLabel, makeIncome } from './money.js';
-import { cfgOf, workdaysOf, shiftYm, fmtDur, dayMonthText, cfgFromTemplate, makeWorkcfg } from './schedule.js';
+import { cfgOf, workdaysOf, shiftYm, fmtDur, dayMonthText, cfgFromTemplate, makeWorkcfg, autoWorkcfg } from './schedule.js';
+import { ensureCalendar } from './calendar-ru.js';
+import { httpFetch } from './platform.js';
 import { payOf, paymonthsOf, computeMonth, payoutPlan, incomeDraft, makePaymonth, makePaycfg, normalizePay, pmId, fmtMoney, fmtMult, parseMinor, CURRENCIES, ROUNDING, roundingId, DISCLAIMER, plural } from './salary.js';
 import { TAX_PRESETS, presetTax, fmtPercent, describeTax } from './salary-tax.js';
 import { createHoursPanel } from './view-salary-hours.js';
@@ -136,5 +138,15 @@ export function createSalaryView(ctx = {}) {
     else if (tab === 'analytics') { if (!noCfg) analytics.render(st); }
     else settings.render(st);
   }
-  return { root, update(evs) { events = evs; if (!root.hidden) render(); }, show() { render(); } };
+  // Нет графика: «5 через 2» ставится сам (как на экране «График»), человек только исправляет отличия; календарь праздников подтягивается в фоне.
+  let creating = false;
+  async function autoDefault() {
+    if (creating) return;
+    creating = true;
+    try { await store.save(autoWorkcfg(todayStr())); announce('Поставил график «5 через 2»: он нужен для расчёта часов. Изменить можно в «Графике».'); }
+    catch (e) { console.error(e); } finally { creating = false; }
+  }
+  async function begin() { if (!cfgOf(events)) await autoDefault(); const c = cfgOf(events); if (c) ensureCalendar(c, { fetchImpl: httpFetch }); }
+  addEventListener('lifeos:calendar', () => { if (!root.hidden) render(); });
+  return { root, update(evs) { events = evs; if (!root.hidden) render(); }, show() { begin(); render(); } };
 }
