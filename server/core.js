@@ -6,7 +6,10 @@
 //  • сервер хранит лишь HMAC от authKey, а не сам пароль;
 //  • данные приходят уже зашифрованными на устройстве; ключ шифрования сервер не знает;
 //  • «мета» (обёрнутый ключ данных) — тоже зашифрована паролем (и кодом восстановления).
-// Аккаунт на сервере ровно один: регистрация открыта, только пока его нет.
+// Аккаунтов несколько (R4.3): первый создаётся по коду установки и становится администратором, остальные — только по одноразовому
+// приглашению (см. social.js). Данные каждого аккаунта изолированы: каждый запрос к данным ограничен uid владельца сессии.
+
+import { handleSocial, isSocialPath, findValidInvite, maxAccounts } from './social.js';
 
 const VERSION = 1;
 const MAX_BODY = 3 * 1024 * 1024;              // 3 МБ на запрос синхронизации
@@ -17,7 +20,8 @@ const MAX_META = 8192;
 const SESSION_MS = 30 * 24 * 3600 * 1000;
 const MAX_SESSION_AGE_MS = 180 * 24 * 3600 * 1000;   // предельный возраст сессии: украденный токен нельзя поддерживать бесконечно
 const PAGE_BYTES = 900 * 1024;
-const MAX_TOTAL_BYTES = 400 * 1024 * 1024;
+const MAX_TOTAL_BYTES = 600 * 1024 * 1024;
+const MAX_USER_BYTES = 200 * 1024 * 1024;       // записи журнала и отправленные сообщения одного аккаунта
 const DEFAULT_ORIGINS = ['https://kolginav9998-afk.github.io', 'https://localhost', 'http://localhost', 'capacitor://localhost'];
 export const lockoutMs = n => (n < 5 ? 0 : Math.min(1000 * 2 ** (n - 5), 15 * 60 * 1000));
 
@@ -150,11 +154,11 @@ const failedAttempt = (store, key, now) => { store.addFail(`ip:${key}`, now); st
 const clearAttempts = (store, key) => store.clearFails(`ip:${key}`);
 
 // ---------- сессии ----------
-async function newSession(store, now) {
+async function newSession(store, uid, now) {
   const token = b64url(randomBytes(32));
   const th = await sha256Hex(token);
   const expires = now + SESSION_MS;
-  store.addSession(th, now, expires);
+  store.addSession(uid, th, now, expires);
   return { token, expiresAt: expires };
 }
 async function authenticate(request, store, now) {
@@ -163,8 +167,13 @@ async function authenticate(request, store, now) {
   const th = await sha256Hex(m[1]);
   const s = store.getSession(th);
   if (!s || s.expires_at < now || now - s.created_at > MAX_SESSION_AGE_MS) throw new HttpError(401, 'unauthorized');
-  if (now - s.last_used > 3600 * 1000) store.touchSession(th, now, Math.min(now + SESSION_MS, s.created_at + MAX_SESSION_AGE_MS));     // продлеваем при использовании, но не дальше предельного возраста
-  return { th, account: store.getAccount() };
+  const account = store.getAccountById(s.uid);
+  if (!account || account.disabled) throw new HttpError(401, 'unauthorized');
+  if (now - s.last_used > 3600 * 1000) {                          // продлеваем при использовании, но не дальше предельного возраста
+    store.touchSession(th, now, Math.min(now + SESSION_MS, s.created_at + MAX_SESSION_AGE_MS));
+    store.touchSeen(account.id, now);
+  }
+  return { th, account };
 }
 
 async function verifyAuth(account, authKeyB64, prefix = '') {
@@ -174,19 +183,23 @@ async function verifyAuth(account, authKeyB64, prefix = '') {
 }
 
 // Правдоподобные «параметры» для несуществующего пользователя, чтобы нельзя было проверять, есть ли такой логин.
-// По ответу нельзя понять, есть ли такой логин: форма (длина соли) и число итераций берутся у настоящего аккаунта, а сами «обманные» значения меняются
-// вместе с настоящими (после смены пароля или кода восстановления у настоящего пользователя другая соль, и у остальных тоже).
-function paramShape(acc, kind) {
-  const salt = acc ? (kind === 'rec' ? acc.rec_salt : acc.auth_salt) : null;
-  const iter = acc ? (kind === 'rec' ? acc.rec_iter : acc.auth_iter) : null;
-  return { seed: String((kind === 'rec' ? acc?.rec_salt : null) ?? acc?.auth_salt ?? ''), bytes: salt ? Math.min(32, Math.max(16, unb64(salt).length)) : 16, iter: iter || (kind === 'rec' ? 200000 : 600000) };
-}
-async function decoyParams(store, username, shape) {
+// Форма (длина соли) и число итераций берутся у одного из настоящих аккаунтов (какого именно — решает имя), а сама соль выводится из
+// секретного ключа сервера и из «отпечатка» всех текущих солей: после смены пароля у кого угодно приманки у всех имён меняются вместе
+// с настоящими параметрами, так что смена параметров у имени не выдаёт, что оно настоящее.
+async function decoyParams(store, username, kind) {
+  const list = store.listAccounts().filter(a => (kind === 'rec' ? a.rec_salt : true));
   let key = store.kvGet('decoy_key');
   if (!key) { key = b64url(randomBytes(32)); store.kvSet('decoy_key', key); }
-  const mac = await hmacHex(te.encode(key), te.encode(`decoy:${shape.seed}:${username}`));
-  return { salt: btoa(String.fromCharCode(...mac.match(/../g).slice(0, shape.bytes).map(x => parseInt(x, 16)))), iter: shape.iter };
+  const seed = await sha256Hex(list.map(a => (kind === 'rec' ? a.rec_salt : a.auth_salt)).join('|'));
+  const mac = await hmacHex(te.encode(key), te.encode(`decoy:${kind}:${seed}:${username}`));
+  const pick = list.length ? list[parseInt(mac.slice(0, 8), 16) % list.length] : null;
+  const salt = pick ? (kind === 'rec' ? pick.rec_salt : pick.auth_salt) : null;
+  const bytes = salt ? Math.min(32, Math.max(16, unb64(salt).length)) : 16;
+  const iter = (kind === 'rec' ? pick?.rec_iter : pick?.auth_iter) || (kind === 'rec' ? 200000 : 600000);
+  return { salt: btoa(String.fromCharCode(...mac.match(/../g).slice(0, bytes).map(x => parseInt(x, 16)))), iter };
 }
+
+const authIterOk = n => Number.isInteger(n) && n >= 1000 && n <= 10_000_000;
 
 // ---------- маршруты ----------
 async function route(request, store, env, now) {
@@ -197,25 +210,35 @@ async function route(request, store, env, now) {
   if (method === 'OPTIONS') return new Response(null, { status: 204, headers: headersFor(request, env) });
 
   if (path === '/v1/status' && method === 'GET') {
-    const acc = store.getAccount();
-    return json(request, env, { app: 'lifeos-sync', v: VERSION, registered: !!acc, setupCodeRequired: !!env.SETUP_CODE, time: now });
+    const registered = store.accountCount() > 0;        // только «есть ли вообще»: число и имена аккаунтов наружу не отдаются
+    return json(request, env, { app: 'lifeos-sync', v: VERSION, registered, setupCodeRequired: !registered && !!env.SETUP_CODE, inviteRequired: registered, time: now });
   }
 
-  // --- регистрация ---
+  // --- регистрация: первый аккаунт по коду установки, остальные по одноразовому приглашению ---
   if (path === '/v1/register' && method === 'POST') {
     const b = await readJson(request);
     const username = normalizeUsername(b.username);
     if (!USER_RE.test(username)) throw new HttpError(400, 'bad_username');
-    if (!checkAuthKey(b.authKey) || !isB64(b.authSalt, 16, 64) || !Number.isInteger(b.authIter) || b.authIter < 1000 || b.authIter > 10_000_000) throw new HttpError(400, 'bad_auth');
+    if (!checkAuthKey(b.authKey) || !isB64(b.authSalt, 16, 64) || !authIterOk(b.authIter)) throw new HttpError(400, 'bad_auth');
     if (!checkMeta(b.meta)) throw new HttpError(400, 'bad_meta');
     let rec = null;
     if (b.recovery !== undefined) {
       const r = b.recovery;
-      if (!r || !checkAuthKey(r.authKey) || !isB64(r.salt, 16, 64) || !Number.isInteger(r.iter) || r.iter < 1000 || r.iter > 10_000_000) throw new HttpError(400, 'bad_recovery');
+      if (!r || !checkAuthKey(r.authKey) || !isB64(r.salt, 16, 64) || !authIterOk(r.iter)) throw new HttpError(400, 'bad_recovery');
       rec = r;
     }
-    if (store.getAccount()) throw new HttpError(409, 'account_exists');            // раньше проверки кода: на занятом сервере код по разнице ответов не подобрать
-    if (env.SETUP_CODE) {
+    let invite = null;
+    if (store.accountCount() > 0) {
+      // Без приглашения (в том числе у старых клиентов) ответ прежний: «аккаунт уже есть». С приглашением код проверяется с тем же
+      // ограничением перебора, что и код установки.
+      if (typeof b.invite !== 'string' || !b.invite) throw new HttpError(409, 'account_exists');
+      const lockKey = clientKey(request);
+      checkLock(store, lockKey, now);
+      invite = await findValidInvite(store, { sha256Hex }, b.invite, now);
+      if (!invite) { failedAttempt(store, lockKey, now); throw new HttpError(403, 'bad_invite'); }
+      if (store.accountCount() >= maxAccounts(env)) throw new HttpError(403, 'accounts_limit');
+      if (store.getAccountByName(username)) throw new HttpError(409, 'account_exists');
+    } else if (env.SETUP_CODE) {
       const lockKey = clientKey(request);
       checkLock(store, lockKey, now);                                               // подбор кода установки ограничен так же, как подбор пароля
       if (!safeEqual(String(b.setupCode ?? ''), String(env.SETUP_CODE))) { failedAttempt(store, lockKey, now); throw new HttpError(403, 'bad_setup_code'); }
@@ -223,13 +246,20 @@ async function route(request, store, env, now) {
     const hashSaltBytes = randomBytes(16);
     const authHash = await hmacHex(hashSaltBytes, unb64(b.authKey));
     const recHash = rec ? await hmacHex(hashSaltBytes, unb64(rec.authKey)) : null;
-    // дальше без await: проверка «аккаунта нет» и запись — одно неделимое действие
-    if (store.getAccount()) throw new HttpError(409, 'account_exists');
-    store.createAccount({
-      username, authSalt: b.authSalt, authIter: b.authIter, hashSalt: btoa(String.fromCharCode(...hashSaltBytes)), authHash,
-      recSalt: rec?.salt, recIter: rec?.iter, recHash, meta: JSON.stringify(b.meta),
-    }, now);
-    const s = await newSession(store, now);
+    // дальше без await: проверки и запись — одно неделимое действие
+    let uid;
+    try {
+      uid = store.registerAccount({
+        username, authSalt: b.authSalt, authIter: b.authIter, hashSalt: btoa(String.fromCharCode(...hashSaltBytes)), authHash,
+        recSalt: rec?.salt, recIter: rec?.iter, recHash, meta: JSON.stringify(b.meta),
+      }, invite?.id ?? null, now);
+    } catch (e) {
+      const code = String(e?.message);
+      if (code === 'account_exists' || code === 'name_taken') throw new HttpError(409, 'account_exists');
+      if (code === 'bad_invite') throw new HttpError(403, 'bad_invite');
+      throw e;
+    }
+    const s = await newSession(store, uid, now);
     return json(request, env, { ok: true, ...s }, 201);
   }
 
@@ -237,9 +267,9 @@ async function route(request, store, env, now) {
   if (path === '/v1/login/params' && method === 'POST') {
     const b = await readJson(request);
     const username = normalizeUsername(b.username);
-    const acc = store.getAccount();
-    const decoy = await decoyParams(store, username, paramShape(acc, 'auth'));      // считаем всегда: время ответа одинаково
-    if (acc && acc.username === username) return json(request, env, { salt: acc.auth_salt, iter: acc.auth_iter });
+    const acc = store.getAccountByName(username);
+    const decoy = await decoyParams(store, username, 'auth');                       // считаем всегда: время ответа одинаково
+    if (acc) return json(request, env, { salt: acc.auth_salt, iter: acc.auth_iter });
     return json(request, env, decoy);
   }
 
@@ -250,13 +280,15 @@ async function route(request, store, env, now) {
     const key = clientKey(request);
     checkLock(store, key, now);
     const username = normalizeUsername(b.username);
-    const acc = store.getAccount();
+    const acc = store.getAccountByName(username);
     let ok = false;
-    if (acc && acc.username === username) ok = await verifyAuth(acc, b.authKey);
+    if (acc) ok = await verifyAuth(acc, b.authKey);
     else await hmacHex(randomBytes(16), unb64(b.authKey));            // выравниваем время ответа
     if (!ok) { failedAttempt(store, key, now); throw new HttpError(401, 'bad_credentials'); }
     clearAttempts(store, key);
-    const s = await newSession(store, now);
+    if (acc.disabled) throw new HttpError(403, 'disabled');            // пароль верный: человек знает, что аккаунт его
+    store.touchSeen(acc.id, now);
+    const s = await newSession(store, acc.id, now);
     return json(request, env, { ok: true, ...s, meta: JSON.parse(acc.meta) });
   }
 
@@ -264,9 +296,9 @@ async function route(request, store, env, now) {
   if (path === '/v1/recover/params' && method === 'POST') {
     const b = await readJson(request);
     const username = normalizeUsername(b.username);
-    const acc = store.getAccount();
-    const decoy = await decoyParams(store, `rec:${username}`, paramShape(acc, 'rec'));
-    if (acc && acc.username === username && acc.rec_salt) return json(request, env, { salt: acc.rec_salt, iter: acc.rec_iter });
+    const acc = store.getAccountByName(username);
+    const decoy = await decoyParams(store, `rec:${username}`, 'rec');
+    if (acc && acc.rec_salt) return json(request, env, { salt: acc.rec_salt, iter: acc.rec_iter });
     return json(request, env, decoy);
   }
   if (path === '/v1/recover' && method === 'POST') {
@@ -275,40 +307,36 @@ async function route(request, store, env, now) {
     const key = clientKey(request);
     checkLock(store, key, now);
     const username = normalizeUsername(b.username);
-    const acc = store.getAccount();
+    const acc = store.getAccountByName(username);
     let ok = false;
-    if (acc && acc.username === username && acc.rec_hash) ok = await verifyAuth(acc, b.recoveryAuthKey, 'rec_');
+    if (acc && acc.rec_hash) ok = await verifyAuth(acc, b.recoveryAuthKey, 'rec_');
     else await hmacHex(randomBytes(16), unb64(b.recoveryAuthKey));                  // выравниваем время ответа, как при входе
     if (!ok) { failedAttempt(store, key, now); throw new HttpError(401, 'bad_credentials'); }
     clearAttempts(store, key);
-    // короткоживущий токен только для шага 2 (смена пароля)
+    if (acc.disabled) throw new HttpError(403, 'disabled');
+    // короткоживущий токен только для шага 2 (смена пароля); хранится хэш, токен одноразовый
     const resetToken = b64url(randomBytes(32));
-    store.kvSet('reset_th', `${await sha256Hex(resetToken)}:${now + 10 * 60 * 1000}`);
+    store.addReset(acc.id, await sha256Hex(resetToken), now, now + 10 * 60 * 1000);
     return json(request, env, { ok: true, resetToken, meta: JSON.parse(acc.meta) });
   }
   if (path === '/v1/recover/finish' && method === 'POST') {
     const b = await readJson(request);
     if (typeof b.resetToken !== 'string' || !/^[A-Za-z0-9_-]{20,100}$/.test(b.resetToken)) throw new HttpError(400, 'bad_token');
-    if (!checkAuthKey(b.newAuthKey) || !isB64(b.newAuthSalt, 16, 64) || !Number.isInteger(b.newAuthIter) || b.newAuthIter < 1000 || b.newAuthIter > 10_000_000) throw new HttpError(400, 'bad_auth');
+    if (!checkAuthKey(b.newAuthKey) || !isB64(b.newAuthSalt, 16, 64) || !authIterOk(b.newAuthIter)) throw new HttpError(400, 'bad_auth');
     if (!checkMeta(b.newMeta)) throw new HttpError(400, 'bad_meta');
-    const th = await sha256Hex(b.resetToken);
-    const acc0 = store.getAccount();
-    if (!acc0) throw new HttpError(404, 'no_account');
+    const uid = store.takeReset(await sha256Hex(b.resetToken), now);
+    const acc0 = uid ? store.getAccountById(uid) : null;
+    if (!acc0 || acc0.disabled) throw new HttpError(401, 'bad_token');
     const newHash = await hmacHex(unb64(acc0.hash_salt), unb64(b.newAuthKey));
-    const stored = store.kvGet('reset_th') ?? '';
-    const [sth, exp] = stored.split(':');
-    if (!stored || !safeEqual(sth ?? '', th) || Number(exp) < now) throw new HttpError(401, 'bad_token');
-    store.kvSet('reset_th', '');
-    store.updateCredentials({ authSalt: b.newAuthSalt, authIter: b.newAuthIter, authHash: newHash, meta: JSON.stringify(b.newMeta) }, now);
-    store.deleteSessionsExcept('');
-    const s = await newSession(store, now);
+    store.updateCredentials(acc0.id, { authSalt: b.newAuthSalt, authIter: b.newAuthIter, authHash: newHash, meta: JSON.stringify(b.newMeta) }, now);
+    store.deleteSessionsExcept(acc0.id, '');
+    const s = await newSession(store, acc0.id, now);
     return json(request, env, { ok: true, ...s });
   }
 
   // ===== дальше — только с входом =====
-  if (!['/v1/logout', '/v1/meta', '/v1/password', '/v1/sync', '/v1/account'].includes(path)) throw new HttpError(404, 'not_found');
+  if (!['/v1/logout', '/v1/meta', '/v1/password', '/v1/sync', '/v1/account'].includes(path) && !isSocialPath(path)) throw new HttpError(404, 'not_found');
   const { th, account } = await authenticate(request, store, now);
-  if (!account) throw new HttpError(401, 'unauthorized');
 
   if (path === '/v1/logout' && method === 'POST') { store.deleteSession(th); return json(request, env, { ok: true }); }
 
@@ -316,7 +344,7 @@ async function route(request, store, env, now) {
 
   if (path === '/v1/password' && method === 'POST') {
     const b = await readJson(request);
-    if (!checkAuthKey(b.oldAuthKey) || !checkAuthKey(b.newAuthKey) || !isB64(b.newAuthSalt, 16, 64) || !Number.isInteger(b.newAuthIter) || b.newAuthIter < 1000 || b.newAuthIter > 10_000_000) throw new HttpError(400, 'bad_auth');
+    if (!checkAuthKey(b.oldAuthKey) || !checkAuthKey(b.newAuthKey) || !isB64(b.newAuthSalt, 16, 64) || !authIterOk(b.newAuthIter)) throw new HttpError(400, 'bad_auth');
     if (!checkMeta(b.newMeta)) throw new HttpError(400, 'bad_meta');
     const key = clientKey(request);
     checkLock(store, key, now);
@@ -324,8 +352,8 @@ async function route(request, store, env, now) {
     const newHash = await hmacHex(unb64(account.hash_salt), unb64(b.newAuthKey));
     if (!okOld) { failedAttempt(store, key, now); throw new HttpError(401, 'bad_credentials'); }
     clearAttempts(store, key);
-    store.updateCredentials({ authSalt: b.newAuthSalt, authIter: b.newAuthIter, authHash: newHash, meta: JSON.stringify(b.newMeta) }, now);
-    store.deleteSessionsExcept(th);                                  // другие устройства войдут заново
+    store.updateCredentials(account.id, { authSalt: b.newAuthSalt, authIter: b.newAuthIter, authHash: newHash, meta: JSON.stringify(b.newMeta) }, now);
+    store.deleteSessionsExcept(account.id, th);                      // другие устройства войдут заново
     return json(request, env, { ok: true });
   }
 
@@ -336,12 +364,12 @@ async function route(request, store, env, now) {
     let recUpdate = null;
     if (b.recovery !== undefined) {
       const r = b.recovery;
-      if (!r || !checkAuthKey(r.authKey) || !isB64(r.salt, 16, 64) || !Number.isInteger(r.iter) || r.iter < 1000 || r.iter > 10_000_000) throw new HttpError(400, 'bad_recovery');
+      if (!r || !checkAuthKey(r.authKey) || !isB64(r.salt, 16, 64) || !authIterOk(r.iter)) throw new HttpError(400, 'bad_recovery');
       recUpdate = { salt: r.salt, iter: r.iter, hash: await hmacHex(unb64(account.hash_salt), unb64(r.authKey)) };
     }
     store.db.tx(() => {
-      store.updateMeta(JSON.stringify(b.meta), now);
-      if (recUpdate) store.db.run('UPDATE account SET rec_salt = ?, rec_iter = ?, rec_hash = ? WHERE id = 1', recUpdate.salt, recUpdate.iter, recUpdate.hash);
+      store.updateMeta(account.id, JSON.stringify(b.meta), now);
+      if (recUpdate) store.setRecovery(account.id, recUpdate);
     });
     return json(request, env, { ok: true });
   }
@@ -349,7 +377,7 @@ async function route(request, store, env, now) {
   if (path === '/v1/sync' && method === 'GET') {
     const since = Math.max(0, Number(url.searchParams.get('since') ?? 0) | 0);
     const limit = Math.min(1000, Math.max(1, Number(url.searchParams.get('limit') ?? 500) | 0));
-    return json(request, env, store.listRecords(since, limit, PAGE_BYTES));
+    return json(request, env, store.listRecords(account.id, since, limit, PAGE_BYTES));
   }
 
   if (path === '/v1/sync' && method === 'POST') {
@@ -361,8 +389,8 @@ async function route(request, store, env, now) {
       if (!c) throw new HttpError(400, 'bad_record', { id: typeof r?.id === 'string' ? r.id.slice(0, 100) : null });
       clean.push(c);
     }
-    if (store.stats().bytes > MAX_TOTAL_BYTES) throw new HttpError(507, 'quota');
-    const res = store.upsertRecords(clean, now);
+    if (store.usedBytes(account.id) > MAX_USER_BYTES || store.totalBytes() > MAX_TOTAL_BYTES) throw new HttpError(507, 'quota');
+    const res = store.upsertRecords(account.id, clean, now);
     return json(request, env, { ok: true, ...res, time: now });
   }
 
@@ -372,8 +400,16 @@ async function route(request, store, env, now) {
     const key = clientKey(request);
     checkLock(store, key, now);
     if (!(await verifyAuth(account, b.authKey))) { failedAttempt(store, key, now); throw new HttpError(401, 'bad_credentials'); }
-    store.wipeAll();
+    if (account.role === 'admin' && store.accountCount() > 1) throw new HttpError(409, 'admin_has_users');       // сначала удалите остальных
+    store.deleteAccount(account.id);
     return json(request, env, { ok: true });
+  }
+
+  if (isSocialPath(path)) {
+    return handleSocial({
+      request, url, path, method, store, env, now, account, maxUserBytes: MAX_USER_BYTES, reply: (body, status = 200) => json(request, env, body, status),
+      H: { HttpError, readJson, isB64, unb64, sha256Hex, randomBytes, normalizeUsername },
+    });
   }
 
   throw new HttpError(404, 'not_found');

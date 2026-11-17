@@ -47,4 +47,33 @@ assert.equal(locked.status, 429, 'после 5 неверных попыток �
 C.use(); await C.svc.loadSession();
 const del = await api.deleteAccount(BASE, C.svc.token(), 'x'.repeat(43) + '=').catch(e => e);
 assert.ok(del.status === 401 || del.status === 429, 'без верного пароля не удаляется');
+// ---- несколько аккаунтов (R4.3): приглашение, контакты, переписка, изоляция, администратор; настоящая база Cloudflare ----
+const call = async (m, p, { body, token } = {}) => {
+  const r = await fetch(BASE + p, { method: m, headers: { 'content-type': 'application/json', ...(token ? { authorization: `Bearer ${token}` } : {}) }, body: body === undefined ? undefined : JSON.stringify(body) });
+  return { status: r.status, body: await r.json().catch(() => null) };
+};
+const metaOf = () => ({ v: 2, kdf: 'PBKDF2-SHA256', iter: 600000, salt: b64(16), wrap: { iv: b64(12), ct: b64(48) } });
+const owner = C.svc.token();
+assert.equal((await call('POST', '/v1/register', { body: { username: 'Анна', authKey: b64(32), authSalt: b64(16), authIter: 600000, meta: metaOf() } })).status, 409, 'без приглашения нельзя');
+const inv = await call('POST', '/v1/invites', { token: owner });
+assert.equal(inv.status, 201);
+const reg = await call('POST', '/v1/register', { body: { username: 'Анна', authKey: b64(32), authSalt: b64(16), authIter: 600000, meta: metaOf(), invite: inv.body.code } });
+assert.equal(reg.status, 201);
+const anna = reg.body.token;
+assert.equal((await call('POST', '/v1/register', { body: { username: 'Борис', authKey: b64(32), authSalt: b64(16), authIter: 600000, meta: metaOf(), invite: inv.body.code } })).status, 403, 'приглашение одноразовое');
+assert.deepEqual((await call('GET', '/v1/contacts', { token: owner })).body.contacts.map(x => x.username), ['анна']);
+assert.equal((await call('POST', '/v1/keys', { token: anna, body: { pub: Buffer.from([4, ...crypto.getRandomValues(new Uint8Array(64))]).toString('base64'), display: 'Аня' } })).status, 200);
+// одинаковый id записи у двух аккаунтов не пересекается
+assert.equal((await call('POST', '/v1/sync', { token: anna, body: { records: [rec('a', 7)] } })).body.accepted, 1);
+assert.deepEqual((await call('GET', '/v1/sync?since=0', { token: anna })).body.records.map(x => [x.id, x.u, x.s]), [['a', 7, 1]]);
+assert.equal((await call('GET', '/v1/sync?since=0', { token: owner })).body.records.find(x => x.id === 'a').u, 100, 'у владельца запись a осталась своя');
+const m1 = { iv: b64(12), ct: b64(80) };
+assert.equal((await call('POST', '/v1/chat/send', { token: owner, body: { to: 'анна', ...m1 } })).status, 201);
+assert.deepEqual((await call('GET', '/v1/chat/inbox?after=0', { token: anna })).body.messages.map(x => [x.from, x.to, x.ct === m1.ct]), [['владелец', 'анна', true]]);
+assert.equal((await call('GET', '/v1/admin/accounts', { token: owner })).body.accounts.length, 2);
+assert.equal((await call('GET', '/v1/admin/accounts', { token: anna })).status, 404, 'обычному человеку админ-маршрутов как будто нет');
+assert.equal((await call('POST', '/v1/admin/accounts/анна/disable', { token: owner })).status, 200);
+assert.equal((await call('GET', '/v1/meta', { token: anna })).status, 401);
+assert.equal((await call('DELETE', '/v1/admin/accounts/анна', { token: owner })).status, 200);
+assert.deepEqual((await call('GET', '/v1/contacts', { token: owner })).body.contacts, []);
 console.log('CF LOCAL OK за', ((Date.now() - t0) / 1000).toFixed(1), 'с');
