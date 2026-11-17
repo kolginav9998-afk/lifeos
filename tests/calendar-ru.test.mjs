@@ -2,7 +2,7 @@
 // автоматический график, «отработано» по плану. Всё детерминировано: календарь собирается из строки цифр, сеть и хранилище подставные.
 import test from 'node:test';
 import assert from 'node:assert/strict';
-import { parseYear, setCalendar, clearCalendars, calendarYears, withCalendar, hasYear, loadCalendars, ensureCalendar, calUrl, daysInYear, hydrate } from '../calendar-ru.js';
+import { parseYear, setCalendar, getCalendar, clearCalendars, calendarYears, withCalendar, hasYear, loadCalendars, ensureCalendar, calUrl, daysInYear, hydrate } from '../calendar-ru.js';
 import { cfgFromTemplate, normalizeCfg, makeWorkcfg, cfgOf, dayPlan, normMinutes, monthSummary, autoWorkcfg, isAutoCfg, workdaysOf, makeWorkday } from '../schedule.js';
 
 // Календарь 2026 для теста: будни 0, суббота и воскресенье 1; особые дни ниже.
@@ -137,12 +137,12 @@ const okFetch = (map, log = []) => async url => { log.push(url); const y = Numbe
 test('загрузка: успешный ответ ставится в календарь и в кэш; год без данных не ломает остальное', async () => {
   clearCalendars(true);
   const st = fakeStorage(), log = [];
-  const r = await loadCalendars([2026, 2027], { fetchImpl: okFetch({ 2026: C26 }, log), storage: st, now: 1_000_000 });
-  assert.deepEqual(r.ok, [2026]); assert.deepEqual(r.failed, [2027]);
+  const r = await loadCalendars([2030, 2031], { fetchImpl: okFetch({ 2030: yearCodes(2030) }, log), storage: st, now: 1_000_000 });
+  assert.deepEqual(r.ok, [2030]); assert.deepEqual(r.failed, [2031]);
   assert.equal(log.length, 2);
-  assert.ok(hasYear(2026) && !hasYear(2027));
-  assert.deepEqual(JSON.parse(st.getItem('lifeos-cal-ru-2026')), { codes: C26, at: 1_000_000 });
-  assert.equal(st.getItem('lifeos-cal-ru-2027'), null, 'неверный ответ в кэш не попадает');
+  assert.ok(hasYear(2030) && !hasYear(2031));
+  assert.deepEqual(JSON.parse(st.getItem('lifeos-cal-ru-2030')), { codes: yearCodes(2030), at: 1_000_000 });
+  assert.equal(st.getItem('lifeos-cal-ru-2031'), null, 'неверный ответ в кэш не попадает');
 });
 
 test('загрузка: свежий кэш не запрашивается заново, старый обновляется, при сбое остаётся старый', async () => {
@@ -167,12 +167,17 @@ test('загрузка: подсаживается кэш с устройств�
   clearCalendars(true);
   const st = fakeStorage({ 'lifeos-cal-ru-2026': JSON.stringify({ codes: C26, at: 1 }), 'lifeos-cal-ru-2031': '{сломано', 'lifeos-other': 'x' });
   hydrate(st);
-  assert.deepEqual(calendarYears(), [2026], 'битая запись и чужой ключ пропущены');
+  assert.equal(getCalendar(2026), C26, 'кэш на устройстве важнее зашитого календаря');
+  assert.ok(!calendarYears().includes(2031), 'битая запись и чужой ключ пропущены');
   clearCalendars();
   const r = await loadCalendars([2030], { fetchImpl: async () => ({ ok: false, text: async () => 'x' }), storage: fakeStorage() });
   assert.deepEqual(r.failed, [2030]);
   const none = await loadCalendars([2030], { fetchImpl: undefined, storage: fakeStorage() });
   assert.deepEqual(none.failed, [2030], 'нет fetch: тихо без календаря');
+  // а у года с зашитым календарём (2026, 2027) без сети календарь всё равно есть
+  clearCalendars(true);
+  const offline = await loadCalendars([2026, 2027], { fetchImpl: undefined, storage: fakeStorage() });
+  assert.deepEqual(offline.ok, [2026, 2027]); assert.deepEqual(offline.failed, []);
 });
 
 test('ensureCalendar: только для графика по дням недели с включённым календарём и не чаще раза в десять минут', async () => {
@@ -187,4 +192,20 @@ test('ensureCalendar: только для графика по дням неде�
   assert.deepEqual(r.ok, [2026]); assert.deepEqual(r.failed, [2027]);
   assert.equal(ensureCalendar(w52(), { year: 2026, now: T0 + 2000, fetchImpl: f, storage: st }), null, 'слишком часто');
   assert.ok(ensureCalendar(w52(), { year: 2026, now: T0 + 11 * 60000, fetchImpl: f, storage: st }), 'через десять минут можно');
+});
+
+test('зашитые календари 2026 и 2027 настоящие: праздники, сокращённые и рабочие по переносу дни', () => {
+  clearCalendars(true);
+  hydrate(fakeStorage());
+  assert.deepEqual(calendarYears(), [2026, 2027]);
+  const c = withCalendar(w52());
+  for (const d of ['2026-01-01', '2026-02-23', '2026-03-09', '2026-05-01', '2026-05-11', '2026-06-12', '2026-11-04', '2026-12-31', '2027-02-22', '2027-03-08']) assert.ok(c.autoOff.includes(d), `праздник ${d}`);
+  for (const d of ['2026-04-30', '2026-11-03', '2027-06-11']) assert.ok(c.shortDays.includes(d), `сокращённый ${d}`);
+  assert.ok(c.autoOn.includes('2027-02-20'), 'рабочая суббота 20 февраля 2027');
+  assert.ok(c.shortDays.includes('2027-02-20'), 'и она сокращённая');
+  assert.equal(dayPlan('2027-02-20', c).plannedMin, 420, 'рабочая суббота перед праздником на час короче');
+  // ноябрь 2026: 21 будний день, минус 4 ноября, минус час за 3 ноября
+  assert.equal(normMinutes('2026-11', c), 20 * 480 - 60);
+  // у календаря нет данных на 2028: график идёт по дням недели
+  assert.equal(dayPlan('2028-05-01', c).kind, 'work');
 });

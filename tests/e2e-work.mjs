@@ -32,7 +32,7 @@ await waitCount(page, '#sch-grid .cal-day', { min: 28 });
 await waitText(page, '#sch-pattern', /5 через 2/);
 await waitText(page, '#sch-stats', /Отработано/);
 await waitText(page, '#sch-cal', /подставлены по производственному календарю/);   // календарь пришёл из подставного ответа
-assert.equal((await attr(`#sch-d-${holiday}`, 'aria-label')).includes('выходной'), true, 'праздничная среда стала выходным без ручной отметки');
+await waitAttr(page, `#sch-d-${holiday}`, 'aria-label', /выходной/);                        // праздничная среда стала выходным без ручной отметки (после ответа календаря)
 await page.click('#sch-auto-change');
 await waitVisible(page, '#sch-wiz');
 await waitAttr(page, '#sch-wiz-tpls button[data-tpl="w52"]', 'aria-pressed', 'true');

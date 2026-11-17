@@ -25,6 +25,8 @@ import { habitStats } from '../habits.js';
 import { makeRng } from '../stats.js';
 import { APP_NAME } from '../config.js';
 import { statsOverview, periodRange, activityByDay, activityText, activityWeeks, appFacts, shareText, SECTIONS, sec, PERIODS, ACTIVITY_LEVELS } from '../profile-stats.js';
+import { clearCalendars } from '../calendar-ru.js';
+clearCalendars();          // цифры теста не должны зависеть от производственного календаря (праздники меняют норму месяца)
 
 // ---------- помощники ----------
 const at = (y, m, d, h = 12, mi = 0) => new Date(y, m - 1, d, h, mi).getTime();      // местное время: тест не зависит от часового пояса машины
