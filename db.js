@@ -89,7 +89,7 @@ async function writeRaw(recs) {
   const a = await idb('readwrite', s => { recs.forEach(r => s.put(r)); });
   const ids = new Set(recs.map(r => r.id));
   const b = state.mirrorOff ? true : lsWrite([...lsRead().filter(r => !ids.has(r.id)), ...recs]);
-  if (!a.ok && !b) throw new Error('Не удалось сохранить данные: хранилище недоступно');
+  if (!a.ok && (state.mirrorOff || !b)) throw new Error('Не удалось сохранить данные: хранилище недоступно');
 }
 
 export async function getAll() {
