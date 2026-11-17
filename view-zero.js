@@ -5,8 +5,8 @@ import { el, fill, icon, ring, announce, focusNode, toast, dateRu } from './ui.j
 import { todayStr } from './events.js';
 import * as store from './store.js';
 import { TRACKS, trackById, doneLessons, makeLessonDone, lessonGoal } from './academy.js';
-import { STATUS_LABEL, SATISFIED, lessonStatus, routeProgress, nextLessons, reviewDue, pickSurprise, surpriseDoneToday, makeCheck, gradeCheck, makeZcheckEvent,
-  placementTarget, openLessonIds, zeroLesson, lastRouteId, dueDate } from './curriculum.js';
+import { STATUS_LABEL, SATISFIED, KIND_LABEL, lessonStatus, routeProgress, nextLessons, reviewDue, pickSurprise, surpriseDoneToday, makeCheck, gradeCheck, makeZcheckEvent,
+  placementTarget, openLessonIds, zeroLesson, lastRouteId, dueDate, spiralPool, weakKinds } from './curriculum.js';
 import { lessonPage, lockedPage, runSequence } from './view-zero-lesson.js';
 import { checkIntro, resultPage } from './view-zero-check.js';
 import { createCatalog } from './view-zero-catalog.js';
@@ -105,7 +105,14 @@ export function createZeroView() {
 
   // ---------- проверки: после урока, входная, быстрая ----------
   function startQuiz(ref, kind = 'quiz', origin = null) {
-    const chk = makeCheck(ref.lesson, kind, now());
+    const t = now(), opts = {};
+    // Повторная проверка (урок уже проверяли): подмешиваем задания из освоенных уроков того же этапа («спиральная проверка»)
+    // и чуть чаще спрашиваем виды заданий, где ошибок больше. Первая проверка урока идёт только по его заданиям.
+    if (kind === 'quiz' && lessonStatus(ref.lesson.id, events, t).attempts > 0) {
+      opts.spiral = spiralPool(ref.lesson, events, t);
+      opts.weak = weakKinds(events.filter(e => e?.type === 'zcheck' && e.payload?.track === ref.track.id));
+    }
+    const chk = makeCheck(ref.lesson, kind, t, opts);
     if (chk.n < chk.minN) { toast('В этом уроке пока мало заданий для проверки'); return; }
     if (kind === 'surprise') return runCheck(ref, chk, origin);
     setOverlay(kind === 'placement' ? 'Входная проверка' : 'Проверка', content(checkIntro({ kind, lesson: ref.lesson, chk, onStart: () => runCheck(ref, chk, origin) })));
@@ -118,7 +125,7 @@ export function createZeroView() {
   async function finishCheck(ref, chk, box, results, origin) {
     const { track, lesson } = ref, t = now();
     const grade = gradeCheck(chk.items, results.map(r => r.answer), results.map(r => r.hinted), { pass: chk.pass, minN: chk.minN });
-    const ev = makeZcheckEvent(track, lesson, chk.kind, { n: grade.n, ok: grade.ok, hints: grade.hints }, t);
+    const ev = makeZcheckEvent(track, lesson, chk.kind, { n: grade.n, ok: grade.ok, hints: grade.hints, byKind: grade.byKind }, t);
     const openBefore = openLessonIds(events, t);
     try { await store.save(ev); } catch (e) { toast(`Не удалось сохранить результат: ${e.message}`); return; }
     const evs = events.some(e => e.id === ev.id) ? events : [...events, ev];
@@ -170,11 +177,14 @@ export function createZeroView() {
   }
   function progressCard(track, p) {
     const pct = Math.round(p.fraction * 100), c = p.counts;
+    // Слабые виды заданий маршрута (маленькая строка; показывается, только если они есть)
+    const weak = weakKinds(events.filter(e => e?.type === 'zcheck' && e.payload?.track === track.id));
     return el('div', { class: 'card zero-progress-card' },
       el('div', { class: 'row zero-ringrow' }, ring(p.fraction, { size: 84, stroke: 9, label: `${pct}%`, name: 'Освоено в маршруте' }),
         el('div', { class: 'grow' }, el('h3', { textContent: track.title }),
           el('p', { id: 'zero-summary', textContent: `Освоено уроков: ${p.done} из ${p.total}` }),
-          el('p', { class: 'muted', textContent: `Просмотрено: ${c.seen} · Новых: ${c.new} · Закрыто: ${c.locked}${p.due ? ` · Пора повторить: ${p.due}` : ''}` }))),
+          el('p', { class: 'muted', textContent: `Просмотрено: ${c.seen} · Новых: ${c.new} · Закрыто: ${c.locked}${p.due ? ` · Пора повторить: ${p.due}` : ''}` }),
+          weak.length ? el('p', { class: 'muted', textContent: `Чаще ошибаешься: ${weak.slice(0, 2).map(x => KIND_LABEL[x.kind] ?? x.kind).join(', ')}` }) : null)),
       el('p', { class: 'muted', textContent: track.intro }),
       p.next ? btn(`Продолжить: ${p.next.title}`, () => openLesson(p.next.id), { id: 'zero-continue', primary: true })
         : el('p', { class: 'ok', textContent: p.total && p.done === p.total ? 'Весь маршрут освоен.' : 'Следующий урок откроется после проверки.' }));

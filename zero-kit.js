@@ -47,14 +47,22 @@ export function shuffled(list, seed) {
   for (let i = a.length - 1; i > 0; i--) { const j = Math.floor(r() * (i + 1)); [a[i], a[j]] = [a[j], a[i]]; }
   return a;
 }
+// «Спиральная проверка»: сколько заданий из ранее освоенных уроков подмешивается в проверку (и не больше трети её размера).
+export const SPIRAL_MAX = 2;
 // Задания для проверки: n штук из проверяемых заданий урока, виды чередуются, порядок зависит от seed.
-export function pickCheckItems(lesson, seed, n = checkOf(lesson).n) {
+// opts.spiral — проверяемые задания из ранее освоенных уроков того же этапа: они уже выучены, поэтому внутри области
+// допуска. Подмешивается не больше SPIRAL_MAX штук и не больше трети проверки; без spiral поведение прежнее.
+export function pickCheckItems(lesson, seed, n = checkOf(lesson).n, opts = {}) {
+  const spiral = Array.isArray(opts.spiral) ? opts.spiral.filter(d => d && GRADED.has(d.t)) : [];
+  const take = Math.min(SPIRAL_MAX, Math.floor(n / 3), spiral.length);
+  const mine = [];
   const pool = shuffled((lesson.drills ?? []).filter(d => GRADED.has(d.t)), seed);
   const byKind = new Map();
   for (const d of pool) { if (!byKind.has(d.t)) byKind.set(d.t, []); byKind.get(d.t).push(d); }
-  const out = [];
-  while (out.length < n && [...byKind.values()].some(v => v.length)) for (const v of byKind.values()) if (v.length && out.length < n) out.push(v.shift());
-  return out;
+  const need = n - take;
+  while (mine.length < need && [...byKind.values()].some(v => v.length)) for (const v of byKind.values()) if (v.length && mine.length < need) mine.push(v.shift());
+  if (!take) return mine;
+  return shuffled([...mine, ...shuffled(spiral, seed).slice(0, take)], seed);
 }
 
 // ===== Проверка структуры одного задания: список проблем (пусто — всё в порядке)
