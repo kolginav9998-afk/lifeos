@@ -3,6 +3,7 @@ import { el, fill, toast, dateRu, moneyText, icon } from './ui.js';
 import { todayStr } from './events.js';
 import * as store from './store.js';
 import { parseAmount, monthOf, monthLabel } from './money.js';
+import { payOf, workHoursText } from './salary.js';
 import { makeWish, wishesOf, wishState, resolveWish, wishStats, hoursLeft } from './wishes.js';
 import { makeDebt, repayDebt, debtLeft, debtsOf, debtTotals, isOverdue, DIRECTIONS } from './debts.js';
 import { autoSavings, autoText } from './automation.js';
@@ -33,9 +34,10 @@ export function createPlansExtras() {
       toast(status === 'dropped' ? 'Хорошее решение: деньги остались при тебе' : 'Отмечено', { actionLabel: 'Отменить', onAction: () => store.save(w) });
     } catch (x) { toast(x.message); }
   }
-  function wishRow(w, now) {
+  function wishRow(w, now, pay) {
     const st = wishState(w, now), p = w.payload;
-    const head = el('div', { class: 'row' }, el('strong', { class: 'grow', textContent: p.text }), el('span', { class: 'muted', textContent: p.amountMinor ? moneyText(p.amountMinor) : '' }));
+    const hours = p.amountMinor ? workHoursText(p.amountMinor, pay) : null;     // цена в часах работы — трезвит перед тратой
+    const head = el('div', { class: 'row' }, el('strong', { class: 'grow', textContent: p.text }), el('span', { class: 'muted', textContent: p.amountMinor ? moneyText(p.amountMinor) + (hours ? ` · ${hours}` : '') : '' }));
     const del = el('button', { type: 'button', class: 'chip danger wish-del', 'aria-label': `Удалить: ${p.text}`, onclick: async () => { const old = await store.remove(w.id); toast('Удалено', old ? { actionLabel: 'Вернуть', onAction: () => store.save(old) } : {}); } }, icon('x', 16));
     if (st === 'wait') {
       const h = hoursLeft(w, now);
@@ -51,11 +53,11 @@ export function createPlansExtras() {
   }
   function renderWishes(today) {
     const now = Date.now(), all = wishesOf(events), open = all.filter(w => w.payload.status === 'wait'), closed = all.filter(w => w.payload.status !== 'wait').slice(0, 5);
-    const ym = monthOf(today), s = wishStats(events, ym);
+    const ym = monthOf(today), s = wishStats(events, ym), pay = payOf(events);
     fill(wishCard, el('h3', { textContent: 'Хочу купить: подожди сутки' }),
       el('p', { class: 'muted', textContent: 'Запиши желание вместо покупки. Через 24 часа реши, нужно ли это по-прежнему. Часто желание проходит, а деньги остаются.' }),
-      ...open.map(w => wishRow(w, now)), open.length ? null : el('p', { class: 'muted', textContent: 'Сейчас ничего не ждёт решения.' }),
-      closed.length ? el('details', { id: 'wish-closed' }, el('summary', { textContent: 'Решённые недавно' }), ...closed.map(w => wishRow(w, now))) : null,
+      ...open.map(w => wishRow(w, now, pay)), open.length ? null : el('p', { class: 'muted', textContent: 'Сейчас ничего не ждёт решения.' }),
+      closed.length ? el('details', { id: 'wish-closed' }, el('summary', { textContent: 'Решённые недавно' }), ...closed.map(w => wishRow(w, now, pay))) : null,
       s.count ? el('p', { id: 'wish-stats', class: 'wish-saved', textContent: `${monthLabel(ym)}: отказов от покупок ${s.count}${s.savedMinor ? `, сохранено ${moneyText(s.savedMinor)}` : ''}` }) : null,
       el('strong', { textContent: 'Новое желание' }), wForm);
   }

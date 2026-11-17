@@ -82,6 +82,8 @@ h3{font-size:1rem;margin-bottom:10px}
 .item .del{border:0;background:none;color:var(--muted);font-size:1.2rem;padding:6px 10px;min-height:44px}
 .item.editing{flex-direction:column;align-items:stretch;gap:8px}
 .item.exp .amount{white-space:nowrap}
+.item.exp .amount-col{display:flex;flex-direction:column;align-items:flex-end;gap:2px;flex:none}
+.item.exp .amount-hours{font-size:.8rem;color:var(--muted)}
 
 /* ---- привычки ---- */
 .habit .h-head{margin-bottom:8px}

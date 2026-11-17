@@ -2,6 +2,7 @@ import { el, toast, dateRu, icon, moneyText, pressable, emptyState } from './ui.
 import { todayStr } from './events.js';
 import { makeEntry, updateExpense, summarizeMonth, shiftMonth, monthLabel, monthOf, categoriesUsed, makeBudget, budgetOf, parseAmount,
   monthTotals, balanceOfMonth, frequentEntries, KINDS, unusualExpense, unusualText } from './money.js';
+import { payOf, workHoursText } from './salary.js';
 import { getPref, setPref } from './prefs.js';
 import * as store from './store.js';
 
@@ -50,6 +51,12 @@ export function createMoneyView({ exportCsv }) {
 
   // ----- форма -----
   const amount = el('input', { id: 'exp-amount', type: 'text', inputMode: 'decimal', placeholder: 'Сумма, например 1250,50', autocomplete: 'off', required: true });
+  const hoursHint = el('p', { id: 'exp-hours', class: 'muted', 'aria-live': 'polite' });   // цена в часах работы, пока вводишь сумму
+  amount.addEventListener('input', () => {
+    let text = null;
+    if (kind === 'expense' && !getPref('hideAmounts')) { try { text = workHoursText(parseAmount(amount.value), payOf(events)); } catch { text = null; } }
+    hoursHint.textContent = text ?? '';
+  });
   const category = el('input', { id: 'exp-category', type: 'text', placeholder: 'Категория', maxLength: 40, autocomplete: 'off' });
   category.setAttribute('list', 'exp-cats');
   const catList = el('datalist', { id: 'exp-cats' });
@@ -59,9 +66,9 @@ export function createMoneyView({ exportCsv }) {
   const submit = el('button', { type: 'submit', class: 'primary' });
   const cancel = el('button', { type: 'button', class: 'cancel', textContent: 'Отмена', hidden: true, onclick: () => { stopEdit(); render(); } });
   const quick = el('div', { id: 'quick-exp', class: 'chips', hidden: true });
-  const form = el('form', { id: 'exp-form', class: 'card form-stack' }, formTitle, quick, amount, el('div', { class: 'two' }, category, date), catList, note, el('div', { class: 'row' }, submit, cancel));
+  const form = el('form', { id: 'exp-form', class: 'card form-stack' }, formTitle, quick, amount, hoursHint, el('div', { class: 'two' }, category, date), catList, note, el('div', { class: 'row' }, submit, cancel));
 
-  function resetForm() { amount.value = ''; note.value = ''; category.value = ''; date.value = todayStr(); }
+  function resetForm() { amount.value = ''; note.value = ''; category.value = ''; date.value = todayStr(); hoursHint.textContent = ''; }
   function setFormLabels() {
     formTitle.textContent = editing ? `Изменить ${K().label.toLowerCase()}` : `Новый ${K().label.toLowerCase()}`;
     submit.textContent = editing ? 'Сохранить' : 'Добавить';
@@ -113,6 +120,7 @@ export function createMoneyView({ exportCsv }) {
 
   function render() {
     const s = summarizeMonth(events, ym, kind);
+    const pay = payOf(events);
     const isExp = kind === 'expense';
     segExp.setAttribute('aria-pressed', String(isExp)); segInc.setAttribute('aria-pressed', String(!isExp));
     label.textContent = monthLabel(ym);
@@ -162,7 +170,10 @@ export function createMoneyView({ exportCsv }) {
       const body = pressable(el('div', { class: 'body' },
         el('span', { class: 'text', textContent: p.category + (p.note ? ' — ' + p.note : '') }),
         el('span', { class: 'meta', textContent: dateRu(p.date) })), () => startEdit(ev));
-      return el('li', { class: 'item exp' }, body, el('strong', { class: 'amount' + (isExp ? '' : ' plus'), textContent: (isExp ? '' : '+') + moneyText(p.amountMinor) }),
+      const amt = el('strong', { class: 'amount' + (isExp ? '' : ' plus'), textContent: (isExp ? '' : '+') + moneyText(p.amountMinor) });
+      const hours = isExp && !getPref('hideAmounts') ? workHoursText(p.amountMinor, pay) : null;   // мелкая подпись у суммы, только если настройка зарплаты заполнена
+      return el('li', { class: 'item exp' }, body,
+        hours ? el('div', { class: 'amount-col' }, amt, el('span', { class: 'amount-hours', textContent: hours })) : amt,
         el('button', { class: 'del', type: 'button', 'aria-label': `Удалить ${K().label.toLowerCase()}`, onclick: () => remove(ev) }, icon('x', 18)));
     }));
     empty.hidden = s.items.length > 0;
