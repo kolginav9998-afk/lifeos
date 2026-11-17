@@ -171,7 +171,7 @@ export function createMoneyView({ exportCsv }) {
         el('span', { class: 'text', textContent: p.category + (p.note ? ' — ' + p.note : '') }),
         el('span', { class: 'meta', textContent: dateRu(p.date) })), () => startEdit(ev));
       const amt = el('strong', { class: 'amount' + (isExp ? '' : ' plus'), textContent: (isExp ? '' : '+') + moneyText(p.amountMinor) });
-      const hours = isExp && !getPref('hideAmounts') ? workHoursText(p.amountMinor, pay) : null;   // мелкая подпись у суммы, только если настройка зарплаты заполнена
+      const hours = isExp && !getPref('hideAmounts') ? workHoursText(p.amountMinor, pay) : '';   // мелкая подпись у суммы, только если настройка зарплаты заполнена
       return el('li', { class: 'item exp' }, body,
         hours ? el('div', { class: 'amount-col' }, amt, el('span', { class: 'amount-hours', textContent: hours })) : amt,
         el('button', { class: 'del', type: 'button', 'aria-label': `Удалить ${K().label.toLowerCase()}`, onclick: () => remove(ev) }, icon('x', 18)));
