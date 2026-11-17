@@ -7,6 +7,7 @@
 import fs from 'node:fs';
 import path from 'node:path';
 import zlib from 'node:zlib';
+import { pathToFileURL } from 'node:url';
 import { execFileSync } from 'node:child_process';
 
 // ---------- ZIP: достать один файл ----------
@@ -182,7 +183,9 @@ function findAapt2() {
   try { versions = fs.readdirSync(dir); } catch { /* SDK нет: проверка только нашим разбором */ }
   const num = v => v.split(/[.-]/).map(x => parseInt(x, 10) || 0);
   versions.sort((a, b) => { const x = num(a), y = num(b); for (let i = 0; i < 4; i++) if ((x[i] || 0) !== (y[i] || 0)) return (y[i] || 0) - (x[i] || 0); return 0; });
-  for (const v of versions) { const p = path.join(dir, v, 'aapt2'); if (fs.existsSync(p)) return p; }
+  for (const v of versions) for (const exe of process.platform === 'win32' ? ['aapt2.exe', 'aapt2'] : ['aapt2']) {
+    const p = path.join(dir, v, exe); if (fs.existsSync(p)) return p;
+  }
   return null;
 }
 
@@ -204,7 +207,8 @@ export function checkApk(file) {
   return { sum, aapt2, ...res };
 }
 
-if (import.meta.url === `file://${process.argv[1]}`) {
+// Прямой запуск: сравнение через file:// URL, чтобы работало и на Windows (обратные слэши в путях).
+if (process.argv[1] && import.meta.url === pathToFileURL(process.argv[1]).href) {
   const args = process.argv.slice(2);
   const json = args.includes('--json');
   const file = args.find(a => !a.startsWith('--'));
