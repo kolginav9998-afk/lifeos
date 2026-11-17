@@ -220,6 +220,7 @@ await page.clock.resume();
   });
   const found = [];
   const axeRun = async label => {
+    await p2.evaluate(() => new Promise(r => requestAnimationFrame(() => requestAnimationFrame(() => setTimeout(r, 60)))));      // уровни заголовков (aria-level) выставляются на следующем кадре: ждём его, иначе на медленном CI ловим гонку
     if (!(await p2.evaluate(() => typeof window.axe !== 'undefined'))) await p2.addScriptTag({ content: AXE });
     const run = () => p2.evaluate(async tags => (await axe.run(document, { runOnly: { type: 'tag', values: tags }, resultTypes: ['violations'] })).violations.map(v => ({ id: v.id, impact: v.impact, nodes: v.nodes.map(n => `${n.target.join(' ')} :: ${n.html.replace(/\s+/g, ' ').slice(0, 110)}`) })), TAGS);
     let res = await run();
