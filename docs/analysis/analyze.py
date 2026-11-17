@@ -217,6 +217,21 @@ def report(zf, min_pairs=20):
 
 
 def main(argv=None):
+    # Консоль Windows часто работает в cp1251, а в отчёте и ошибках есть кириллица и символы
+    # вроде «σ» — перенастраиваем вывод на UTF-8 с заменой символов, которые не получится вывести.
+    for stream in (sys.stdout, sys.stderr):
+        try:
+            stream.reconfigure(encoding="utf-8", errors="replace")
+        except (AttributeError, ValueError, io.UnsupportedOperation):
+            # Старый Python без reconfigure: оборачиваем поток вручную.
+            try:
+                wrapped = io.TextIOWrapper(stream.buffer, encoding="utf-8", errors="replace")
+            except (AttributeError, ValueError, io.UnsupportedOperation):
+                continue
+            if stream is sys.stdout:
+                sys.stdout = wrapped
+            else:
+                sys.stderr = wrapped
     ap = argparse.ArgumentParser(description="Разбор выгрузки Life OS (ZIP).")
     ap.add_argument("archive", help="файл ZIP из приложения")
     ap.add_argument("--out", help="сохранить отчёт в файл (Markdown)")
