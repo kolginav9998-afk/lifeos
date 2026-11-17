@@ -14,7 +14,7 @@ const dm = n => { const d = new Date(); d.setDate(d.getDate() + n); return `${St
 // ---------- люди ----------
 await tab(page, 'people');
 assert.equal(await text('#title'), 'Люди');
-assert.deepEqual(await page.locator('#subnav button').allTextContents(), ['Задачи', 'Привычки', 'Дневник', 'Здоровье', 'Тренировки', 'Заметки', 'Итоги', 'Люди']);
+assert.deepEqual(await page.locator('#subnav button').allTextContents(), ['Задачи', 'Привычки', 'Дневник', 'Здоровье', 'Тренировки', 'Заметки', 'Итоги', 'Люди', 'Чат']);
 assert.match(await text('#pp-soon'), /нет/);
 await page.click('#pp-new summary');
 await page.click('#pp-add');

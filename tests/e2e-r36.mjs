@@ -57,7 +57,7 @@ await until(page, () => document.getElementById('minimum').hidden);
 // ---------- «Рефлексия»: вечерний обзор ----------
 await tab(page, 'reflect');
 assert.equal(await text('#title'), 'Рефлексия');
-assert.deepEqual(await page.locator('#subnav button').allTextContents(), ['Задачи', 'Привычки', 'Дневник', 'Здоровье', 'Тренировки', 'Заметки', 'Итоги', 'Люди']);
+assert.deepEqual(await page.locator('#subnav button').allTextContents(), ['Задачи', 'Привычки', 'Дневник', 'Здоровье', 'Тренировки', 'Заметки', 'Итоги', 'Люди', 'Чат']);
 assert.equal(await page.locator('#lowmood').isHidden(), true, 'отложенное предупреждение не повторяется');
 await page.click('#rv-save'); await toast(/хотя бы на один/);
 await page.fill('#rv-win', 'Закрыл отчёт'); await page.fill('#rv-learn', 'Начинать с трудного');
@@ -263,7 +263,7 @@ assert.deepEqual(await page.locator('#tabs button span').allTextContents(), ['С
 assert.equal(await text('#title'), 'Настройки', 'остаёмся на настройках');
 await page.click('#tabs button[data-tab="today"]');
 await until(page, () => !document.getElementById('view-today').hidden);
-assert.deepEqual(await page.locator('#subnav button').allTextContents(), ['Задачи', 'Привычки', 'Дневник', 'Здоровье', 'Заметки']);
+assert.deepEqual(await page.locator('#subnav button').allTextContents(), ['Задачи', 'Привычки', 'Дневник', 'Здоровье', 'Заметки', 'Чат']);
 for (const id of ['focus-chip', 'learn-chip', 'test-chip', 'okr-chip']) assert.equal(await page.locator(`#${id}`).count(), 0, `${id} скрыт в простом режиме`);
 assert.equal(await page.locator('#heavy-chip').count(), 1, '«Тяжёлый день» остаётся');
 assert.equal(await page.locator('#review').isHidden(), true); assert.equal(await page.locator('#journal').isHidden(), true);
