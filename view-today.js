@@ -28,6 +28,7 @@ import { createDeviceHints } from './view-device-hints.js';
 import { createDayCards } from './view-day-cards.js';
 import { lessonSkillStatus } from './skills.js';
 import { heroOf } from './daycards.js';
+import { bestAction, warmCard, allDone } from './today-action.js';
 import * as vault from './vault.js';
 import * as store from './store.js';
 
@@ -302,7 +303,7 @@ export function createTodayView({ go }) {
     toast(`Удалено сделанных: ${ids.length}`, { actionLabel: 'Отменить', onAction: () => store.saveMany(old) });
   };
 
-  root.append(hero, whatsNew, summary, hintsBox, deviceHints.root, parkedBox, moneyNudge.root, intentionBox, planCard, dayCards.root, onboarding, wotd, focusHost, form, minimum, review, journal, ...Object.values(sections).map(s => s.sec), empty, doneBlock);
+  root.append(hero, actionBox, whatsNew, summary, hintsBox, deviceHints.root, parkedBox, moneyNudge.root, intentionBox, planCard, dayCards.root, onboarding, wotd, focusHost, form, minimum, review, journal, ...Object.values(sections).map(s => s.sec), empty, doneBlock);
 
   // ----- элементы списка -----
   async function removeTask(ev) {
@@ -449,14 +450,44 @@ export function createTodayView({ go }) {
     const pick = rankTasks(events, today).slice(0, 3);
     minList.replaceChildren(...(pick.length ? pick.map(e => item(e, today)) : [el('li', { class: 'muted', textContent: 'Задач нет. Отдохни.' })]));
   }
-  const moveOverdue = el('button', { type: 'button', id: 'move-overdue', class: 'chip', textContent: 'Перенести всё на сегодня', onclick: async () => {
+  const moveOverdueToToday = async () => {
     const today = todayStr();
     const old = events.filter(e => e.type === 'task' && !e.payload.done && e.payload.due && e.payload.due < today);
     if (!old.length) return;
     await store.saveMany(old.map(e => updateTask(e, { text: e.payload.text, due: today, repeat: e.payload.repeat?.type || '', priority: e.payload.priority })));
     toast(`Перенесено на сегодня: ${old.length}`, { actionLabel: 'Отменить', onAction: () => store.saveMany(old) });
-  } });
+  };
+  const moveOverdue = el('button', { type: 'button', id: 'move-overdue', class: 'chip', textContent: 'Перенести всё на сегодня', onclick: moveOverdueToToday });
   sections.overdue.sec.insertBefore(moveOverdue, sections.overdue.ul);
+
+  // «Самое полезное прямо сейчас»: одна большая кнопка под hero (или тёплая карточка, когда всё сделано)
+  const actionBox = el('div', { id: 'best-action', hidden: true });
+  function runBestAction(a) {
+    if (a.kind === 'overdue') return moveOverdueToToday();
+    if (a.kind === 'morning' || a.kind === 'evening') return go('diary');
+    if (a.kind === 'habits') return go('habits');
+    if (a.kind === 'main') {                    // открыть главное дело в обычном редакторе и подвести к нему экран
+      editingId = a.taskId; editorEl = null; render();
+      [...root.querySelectorAll('[data-id]')].find(n => n.dataset.id === a.taskId)?.scrollIntoView({ block: 'center' });
+    }
+  }
+  function renderBestAction(today, heavy) {
+    const a = heavy ? null : bestAction(events, today);
+    actionBox.hidden = !a;
+    if (!a) { actionBox.replaceChildren(); return; }
+    if (a.kind === 'alldone') {                 // кольцо закрыто: вместо кнопки — тёплая карточка
+      const w = warmCard(events, today);
+      fill(actionBox, el('div', { id: 'alldone-card', class: 'card calm' },
+        el('strong', { textContent: 'Всё сделано на сегодня' }),
+        w.kind === 'joy' ? el('p', { textContent: `«${w.text}»` }) : el('p', { textContent: w.text }),
+        w.kind === 'joy' ? el('p', { class: 'muted', textContent: 'Из твоей копилки радостей' }) : null));
+      return;
+    }
+    fill(actionBox, el('div', { class: 'card calm best-action' },
+      el('p', { class: 'muted', textContent: 'Сначала самое важное' }),
+      el('button', { type: 'button', id: 'best-action-btn', class: 'primary', textContent: a.label, onclick: () => runBestAction(a) }),
+      el('p', { class: 'muted', textContent: a.why })));
+  }
 
   function render() {
     const today = todayStr();
@@ -475,6 +506,7 @@ export function createTodayView({ go }) {
     const heavy = !!getPref('heavyDay');
     renderWhatsNew(); renderIntention(today); renderHints(today, heavy); renderParked(today); moneyNudge.update(events); deviceHints.update(events); renderPlan(today); dayCards.update(events);
     renderMinimum(g, today, heavy);
+    renderBestAction(today, heavy);
     for (const key of Object.keys(sections)) {
       sections[key].sec.hidden = heavy || g[key].length === 0;
       sections[key].ul.replaceChildren(...g[key].map(e => item(e, today)));
@@ -484,7 +516,7 @@ export function createTodayView({ go }) {
     doneList.replaceChildren(...g.done.slice(0, 50).map(e => item(e, today)));
     doneCount.textContent = g.done.length;
     clearDone.hidden = g.done.length === 0;
-    empty.hidden = heavy || g.openCount > 0;
+    empty.hidden = heavy || g.openCount > 0 || allDone(events, today);   // когда кольцо закрыто, вместо холодной пустой подписи — тёплая карточка наверху
     renderSummary(g, today);
     renderReview(today);
     renderJournal();

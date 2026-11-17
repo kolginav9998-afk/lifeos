@@ -509,6 +509,9 @@ details[open]>summary::after{transform:rotate(-135deg) translateY(-1px)}
 .hero .hello{font-size:1.35rem;overflow-wrap:anywhere}
 .hero .date{margin:0}
 .hero-cap{margin-top:6px;font-size:.92rem;color:var(--muted)}
+.best-action .primary{width:100%;margin:2px 0 6px}
+.best-action p{margin:0}
+#alldone-card p{margin:6px 0 0}
 .hero-ring{flex:none;line-height:0}
 .ring-track{fill:none;stroke:var(--soft)}
 .ring-bar{fill:none;stroke:url(#ring-grad);stroke-linecap:round;transition:stroke-dashoffset .7s cubic-bezier(.2,.8,.2,1)}
