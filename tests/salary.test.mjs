@@ -3,7 +3,7 @@ import test from 'node:test';
 import assert from 'node:assert/strict';
 import { normalizeCfg, cfgFromTemplate } from '../schedule.js';
 import { TAX_PRESETS, presetTax, normalizeTax, checkTax, bracketsError, parsePercent, fmtPercent, taxOnAmount, monthTax, describeTax, MAX_RATE_BP } from '../salary-tax.js';
-import { normalizePay, checkPay, makePaycfg, payOf, makePaymonth, paymonthsOf, parseMinor, parseMult, fmtMult, fmtMoney, minorToInput, splitOvertime, computeMonth, payoutPlan, upcomingPayouts, incomeDraft, plural, ROUNDING, roundingId, DISCLAIMER } from '../salary.js';
+import { normalizePay, checkPay, makePaycfg, payOf, makePaymonth, paymonthsOf, parseMinor, parseMult, fmtMult, fmtMoney, minorToInput, splitOvertime, computeMonth, payoutPlan, upcomingPayouts, incomeDraft, plural, netHourlyMinor, workHours, workHoursText, ROUNDING, roundingId, DISCLAIMER } from '../salary.js';
 import { monthSeries, whatIf, insights } from '../salary-insights.js';
 import { makeIncome, MAX_MINOR } from '../money.js';
 
@@ -200,4 +200,28 @@ test('аналитика: «а что если», ряд месяцев, выв�
   const heavy = computeMonth({ ...args, days: new Map([day('2026-11-17', '09:00', '22:00'), day('2026-11-18', '09:00', '22:00')]) }); assert.ok(insights({ cur: heavy, pay: pay0(), today: '2026-12-01' }).some(i => i.id === 'ot-norm' && i.tone === 'warn'));
   assert.deepEqual([plural(1, 'день', 'дня', 'дней'), plural(2, 'день', 'дня', 'дней'), plural(5, 'день', 'дня', 'дней'), plural(11, 'день', 'дня', 'дней'), plural(21, 'день', 'дня', 'дней'), plural(22, 'день', 'дня', 'дней')], ['день', 'дня', 'дней', 'дней', 'день', 'дня']);
   assert.match(DISCLAIMER, /приблизительный.*не бухгалтерия и не налоговая консультация/);
+});
+
+test('цена в часах работы: чистая ставка часа и подпись; без настроек или ставки — ничего не показываем', () => {
+  // почасовой режим: час стоит baseMinor; налог 13 % — на руки 87 %
+  const hourly = pay0({ mode: 'hourly', baseMinor: 100_000 });                       // 1000 ₽/ч gross
+  assert.equal(netHourlyMinor(hourly), 87_000);
+  assert.equal(workHours(522_000, hourly), 6);                                        // 5220 ₽ = ровно 6 ч
+  assert.equal(workHours(1, hourly), 0.1, 'копейка — уже десятая часа, округление вверх');
+  assert.equal(workHoursText(522_000, hourly), '≈ 6 ч работы');
+  assert.equal(workHoursText(265_500, hourly), '≈ 3,1 ч работы');
+  // оклад с указанной часовой ставкой: берётся она
+  const salary = pay0({ hourlyMinor: 50_000 });                                      // 500 ₽/ч gross
+  assert.equal(netHourlyMinor(salary), 43_500);
+  assert.equal(workHoursText(435_000, salary), '≈ 10 ч работы');
+  // оклад без часовой ставки, пустые и битые настройки, нулевые суммы — подписи нет
+  assert.equal(netHourlyMinor(pay0()), null, 'оклад без hourlyMinor: без графика час не посчитать');
+  assert.equal(netHourlyMinor(null), null); assert.equal(netHourlyMinor({}), null); assert.equal(netHourlyMinor('x'), null);
+  assert.equal(netHourlyMinor(pay0({ mode: 'hourly', baseMinor: 0 })), null, 'нулевая ставка');
+  assert.equal(workHours(0, hourly), null); assert.equal(workHours(-5, hourly), null); assert.equal(workHours(1.5, hourly), null);
+  assert.equal(workHoursText(100_000, null), null);
+  // без налога ставка не режется; налог по шкале тоже применяется
+  assert.equal(netHourlyMinor(normalizePay({ mode: 'hourly', baseMinor: 100_000, tax: { kind: 'flat', rateBp: 0 } })), 100_000);
+  const own = normalizePay({ mode: 'hourly', baseMinor: 100_000, tax: { kind: 'brackets', basis: 'monthly', brackets: [{ upToMinor: 50_000, rateBp: 1000 }, { upToMinor: null, rateBp: 2000 }] } });
+  assert.equal(netHourlyMinor(own), 100_000 - (5_000 + 10_000), 'час по двум ступеням: 10 % до 500 ₽, 20 % выше');
 });
