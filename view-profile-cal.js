@@ -1,7 +1,7 @@
 // Календарь активности для экрана «Профиль»: 26 недель, по клетке на день, цвет — сколько было записей.
 // Одним цветом ничего не сказано: рядом сводка словами и таблица по неделям (открывается кнопкой), поэтому сама сетка для диктора скрыта.
 import { el, fill } from './ui.js';
-import { activityByDay, activityText, activityWeeks, ACTIVITY_LEVELS, appFacts } from './profile-stats.js';
+import { activityByDay, activityText, activityWeeks, ACTIVITY_LEVELS } from './profile-stats.js';
 import { plural } from './home.js';
 
 const WEEKS = 26;
@@ -23,8 +23,9 @@ export function createCalendar() {
     el('p', { class: 'muted', textContent: 'Каждая клетка — один день, справа сегодняшний. Чем темнее клетка, тем больше записей в этот день.' }),
     grid, legend, words, more);
 
-  function render(events, now = Date.now()) {
-    const cal = activityByDay(events, now, WEEKS), facts = appFacts(events, now);
+  // facts — уже посчитанные appFacts (серия): второй раз журнал не перебираем.
+  function render(events, now, facts) {
+    const cal = activityByDay(events, now, WEEKS);
     grid.style.setProperty('--cols', String(cal.weeks.length));
     fill(grid, ...cal.weeks.flatMap(week => week.map(c => el('i', { class: `pr-cell pr-l${c.level}${c.future ? ' pr-future' : ''}`, title: c.future ? '' : `${ru(c.date)}: ${c.count ? records(c.count) : 'записей нет'}` }))));
     words.textContent = `${activityText(cal)}${facts.streak ? ` Дней подряд сейчас: ${facts.streak}.` : ''}`;

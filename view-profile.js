@@ -66,10 +66,10 @@ export function createProfileView(ctx = {}) {
   // Нажатая кнопка при перерисовке заменяется новой: фокус возвращаем на такую же (у кнопок есть метка data-fk).
   function render() {
     const a = document.activeElement, fk = a && root.contains(a) ? a.dataset.fk ?? null : null;
-    const now = Date.now(), range = periodRange(period, now), list = statsOverview(events, now, range);
+    const now = Date.now(), range = periodRange(period, now), list = statsOverview(events, now, range), facts = appFacts(events, now);
     last = { list, range };
-    fill(body, header(profileCard(events, account.info()), appFacts(events, now)), periodBlock(range), ...list.map(sectionCard), cal.root);
-    cal.render(events, now);
+    fill(body, header(profileCard(events, account.info()), facts), periodBlock(range), ...list.map(sectionCard), cal.root);
+    cal.render(events, now, facts);
     if (fk) { const n = [...root.querySelectorAll('[data-fk]')].find(x => x.dataset.fk === fk); if (n && document.activeElement !== n) n.focus({ preventScroll: true }); }
   }
   return { root, update(evs) { events = evs; if (!root.hidden) render(); }, show() { render(); } };
