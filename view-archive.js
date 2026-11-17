@@ -6,6 +6,7 @@ import * as store from './store.js';
 import { serialize, todayStr } from './events.js';
 import { encryptBackup, decryptBackup, readBackup, backupKind, NeedPasswordError, BadBackupPasswordError, MAX_BACKUP_BYTES } from './backup.js';
 import { importPlan, planEvents, planGroups, filterPlan, cleanPrefs, archiveName, looksLikeZip } from './archive.js';
+import { buildHtmlArchive } from './export-html.js';
 import { describeEvent } from './search.js';
 import { saveTextFile } from './platform.js';
 import * as vault from './vault.js';
@@ -47,6 +48,21 @@ export function createArchive({ onSaved = () => {} } = {}) {
       toast(`Сохранено записей: ${store.state.events.length}`);
       refresh(); onSaved();
     } catch (err) { toast('Не удалось сохранить: ' + (err?.message || err)); }
+  };
+
+  // «Вечный» HTML-архив: один файл, который откроется в любом браузере без приложения и интернета.
+  const htmlBtn = el('button', { id: 'export-html', type: 'button', textContent: 'Вечный HTML-архив' });
+  htmlBtn.onclick = async () => {
+    if (!confirm('Файл будет БЕЗ шифрования: любой, кто его получит, прочтёт все данные. Храни его как личный документ. Продолжить?')) return;
+    setBusy(htmlBtn, true, 'Собираю…');
+    try {
+      const html = buildHtmlArchive(store.state.events, { exportedAt: Date.now(), version: VERSION, prefs: cleanPrefs(getPrefs()) });
+      await saveTextFile(`lifeos-archive-${todayStr()}.html`, html, 'text/html');
+      setPref('lastBackupAt', Date.now());
+      toast(`HTML-архив сохранён (записей: ${store.state.events.length})`);
+      refresh(); onSaved();
+    } catch (err) { toast('Не удалось сохранить: ' + (err?.message || err)); }
+    finally { setBusy(htmlBtn, false); }
   };
 
   // ---------- загрузить ----------
@@ -152,6 +168,9 @@ export function createArchive({ onSaved = () => {} } = {}) {
     el('strong', { textContent: 'Сохранить архив' }),
     revealable(bkPass),
     el('div', { class: 'row wrap' }, bkBtn, plainBtn),
+    el('strong', { textContent: 'Вечный HTML-архив' }),
+    el('p', { class: 'muted', textContent: 'Один файл, который откроется в любом браузере даже через много лет — без приложения и интернета: разделы, поиск, фильтры, суммы по деньгам. Исходные данные можно скачать из него обратно. Файл не зашифрован — храни его как личный документ.' }),
+    el('div', { class: 'row wrap' }, htmlBtn),
     el('label', {}, 'Напоминать про архив: ', remind),
     el('strong', { textContent: 'Загрузить архив' }),
     el('p', { class: 'muted', textContent: 'Выбери файл (.json): открытый или зашифрованный. Новое добавится само, твои данные не затрутся. Если в файле есть отличающиеся записи, сначала покажу, что внутри.' }),
