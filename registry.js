@@ -48,7 +48,7 @@ export const REGISTRY = {
   testrun: { label: 'Прохождение проверки', group: 'Проверки', module: 'bt-core.js', privacy: 'numbers', analytics: true, fields: 'date, mode, tests{metrics, trials}, state, startedAt, durationMs' },
   experiment: { label: 'Личный эксперимент', group: 'Проверки', module: 'experiments.js', privacy: 'text', analytics: false, fields: 'title, change, metric, days, blockDays, startDate, order, cancelled' },
   person: { label: 'Человек', group: 'Люди и цели', module: 'people.js', privacy: 'people', analytics: false, fields: 'name, birthday, birthYear, cadenceDays, lastContact, note' },
-  okr: { label: 'Цель квартала', group: 'Люди и цели', module: 'okr.js', privacy: 'text', analytics: false, fields: 'title, why, due, krs[text, target, current, unit], status' },
+  okr: { label: 'Цель квартала', group: 'Люди и цели', module: 'okr.js', privacy: 'text', analytics: false, fields: 'title, why, due, krs[text, target, current, unit, auto{kind (count|sum), type, field, from, to}], status' },
   intention: { label: 'Намерение дня', group: 'Рефлексия', module: 'reflect.js', privacy: 'text', analytics: false, fields: 'date, text' },
   dayreview: { label: 'Вечерний обзор', group: 'Рефлексия', module: 'reflect.js', privacy: 'text', analytics: false, fields: 'date, win, miss, learn' },
   weekreflect: { label: 'Итоги недели', group: 'Рефлексия', module: 'reflect.js', privacy: 'text', analytics: false, fields: 'week, went, blocked, change' },
@@ -108,6 +108,6 @@ export function erMarkdown() {
   L.push('```', '', '## Связи по идентификатору', '', '| Родитель | Потомок | Поле | Смысл |', '|---|---|---|---|');
   for (const [parent, child, field, what] of RELATIONS) L.push(`| \`${parent}\` | \`${child}\` | \`${field}\` | ${what} |`);
   L.push('', '## Записи по дням', '', 'Эти типы привязаны к дню полем `date`: ' + BY_DAY.map(t => `\`${t}\``).join(', ') + '. Узел «day» условный: отдельной записи «день» нет, день — это просто дата.', '',
-    '## Внутри записи (не отдельные типы)', '', '- `okr` содержит список результатов `krs[]` (текст, цель, текущее значение, единица).', '- `workout` содержит упражнения и подходы `exercises[].sets[]`.', '- `testrun` содержит результаты тестов и отдельные пробы `tests{}.trials[]`.', '- `decision` содержит итог `closed{}` после оценки решения.', '');
+    '## Внутри записи (не отдельные типы)', '', '- `okr` содержит список результатов `krs[]` (текст, цель, текущее значение, единица, необязательный автоподсчёт `auto` по журналу: вид, тип записи, поле, период).', '- `workout` содержит упражнения и подходы `exercises[].sets[]`.', '- `testrun` содержит результаты тестов и отдельные пробы `tests{}.trials[]`.', '- `decision` содержит итог `closed{}` после оценки решения.', '');
   return L.join('\n');
 }
