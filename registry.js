@@ -43,7 +43,7 @@ export const REGISTRY = {
   dictself: { label: 'Самооценка речи (дикция)', group: 'Учёба', module: 'diction.js', privacy: 'learning', analytics: false, fields: 'date, scores (clarity, tempo, volume, intonation, pauses, fillers: 1–5), note, weak' },
   learngoal: { label: 'Недельная цель по курсу (минуты)', group: 'Учёба', module: 'practice.js', privacy: 'learning', analytics: false, fields: 'track, minutes' },
   ucard: { label: 'Своя карточка', group: 'Учёба', module: 'academy.js', privacy: 'text', analytics: false, fields: 'q, a, hint' },
-  zcheck: { label: 'Проверка урока «с нуля»', group: 'Учёба', module: 'curriculum.js', privacy: 'learning', analytics: true, fields: 'track, lesson, kind (quiz|surprise|placement), n, ok, hints, date' },
+  zcheck: { label: 'Проверка урока «с нуля»', group: 'Учёба', module: 'curriculum.js', privacy: 'learning', analytics: true, fields: 'track, lesson, kind (quiz|surprise|placement), n, ok, hints, date, byKind (разбивка по видам заданий: choose|listen|typed|order|match → {ok, n}; необязательное)' },
   resource: { label: 'Отметка о внешнем курсе', group: 'Учёба', module: 'zero-resources.js', privacy: 'learning', analytics: false, fields: 'id, status (not_started|in_progress|completed|abandoned), note, date' },
   testrun: { label: 'Прохождение проверки', group: 'Проверки', module: 'bt-core.js', privacy: 'numbers', analytics: true, fields: 'date, mode, tests{metrics, trials}, state, startedAt, durationMs' },
   experiment: { label: 'Личный эксперимент', group: 'Проверки', module: 'experiments.js', privacy: 'text', analytics: false, fields: 'title, change, metric, days, blockDays, startDate, order, cancelled' },

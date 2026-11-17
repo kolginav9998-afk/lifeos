@@ -82,7 +82,7 @@ _Файл создан из `registry.js` и сверяется с ним тес
 | `dictself` | Самооценка речи (дикция) | date, scores (clarity, tempo, volume, intonation, pauses, fillers: 1–5), note, weak | учёба | нет | `diction.js` |
 | `learngoal` | Недельная цель по курсу (минуты) | track, minutes | учёба | нет | `practice.js` |
 | `ucard` | Своя карточка | q, a, hint | личный текст | нет | `academy.js` |
-| `zcheck` | Проверка урока «с нуля» | track, lesson, kind (quiz|surprise|placement), n, ok, hints, date | учёба | да | `curriculum.js` |
+| `zcheck` | Проверка урока «с нуля» | track, lesson, kind (quiz|surprise|placement), n, ok, hints, date, byKind (разбивка по видам заданий: choose|listen|typed|order|match → {ok, n}; необязательное) | учёба | да | `curriculum.js` |
 | `resource` | Отметка о внешнем курсе | id, status (not_started|in_progress|completed|abandoned), note, date | учёба | нет | `zero-resources.js` |
 
 ## Проверки
