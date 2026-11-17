@@ -12,7 +12,7 @@ assert.deepEqual(await page.locator('#tabs button span').allTextContents(), ['С
 // «Меню» — первый экран своей вкладки
 await page.click('#tabs button[data-tab="more"]');
 await waitText(page, '#title', 'Меню');
-assert.deepEqual(await page.locator('#subnav button').allTextContents(), ['Все разделы', 'Профиль', 'Настройки', 'Справка']);
+assert.deepEqual(await page.locator('#subnav button').allTextContents(), ['Все разделы', 'Профиль', 'Аккаунт', 'Настройки', 'Справка']);
 await waitCount(page, '.menu-sec', 7);
 assert.ok(await page.locator('.menu-tile').count() >= 20, 'плитки по всем разделам');
 assert.equal(await page.locator('#menu-results').isHidden(), true);

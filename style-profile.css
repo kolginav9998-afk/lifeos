@@ -1,1 +1,65 @@
-/* Статистика в профиле. Подключается после style-diction.css (см. index.html). */
+/* Экран «Профиль»: шапка, период, плитки статистики, календарь активности, окно «Поделиться итогом». Подключается после style-diction.css (см. index.html). Цвета только из токенов. */
+
+#view-profile .pr-body{display:flex;flex-direction:column;gap:var(--s4);min-width:0}
+
+/* шапка */
+#view-profile .pr-head .profile-who{min-width:0}
+#view-profile .pr-head .profile-who strong,#view-profile .pr-head .profile-motto{overflow-wrap:anywhere}
+#view-profile .pr-actions{margin-top:var(--s3);gap:var(--s2)}
+#view-profile .pr-actions button{flex:1 1 150px;min-height:48px}
+
+/* переключатель периода */
+#view-profile .pr-period{display:flex;flex-direction:column;gap:var(--s2)}
+#view-profile .pr-period p{margin:0}
+#view-profile .pr-seg{grid-template-columns:repeat(3,minmax(0,1fr))}
+#view-profile .pr-seg .seg{min-height:44px;padding:4px 6px;font-size:var(--t14);line-height:1.2;overflow-wrap:anywhere}
+#view-profile .pr-seg .seg[aria-pressed=true]::before{content:"✓ "}
+
+/* разделы с плитками */
+#view-profile .pr-sec{display:flex;flex-direction:column;gap:var(--s3);min-width:0}
+#view-profile .pr-h{display:flex;align-items:center;gap:var(--s2);margin:0;font-size:var(--t16);overflow-wrap:anywhere}
+#view-profile .pr-h svg{flex:none;color:var(--mode-accent)}
+#view-profile .pr-tiles{display:grid;grid-template-columns:repeat(auto-fit,minmax(min(100%,120px),1fr));gap:var(--s2);margin:0}
+#view-profile .pr-tile{display:flex;flex-direction:column;gap:2px;min-width:0;margin:0;padding:var(--s3);border:1px solid var(--line);border-radius:var(--r12)}
+#view-profile .pr-tile dd{margin:0;min-width:0}
+#view-profile .pr-v{order:-1;font-size:var(--t24);font-weight:700;line-height:1.2;font-variant-numeric:tabular-nums;overflow-wrap:anywhere}
+#view-profile .pr-l{font-size:var(--t14);font-weight:600;line-height:1.3;overflow-wrap:anywhere}
+#view-profile .pr-hint{font-size:var(--t14);line-height:1.35;color:var(--muted);overflow-wrap:anywhere}
+#view-profile .pr-open{align-self:flex-start;min-height:44px;padding:8px var(--s4);font-weight:600}
+#view-profile .pr-sec .empty{padding:var(--s2) 0 0}
+#view-profile .pr-sec .empty .ill{width:96px}
+#view-profile .pr-sec .empty-p{max-width:none}
+
+/* календарь активности: недели по столбцам, дни по строкам (сверху понедельник); пустые и будущие дни не красятся */
+#view-profile .pr-cal{display:flex;flex-direction:column;gap:var(--s3);min-width:0}
+#view-profile .pr-cal p{margin:0}
+#view-profile .pr-grid{display:grid;grid-template-rows:repeat(7,auto);grid-auto-flow:column;grid-template-columns:repeat(var(--cols,26),minmax(0,1fr));gap:2px}
+#view-profile .pr-cell{display:block;aspect-ratio:1;min-width:0;border-radius:2px;background:color-mix(in srgb,var(--text) 9%,transparent)}
+#view-profile .pr-cell.pr-l1{background:color-mix(in srgb,var(--mode-accent) 28%,transparent)}
+#view-profile .pr-cell.pr-l2{background:color-mix(in srgb,var(--mode-accent) 52%,transparent)}
+#view-profile .pr-cell.pr-l3{background:color-mix(in srgb,var(--mode-accent) 76%,transparent)}
+#view-profile .pr-cell.pr-l4{background:var(--mode-accent)}
+#view-profile .pr-cell.pr-future{visibility:hidden}
+#view-profile .pr-legend{display:flex;flex-wrap:wrap;gap:var(--s2) var(--s4);list-style:none;margin:0;padding:0;font-size:var(--t14);color:var(--muted)}
+#view-profile .pr-legend li{display:flex;align-items:center;gap:6px}
+#view-profile .pr-legend .pr-cell{width:14px;flex:none}
+#view-profile .pr-cal-text{overflow-wrap:anywhere}
+#view-profile .pr-table{width:100%;border-collapse:collapse;font-size:var(--t14)}
+#view-profile .pr-table caption{text-align:left;color:var(--muted);padding-bottom:var(--s2)}
+#view-profile .pr-table th,#view-profile .pr-table td{padding:var(--s2);border-top:1px solid var(--line);text-align:right;font-variant-numeric:tabular-nums;overflow-wrap:anywhere}
+#view-profile .pr-table thead th{color:var(--muted);font-weight:600}
+#view-profile .pr-table tbody th,#view-profile .pr-table thead th:first-child{text-align:left}
+#view-profile .pr-table tbody th{font-weight:600}
+
+/* окно «Поделиться итогом» */
+#pr-share-win{gap:var(--s3)}
+#pr-share-win .sess-top{flex-wrap:wrap;gap:var(--s2) var(--s3)}
+#pr-share-win #pr-share-title{flex:1 1 auto;min-width:0;font-size:var(--t20);outline:none;overflow-wrap:anywhere}
+#pr-share-win #pr-share-note{margin:0}
+#pr-share-win textarea{min-height:40vh;font-size:var(--t16);line-height:1.5;resize:vertical}
+#pr-share-win .row button{flex:1 1 150px;min-height:48px}
+
+@media (prefers-reduced-motion:no-preference){
+  #view-profile .pr-open,#view-profile .pr-actions button{transition:background-color .15s var(--ease),transform .15s var(--ease)}
+  #view-profile .pr-open:active,#view-profile .pr-actions button:active{transform:scale(.98)}
+}

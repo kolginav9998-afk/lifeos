@@ -40,6 +40,7 @@ import { createAccountView } from './view-account.js';
 import { createHelpView } from './view-help.js';
 import { createMenuView } from './view-menu.js';
 import { createHomeView } from './view-home.js';
+import { createProfileView } from './view-profile.js';
 import { createSalaryView } from './view-salary.js';
 import { createScheduleView } from './view-schedule.js';
 import { createTour, openTarget } from './view-help-tour.js';
@@ -70,7 +71,8 @@ const DEFS = [
   { id: 'okr', group: 'grow', title: 'Цели', sub: 'Цели', make: () => createOkrView() },
   { id: 'insights', group: 'grow', title: 'Аналитика', sub: 'Аналитика', make: () => createInsightsView() },
   { id: 'menu', group: 'more', title: 'Меню', sub: 'Все разделы', make: ctx => createMenuView(ctx) },
-  { id: 'account', group: 'more', title: 'Профиль', sub: 'Профиль', make: ctx => createAccountView(ctx) },
+  { id: 'profile', group: 'more', title: 'Профиль', sub: 'Профиль', make: ctx => createProfileView(ctx) },
+  { id: 'account', group: 'more', title: 'Аккаунт', sub: 'Аккаунт', make: ctx => createAccountView(ctx) },
   { id: 'more', group: 'more', title: 'Настройки', sub: 'Настройки', make: ctx => createSettingsView(ctx) },
   { id: 'help', group: 'more', title: 'Справка', sub: 'Справка', make: ctx => createHelpView(ctx) },
 ];
@@ -82,11 +84,11 @@ const GROUPS = [
   { id: 'more', label: 'Меню', icon: 'more' },
 ];
 // Режимы оформления (--mode-accent в style.css): у учёбы, денег, аналитики и безопасности свой акцент, у остальных — основной.
-const MODE_OF = { learn: 'learn', tests: 'learn', skills: 'learn', zero: 'learn', diction: 'learn', money: 'finance', salary: 'finance', schedule: 'finance', insights: 'analytics', okr: 'analytics', plans: 'analytics', reflect: 'analytics', account: 'security', more: 'security', help: 'security' };
+const MODE_OF = { learn: 'learn', tests: 'learn', skills: 'learn', zero: 'learn', diction: 'learn', money: 'finance', salary: 'finance', schedule: 'finance', insights: 'analytics', okr: 'analytics', plans: 'analytics', reflect: 'analytics', profile: 'analytics', account: 'security', more: 'security', help: 'security' };
 const FOCUS_TAB = { task: 'today', habit: 'habits', expense: 'money', note: 'notes', diary: 'diary', measure: 'health' };
 
 // Простой режим: меньше вкладок и экранов, только самое нужное. Остальные экраны по-прежнему открываются из чипов и поиска.
-const SIMPLE_VIEWS = new Set(['today', 'habits', 'diary', 'health', 'notes', 'menu', 'home', 'more', 'account', 'help', 'zero', 'diction']);
+const SIMPLE_VIEWS = new Set(['today', 'habits', 'diary', 'health', 'notes', 'menu', 'profile', 'home', 'more', 'account', 'help', 'zero', 'diction']);
 const visibleDefs = () => (getPref('simple') ? DEFS.filter(d => SIMPLE_VIEWS.has(d.id)) : DEFS);
 
 // ---------- тема ----------
@@ -367,7 +369,9 @@ function handleUrlParams() {
 // ---------- сборка интерфейса ----------
 // Экраны создаются заново и при блокировке: в скрытых экранах и открытых окнах не должно оставаться личных данных.
 function buildViews() {
-  const main = $('view'), ctx = { go: navigate, lockNow, applyTheme, applyMode, onVaultChange: updateLockButton, openAccount: () => go('account'), exportCsv: () => views.more.exportCsv(),
+  const main = $('view'), ctx = { go: navigate, lockNow, applyTheme, applyMode, onVaultChange: updateLockButton, openAccount: () => go('account'),
+    editProfile: () => { navigate('account'); const form = views.account.root.querySelector('#profile-edit'); if (form) form.open = true; },        // «Изменить профиль»: аккаунт с раскрытой формой имени, значка и цвета
+    exportCsv: () => views.more.exportCsv(),
     openHelp, openZero: (trackId, lessonId) => { navigate('zero'); views.zero.open(trackId, lessonId); }, showTour: () => { window.scrollTo(0, 0); tour.show(); },
     onLoggedOut: () => { paintAvatar(store.state.events); if (REQUIRE_ACCOUNT) showGate(); } };
   for (const d of DEFS) {
@@ -404,7 +408,7 @@ function build() {
   };
   $('search-input').oninput = renderSearch;
   $('lock-top').onclick = () => lockNow();
-  $('profile-btn').onclick = () => navigate('account');
+  $('profile-btn').onclick = () => navigate('profile');                  // аватар открывает профиль с цифрами; имя, значок и аккаунт — по кнопке «Изменить профиль»
   $('skip-link').onclick = e => { e.preventDefault(); focusNode($('view'), { preventScroll: false }); };       // «Перейти к содержимому» (видна при фокусе с клавиатуры)
 
   buildViews();

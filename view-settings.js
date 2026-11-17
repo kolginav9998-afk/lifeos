@@ -95,7 +95,7 @@ export function createSettingsView({ lockNow, applyTheme, applyMode = () => {}, 
       try {
         const wasQuick = quickUnlockEnabled();
         await account.changePassword({ oldPassword: o.value, newPassword: n1.value });
-        toast(wasQuick ? 'Пароль изменён. Вход по отпечатку выключен: включи его заново в Профиле, в карточке «Быстрый вход».' : 'Пароль изменён'); o.value = n1.value = n2.value = '';
+        toast(wasQuick ? 'Пароль изменён. Вход по отпечатку выключен: включи его заново в Аккаунте, в карточке «Быстрый вход».' : 'Пароль изменён'); o.value = n1.value = n2.value = '';
       }
       catch (err) { toast(err instanceof vault.WrongPasswordError ? 'Текущий пароль неверный' : describeError(err)); }
       finally { setBusy(chBtn, false); }

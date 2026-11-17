@@ -1,4 +1,4 @@
-// Демо-данные для скриншотов и проверок оформления: задачи, привычки, расходы, отметки дня, замеры, заметка, профиль.
+// Демо-данные для скриншотов и проверок оформления: задачи, привычки, расходы, отметки дня, замеры, заметка, профиль, вещи дома.
 export async function seedDemo(page) {
   await page.evaluate(async () => {
   const s = await import('./store.js'); const E = await import('./events.js'); const H = await import('./habits.js');
@@ -25,6 +25,14 @@ export async function seedDemo(page) {
   }
   evs.push(Hl.makeMeasure({ kind: 'bp', value: 122, value2: 79, date: d(-1) }, now));
   evs.push(N.makeNote('Идея: сделать недельный обзор по воскресеньям\nи записывать три главных вывода', now));
+  // «Дом»: четыре вещи с отметками «надел», «использовал» и «постирал» за последние дни (время записи разнесено по дням: заполнен и календарь активности профиля)
+  const Hm = await import('./home.js'), ago = n => { const [y, m, dd] = d(-n).split('-').map(Number); return new Date(y, m - 1, dd, 12).getTime(); };       // полдень того дня по местному времени: день записи не зависит от часа запуска и перехода на летнее время
+  const items = [Hm.makeItem({ name: 'Куртка зимняя', kind: 'clothes', place: 'Шкаф в прихожей', priceMinor: 1250000, care: { how: 'machine', temp: 30, washEveryWears: 15 } }, ago(120) + 1),
+    Hm.makeItem({ name: 'Футболка белая', kind: 'clothes', care: { how: 'machine', temp: 40, washEveryWears: 1 } }, ago(60) + 2),
+    Hm.makeItem({ name: 'Полотенце банное', kind: 'towels' }, ago(40) + 3), Hm.makeItem({ name: 'Чайник', kind: 'kitchen', place: 'Кухня', priceMinor: 350000 }, ago(30) + 4)];
+  evs.push(...items);
+  [[0, 'wear', 0], [0, 'wear', 2], [0, 'wear', 5], [1, 'wear', 0], [1, 'wear', 1], [1, 'wash', 1], [2, 'use', 1], [2, 'wash', 6], [3, 'use', 0], [3, 'use', 3]]
+    .forEach(([i, kind, n], k) => evs.push(Hm.makeLog(items[i], kind, { date: d(-n) }, ago(n) + 10 + k)));
   await s.saveMany(evs);
 });
   await page.waitForTimeout(400);

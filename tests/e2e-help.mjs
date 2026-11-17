@@ -16,7 +16,7 @@ await until(p, () => !document.getElementById('app').hidden);
 
 await tab(p, 'help');
 assert.equal(await p.textContent('#title'), 'Справка');
-assert.deepEqual(await p.locator('#subnav button').allTextContents(), ['Все разделы', 'Профиль', 'Настройки', 'Справка'], 'Справка рядом с Настройками и Профилем');
+assert.deepEqual(await p.locator('#subnav button').allTextContents(), ['Все разделы', 'Профиль', 'Аккаунт', 'Настройки', 'Справка'], 'Справка рядом с Настройками, Профилем и Аккаунтом');
 assert.ok(await p.locator('#help-list .help-item').count() >= 14, 'в списке все вопросы');
 assert.match(await p.textContent('#help-list .help-item >> nth=0'), /С чего начать/);
 
@@ -49,9 +49,9 @@ await p.click('#help-back');
 assert.equal(await p.locator('#help-list').isVisible(), true);
 assert.equal(await p.evaluate(() => document.activeElement?.dataset?.article), 'forgot-password', 'после «Назад» фокус на той же строке списка');
 await p.click('#help-list .help-item[data-article="forgot-password"]');
-assert.equal(await p.textContent('#help-action'), 'Открыть Профиль');
+assert.equal(await p.textContent('#help-action'), 'Открыть Аккаунт');
 await p.click('#help-action');
-assert.equal(await p.textContent('#title'), 'Профиль');
+assert.equal(await p.textContent('#title'), 'Аккаунт');
 assert.equal(await p.locator('#view-account').isVisible(), true);
 assert.equal(await active(p), 'title', 'после перехода фокус на заголовке экрана');
 
@@ -72,7 +72,7 @@ assert.equal(await p.getAttribute('#help-link', 'href'), APK_LINK);
 assert.equal(await p.getAttribute('#help-link', 'target'), '_blank');
 assert.equal(APK_LINK, 'https://github.com/kolginav9998-afk/lifeos/releases/download/latest-apk/lifeos.apk');
 await p.click('#help-action');
-assert.equal(await p.textContent('#title'), 'Профиль');
+assert.equal(await p.textContent('#title'), 'Аккаунт');
 const nearTop = await p.evaluate(() => { const r = document.getElementById('upd-card').getBoundingClientRect(); return r.top >= 0 && r.top < innerHeight / 2; });
 assert.ok(nearTop, 'карточка обновления в видимой части экрана');
 
@@ -153,7 +153,7 @@ await until(A, () => !document.getElementById('app').hidden, null, 30000);
 // первое знакомство: карточка 1, фокус на заголовке, один раз на устройстве
 await until(A, () => !document.getElementById('tour').hidden);
 assert.equal(await A.textContent('#tour-step'), 'Шаг 1 из 3');
-assert.equal(await A.textContent('#tour-title'), 'Это твой профиль: имя и значок');
+assert.equal(await A.textContent('#tour-title'), 'Это твой профиль: цифры и значок');
 assert.equal(await active(A), 'tour-title');
 assert.equal(await A.evaluate(() => JSON.parse(localStorage.getItem('lifeos.prefs.v1')).tourDone), true, 'отмечено сразу, второй раз не покажем');
 assert.equal(await A.getAttribute('#tour-close', 'aria-label'), 'Закрыть подсказки');
@@ -166,16 +166,16 @@ assert.equal(await A.textContent('#title'), 'Профиль');
 assert.equal(await A.textContent('#tour-step'), 'Шаг 2 из 3');
 assert.equal(await A.textContent('#tour-title'), 'Сохрани архив и код восстановления');
 assert.equal(await active(A), 'title', 'фокус на открытом экране, а не отнят знакомством');
-assert.ok(await A.locator('#acc-help').count() === 1, 'в Профиле (с аккаунтом) есть кнопка справки');
+assert.ok(await A.locator('#pr-edit').count() === 1 && await A.locator('#pr-sec-app').count() === 1, 'открылся профиль с цифрами и кнопкой «Изменить профиль»');
 // карточка 2: «Позже» пропускает её
 await A.click('#tour-later');
 assert.equal(await A.textContent('#tour-step'), 'Шаг 3 из 3');
-assert.equal(await A.textContent('#tour-title'), 'Обновления приходят кнопкой в Профиле');
+assert.equal(await A.textContent('#tour-title'), 'Обновления приходят кнопкой в Аккаунте');
 assert.equal(await active(A), 'tour-title');
 // карточка 3: показать кнопку обновления и закрыться
 await A.click('#tour-act');
 assert.equal(await A.locator('#tour').isVisible(), false);
-assert.equal(await A.textContent('#title'), 'Профиль');
+assert.equal(await A.textContent('#title'), 'Аккаунт');
 assert.ok(await A.evaluate(() => { const r = document.getElementById('upd-card').getBoundingClientRect(); return r.top >= 0 && r.top < innerHeight / 2; }), 'карточка обновления на виду');
 
 // действие «Открыть архив» из знакомства: настройки, карточка архива на виду

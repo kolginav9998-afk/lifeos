@@ -255,7 +255,7 @@ await t.close();
   for (const theme of THEMES) { await setTheme(g, theme); await runAxe(g, `${theme} / вход: код восстановления`); }
   await g.check('#gate-code-ok'); await g.click('#gate-code-done');
   await until(g, () => !document.getElementById('app').hidden, null, 60000);
-  await g.click('#profile-btn'); await settle(g, 400);
+  await tab(g, 'account'); await settle(g, 400);
   await g.click('#acc-logout');
   await until(g, () => document.getElementById('gate-login'));
   for (const theme of THEMES) { await setTheme(g, theme); await runAxe(g, `${theme} / вход: пароль`); }

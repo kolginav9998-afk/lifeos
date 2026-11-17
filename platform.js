@@ -25,12 +25,12 @@ export async function httpFetch(url, init) {
 export const nativePlugin = name => (isNative ? plugin(name) : null);
 
 // Сохранить текстовый файл: на сайте — скачивание, в приложении — окно «Поделиться/Сохранить».
-export async function saveTextFile(filename, text, mime = 'application/json') {
+export async function saveTextFile(filename, text, mime = 'application/json', dialogTitle = 'Сохранить резервную копию') {
   if (isNative) {
     const Filesystem = plugin('Filesystem');
     const Share = plugin('Share');
     const { uri } = await Filesystem.writeFile({ path: filename, data: text, directory: 'CACHE', encoding: 'utf8' });
-    await Share.share({ title: filename, url: uri, dialogTitle: 'Сохранить резервную копию' });
+    await Share.share({ title: filename, url: uri, dialogTitle });
     return 'share';
   }
   const blob = new Blob([text], { type: mime });

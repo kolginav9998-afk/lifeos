@@ -41,7 +41,7 @@ await appReady(p);
 await until(p, () => /Доступна новая версия R9\.99/.test(document.getElementById('toast').textContent), null, 10000);
 assert.equal(asked, 1);
 await p.click('#toast button');
-assert.equal(await p.textContent('#title'), 'Профиль');
+assert.equal(await p.textContent('#title'), 'Аккаунт');
 await until(p, () => document.getElementById('upd-go'));
 assert.match(await p.textContent('#upd-status'), /Доступна новая версия R9\.99 \(1 КБ\)/);
 assert.match(await p.textContent('#upd-card'), /Новое первое[\s\S]*Новое второе/);
