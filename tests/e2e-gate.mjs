@@ -49,8 +49,10 @@ assert.equal((await A.textContent('#profile-btn')).trim(), 'В');
 // ===== 2. Профиль: имя, значок, цвет =====
 await A.click('#profile-btn');
 assert.equal(await A.textContent('#title'), 'Профиль');
-assert.equal(await A.textContent('#profile-who-name'), 'владелец', 'пока имени нет, показан логин');
-await A.click('#profile-edit summary');
+assert.equal(await A.textContent('#pr-name'), 'владелец', 'пока имени нет, показан логин');
+await A.click('#pr-edit');                                                     // «Изменить профиль» открывает аккаунт сразу с раскрытой формой
+await until(A, () => document.getElementById('title').textContent === 'Аккаунт' && document.getElementById('profile-edit').open);
+assert.equal(await A.textContent('#profile-who-name'), 'владелец');
 await A.fill('#pf-name', 'А');
 await A.click('#pf-save');
 await until(A, () => /хотя бы два/.test(document.getElementById('pf-err').textContent));

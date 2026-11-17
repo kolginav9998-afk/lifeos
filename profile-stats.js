@@ -324,7 +324,7 @@ export function shareText(sections, range) {
     if (picked.length) lines.push(`${s.title}: ${picked.join(', ')}`);
   }
   if (!lines.length) return '';
-  return [`Мои итоги в «${APP_NAME}»${range && range.kind !== 'all' ? ` (${range.text})` : ''}`, ...lines].join('\n');
+  return [`Мои итоги в приложении «${APP_NAME}»${range && range.kind !== 'all' ? ` (${range.text})` : ''}`, ...lines].join('\n');
 }
 
 // ---------- календарь активности ----------
@@ -353,7 +353,7 @@ export function activityByDay(events, now = Date.now(), weeks = 26) {
 export function activityText(a) {
   const span = `${pl(a.weeks.length, 'неделю', 'недели', 'недель')} (${rangeText(a.from, a.to)})`;
   if (!a.total) return `За ${span} записей не было.`;
-  const lead = `За ${span} записи были в ${pl(a.activeDays, 'день', 'дня', 'дней')} из ${num(a.days)}, всего ${pl(a.total, 'запись', 'записи', 'записей')}.`;
+  const lead = `За ${span} активных дней: ${num(a.activeDays)} из ${num(a.days)}, всего ${pl(a.total, 'запись', 'записи', 'записей')}.`;
   return a.busiest ? `${lead} Больше всего записей было ${dateText(a.busiest.date)}: ${num(a.busiest.count)}.` : lead;
 }
 export function activityWeeks(a) {

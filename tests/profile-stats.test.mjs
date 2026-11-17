@@ -453,13 +453,13 @@ test('календарь словами: сводка, самый насыщен
   const cal = activityByDay(evs, NOW);
   assert.deepEqual(cal.busiest, { date: day(-20), count: 5 }, 'при равенстве выбирается более ранний день');
   assert.equal(cal.from, '2026-05-25');
-  assert.equal(activityText(cal), `За 26 недель (25 мая – 17 ноября) записи были в 4 дня из ${cal.days}, всего 13 записей. Больше всего записей было 28 октября: 5.`);
+  assert.equal(activityText(cal), `За 26 недель (25 мая – 17 ноября) активных дней: 4 из ${cal.days}, всего 13 записей. Больше всего записей было 28 октября: 5.`);
   const weeks = activityWeeks(cal);
   assert.equal(weeks.length, 26); assert.equal(weeks[0].text, '16–17 ноября', 'новые недели первыми, неполная текущая — только до сегодня');
   assert.deepEqual([weeks[0].count, weeks[0].active], [1, 1]);
   assert.deepEqual([weeks[1].text, weeks[1].count, weeks[1].active], ['9–15 ноября', 2, 1], 'воскресенье 15 ноября — ещё прошлая неделя');
   assert.equal(weeks.reduce((s, w) => s + w.count, 0), cal.total); assert.equal(weeks.reduce((s, w) => s + w.active, 0), cal.activeDays);
-  assert.match(activityText(activityByDay([ev('note', {}, NOW)], NOW, 1)), /^За 1 неделю \(16–17 ноября\) записи были в 1 день из 2, всего 1 запись\./);
+  assert.match(activityText(activityByDay([ev('note', {}, NOW)], NOW, 1)), /^За 1 неделю \(16–17 ноября\) активных дней: 1 из 2, всего 1 запись\./);
 });
 
 // ============================================================ итог «Поделиться» ============================================================
@@ -467,13 +467,13 @@ test('календарь словами: сводка, самый насыщен
 test('итог «Поделиться»: по строке на раздел, только числа с пометкой share, без денег, здоровья и названий', () => {
   const evs = rich(), txt = shareText(overview(evs, 'month'), periodRange('month', NOW));
   const lines = txt.split('\n');
-  assert.equal(lines[0], `Мои итоги в «${APP_NAME}» (1–17 ноября)`);
+  assert.equal(lines[0], `Мои итоги в приложении «${APP_NAME}» (1–17 ноября)`);
   assert.ok(lines.length >= 6 && lines.length <= 12, `коротко: ${lines.length} строк`);
   assert.match(txt, /Приложение: дней с первой записи \d+, активных дней \d+, дней подряд сейчас \d+/);
   assert.match(txt, /Дела: сделано за ноябрь 3/);
   assert.match(txt, /Тренировки: тренировок за ноябрь 2/);
   assert.ok(!/кг|₽|сон|настроен|вес|Зарядка|Чтение|Куртка|Анна|зарплат/i.test(txt), `в итоге нет личного: ${txt}`);
-  assert.equal(shareText(overview(evs, 'all'), periodRange('all', NOW)).split('\n')[0], `Мои итоги в «${APP_NAME}»`, 'за всё время период в скобках не пишется');
+  assert.equal(shareText(overview(evs, 'all'), periodRange('all', NOW)).split('\n')[0], `Мои итоги в приложении «${APP_NAME}»`, 'за всё время период в скобках не пишется');
   assert.equal(shareText([], periodRange('month', NOW)), '');
 });
 
