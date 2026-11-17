@@ -8,7 +8,7 @@ from PIL import Image, ImageDraw, ImageChops, ImageFilter
 
 ROOT = os.path.normpath(os.path.join(os.path.dirname(os.path.abspath(__file__)), '..'))
 SRC = os.path.join(ROOT, 'assets', 'icon-source.webp')
-BG = (2, 8, 22)            # #020816 — тёмный фон иконки (совпадает с фоном аватарки)
+BG = (34, 42, 53)          # #222a35 — спокойный шиферный фон иконки (совпадает с низом градиента аватарки)
 SS = 4                     # суперсэмплинг для гладких краёв масок
 
 art = Image.open(SRC).convert('RGB')
@@ -94,7 +94,7 @@ if not SPLASH_ONLY:
 
 # Заставка при запуске (Android до 12 показывает этот рисунок; размеры повторяют шаблон Capacitor): тёмный фон со свечением и значком.
 def splash(w, h):
-    top, bot = (12, 13, 31), (7, 8, 18)
+    top, bot = (44, 54, 67), (26, 32, 41)   # спокойный шиферный градиент
     im = Image.new('RGB', (w, h))
     d = ImageDraw.Draw(im)
     for y in range(h):
@@ -102,7 +102,7 @@ def splash(w, h):
         d.line([(0, y), (w, y)], fill=tuple(int(top[i] + (bot[i] - top[i]) * t) for i in range(3)))
     cx, cy, r = w // 2, int(h * 0.46), int(min(w, h) * 0.40)
     glow = Image.new('RGBA', (w, h), (0, 0, 0, 0))
-    ImageDraw.Draw(glow).ellipse([cx - r, cy - r, cx + r, cy + r], fill=(124, 92, 255, 110))
+    ImageDraw.Draw(glow).ellipse([cx - r, cy - r, cx + r, cy + r], fill=(127, 184, 171, 70))   # мягкий шалфейный, без неона
     glow = glow.filter(ImageFilter.GaussianBlur(r * 0.55))
     out = Image.alpha_composite(im.convert('RGBA'), glow)
     size = int(min(w, h) * 0.26)
