@@ -67,6 +67,7 @@ export function createChat({ api, base, token, me, kv, getKeys, putKeys, now = (
     return out;
   }
   const contactOf = peer => contactList.find(c => c.username === norm(peer)) ?? null;
+  const list = () => [...contactList];
   async function acceptKey(peer) {
     const c = contactOf(peer);
     if (!c?.pub) throw new ChatError('no_key', 'У человека нет ключа');
@@ -141,5 +142,5 @@ export function createChat({ api, base, token, me, kv, getKeys, putKeys, now = (
   // Забыть всё на устройстве (при смене аккаунта): ключи в журнале здесь не трогаем, это решает вызывающий.
   async function forget() { threads.clear(); shared.clear(); contactList = []; loaded = false; await kv.set('peers', []); await kv.set(K.cursor, 0); }
 
-  return { init, contacts, acceptKey, safety, poll, send, thread, unread, markRead, unreadTotal, meetings, allMeetings, forget, contactOf: peer => contactOf(peer), publicKey: () => myPub };
+  return { init, contacts, list, acceptKey, safety, poll, send, thread, unread, markRead, unreadTotal, meetings, allMeetings, forget, contactOf: peer => contactOf(peer), publicKey: () => myPub };
 }

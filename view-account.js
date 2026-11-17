@@ -3,6 +3,7 @@ import * as vault from './vault.js';
 import * as db from './db.js';
 import * as store from './store.js';
 import * as sync from './app-sync.js';
+import * as chatApp from './app-chat.js';
 import { account } from './app-sync.js';
 import { describeError } from './account.js';
 import { DEFAULT_SERVER, APP_NAME } from './config.js';
@@ -415,7 +416,7 @@ export function createAccountView({ go, onVaultChange = () => {}, gate = false, 
       try { await sync.syncNow(); } catch { /* нет связи: выйдем, но предупредим ниже */ }
       const left = sync.status.pending;
       if (left > 0 && !out.dataset.sure) { out.dataset.sure = '1'; out.textContent = `Не отправлено записей: ${left}. Выйти всё равно?`; toast('Не все записи успели уйти на сервер. Подключись к интернету или сохрани архив, потом выходи'); return; }
-      sync.stop(); await account.logout(); checked = null; onVaultChange(); toast('Вы вышли из аккаунта'); render(); onLoggedOut(); });
+      sync.stop(); chatApp.reset(); await account.logout(); checked = null; onVaultChange(); toast('Вы вышли из аккаунта'); render(); onLoggedOut(); });
     cards.push(card('Выход', el('p', { class: 'muted', textContent: 'Выход не стирает данные на этом устройстве и не удаляет аккаунт. Пока не войдёшь снова, приложение не откроется.' }), out));
     return cards;
   }

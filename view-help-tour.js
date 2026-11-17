@@ -22,7 +22,7 @@ export function createTour({ run }) {
 
   function paint(focus) {
     const c = TOUR[index];
-    const title = el('h3', { id: 'tour-title', tabIndex: -1, textContent: c.title });
+    const title = el('h3', { id: 'tour-title', tabIndex: -1, 'aria-level': '2', textContent: c.title });
     fill(root,
       el('div', { class: 'tour-head' },
         el('span', { id: 'tour-step', class: 'muted', textContent: `Шаг ${index + 1} из ${TOUR.length}` }),

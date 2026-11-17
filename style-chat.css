@@ -1,0 +1,63 @@
+/* Экран «Чат и встречи» (R4.3): список, переписка, карточки встреч, мастер, окно ответа. Подключается последним (см. index.html). Цвета только из токенов. */
+#view-chat .ch-page{display:flex;flex-direction:column;gap:var(--s4);min-width:0}
+#view-chat .ch-top{gap:var(--s2)}
+#view-chat .ch-head{display:flex;align-items:center;gap:var(--s3);min-width:0}
+#view-chat .ch-head .ch-who{flex:1;min-width:0}
+#view-chat .ch-who{display:flex;flex-direction:column;min-width:0}
+#view-chat .ch-who strong,#view-chat .ch-who span{overflow-wrap:anywhere}
+#view-chat .ch-av{flex:none;display:inline-grid;place-items:center;width:44px;height:44px;border-radius:50%;background:var(--av,var(--accent));color:#0b0d12;font-weight:800;font-size:var(--t16)}
+#view-chat .ch-list{list-style:none;margin:0;padding:0;display:flex;flex-direction:column;gap:var(--s2)}
+#view-chat .ch-contact{display:flex;align-items:center;gap:var(--s3);width:100%;min-height:64px;padding:var(--s3);text-align:left;background:var(--card);border:1px solid var(--line);border-radius:var(--r12);color:var(--text)}
+#view-chat .ch-contact .ch-who{flex:1}
+#view-chat .ch-prev{white-space:nowrap;overflow:hidden;text-overflow:ellipsis;max-width:100%}
+#view-chat .ch-meta{display:flex;flex-direction:column;align-items:flex-end;gap:var(--s1);flex:none}
+#view-chat .ch-badge{min-width:22px;height:22px;padding:0 6px;border-radius:11px;display:inline-grid;place-items:center;background:var(--accent);color:#0b0d12;font-weight:800;font-size:var(--t14)}
+/* переписка */
+#view-chat .ch-log{display:flex;flex-direction:column;gap:var(--s2);max-height:min(58vh,520px);min-height:200px;overflow-y:auto;padding:var(--s2);background:var(--soft);border-radius:var(--r12)}
+#view-chat .ch-msg{max-width:84%;padding:var(--s2) var(--s3);border-radius:var(--r12);background:var(--card);border:1px solid var(--line);align-self:flex-start;overflow-wrap:anywhere}
+#view-chat .ch-msg.out{align-self:flex-end;background:var(--tint-accent);border-color:var(--mode-accent)}
+#view-chat .ch-msg p{margin:0;white-space:pre-wrap}
+#view-chat .ch-msg time{display:block;margin-top:2px;font-size:var(--t12)}
+#view-chat .ch-day-sep{align-self:center;margin:var(--s2) 0;font-size:var(--t12);color:var(--muted)}
+#view-chat .ch-sys{align-self:center;margin:2px 0;font-size:var(--t14);color:var(--muted);text-align:center}
+#view-chat .ch-card{align-self:stretch}
+#view-chat .ch-form{display:flex;flex-direction:column;gap:var(--s2)}
+#view-chat .ch-form textarea{width:100%;min-height:64px;resize:vertical}
+#view-chat .ch-f{display:flex;flex-direction:column;gap:var(--s1);min-width:0}
+/* карточка встречи: у каждого вида своё настроение, состояние ещё и словами и значком */
+.mt-card{display:flex;flex-direction:column;gap:var(--s2);padding:var(--s4);border-radius:var(--r16,16px);background:var(--card);border:1px solid var(--line);border-left:6px solid var(--mt,var(--accent))}
+.mt-card.mood-romantic{--mt:#e0436a}
+.mt-card.mood-business{--mt:#2f7bff}
+.mt-card.mood-friends{--mt:#14b8a6}
+.mt-card.mood-family{--mt:#e08a00}
+.mt-card.mood-other{--mt:var(--accent)}
+.mt-card.st-cancelled,.mt-card.st-declined{opacity:1;border-left-style:dashed}
+.mt-head{display:flex;align-items:center;gap:var(--s3)}
+.mt-ico{display:inline-grid;place-items:center;width:40px;height:40px;border-radius:12px;background:var(--soft);color:var(--text)}
+.mt-title{display:block;overflow-wrap:anywhere}
+.mt-status{display:flex;align-items:center;gap:var(--s2);margin:0;font-weight:700}
+.mt-dl{display:grid;grid-template-columns:auto 1fr;gap:var(--s1) var(--s3);margin:0}
+.mt-dl dd{margin:0;overflow-wrap:anywhere}
+/* мастер и ответ */
+.ch-tiles{display:grid;grid-template-columns:repeat(auto-fit,minmax(min(100%,130px),1fr));gap:var(--s2)}
+.ch-tile{display:flex;flex-direction:column;align-items:center;justify-content:center;gap:var(--s1);min-height:76px;padding:var(--s3);text-align:center;background:var(--card);border:2px solid var(--line);border-radius:var(--r12);color:var(--text);overflow-wrap:anywhere}
+.ch-tile[aria-pressed=true]{border-color:var(--mode-accent);background:var(--tint-accent);font-weight:700}
+.ch-tile[aria-pressed=true]::after{content:"✓ выбрано";font-size:var(--t12)}
+.ch-cal .ch-day{min-height:44px}
+.ch-cal .ch-day.picked,.ch-cal .ch-day[aria-pressed=true]{outline:3px solid var(--mode-accent);background:var(--tint-accent);font-weight:800}
+.ch-places{margin:0}
+.ch-fresh{padding:var(--s4);background:var(--tint-accent);border:1px solid var(--mode-accent);border-radius:var(--r12)}
+.ch-code{display:block;font-size:var(--t24);letter-spacing:.08em;font-variant-numeric:tabular-nums;overflow-wrap:anywhere;user-select:all}
+.ch-link{overflow-wrap:anywhere;user-select:all}
+.ch-row{display:flex;align-items:center;gap:var(--s3);flex-wrap:wrap;padding:var(--s2) 0;border-bottom:1px solid var(--line)}
+.overlay .ch-code{margin:var(--s4) 0}
+/* число непрочитанного на вкладке «Сегодня» и на чипе «Чат» */
+#tabs button[data-badge]:not([data-badge=""]),#subnav button[data-badge]:not([data-badge=""]){position:relative}
+#tabs button[data-badge]:not([data-badge=""])::after,#subnav button[data-badge]:not([data-badge=""])::after{content:attr(data-badge);position:absolute;top:2px;right:6px;min-width:18px;height:18px;padding:0 4px;border-radius:9px;display:grid;place-items:center;background:var(--accent);color:#0b0d12;font-size:11px;font-weight:800;line-height:1}
+@media (prefers-reduced-motion:reduce){#view-chat *{scroll-behavior:auto}}
+/* контраст: серый текст на цветной подложке сообщения и в выделенном блоке приглашения берём обычным цветом, красные кнопки внутри карточки встречи — с запасом */
+#view-chat .ch-msg.out time,#view-chat .ch-msg.out .muted{color:var(--text);opacity:.85}
+#view-chat .ch-fresh .muted{color:var(--text);opacity:.85}
+.mt-card .chip.danger,.mt-card button.danger{background:transparent;border:1px solid var(--danger-ink);color:var(--danger-ink)}
+@media (prefers-color-scheme:dark){:root:not([data-theme=light]) .mt-card .chip.danger{color:var(--text);border-color:var(--danger)}}
+:root[data-theme=dark] .mt-card .chip.danger{color:var(--text);border-color:var(--danger)}

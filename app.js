@@ -42,6 +42,8 @@ import { createMenuView } from './view-menu.js';
 import { createHomeView } from './view-home.js';
 import { createProfileView } from './view-profile.js';
 import { createSalaryView } from './view-salary.js';
+import { createChatView } from './view-chat.js';
+import * as chatApp from './app-chat.js';
 import { createScheduleView } from './view-schedule.js';
 import { createTour, openTarget } from './view-help-tour.js';
 import { searchHelp } from './help.js';
@@ -58,6 +60,7 @@ const DEFS = [
   { id: 'notes', group: 'today', title: 'Заметки', sub: 'Заметки', make: () => createNotesView() },
   { id: 'reflect', group: 'today', title: 'Рефлексия', sub: 'Итоги', make: () => createReflectView() },
   { id: 'people', group: 'today', title: 'Люди', sub: 'Люди', make: () => createPeopleView() },
+  { id: 'chat', group: 'today', title: 'Чат и встречи', sub: 'Чат', make: () => createChatView() },
   { id: 'home', group: 'home', title: 'Дом', sub: 'Вещи', make: ctx => createHomeView(ctx) },
   { id: 'money', group: 'money', title: 'Деньги', sub: 'Расходы', make: ctx => createMoneyView(ctx) },
   { id: 'salary', group: 'money', title: 'Зарплата', sub: 'Зарплата', make: ctx => createSalaryView(ctx) },
@@ -88,7 +91,7 @@ const MODE_OF = { learn: 'learn', tests: 'learn', skills: 'learn', zero: 'learn'
 const FOCUS_TAB = { task: 'today', habit: 'habits', expense: 'money', note: 'notes', diary: 'diary', measure: 'health' };
 
 // Простой режим: меньше вкладок и экранов, только самое нужное. Остальные экраны по-прежнему открываются из чипов и поиска.
-const SIMPLE_VIEWS = new Set(['today', 'habits', 'diary', 'health', 'notes', 'menu', 'profile', 'home', 'more', 'account', 'help', 'zero', 'diction']);
+const SIMPLE_VIEWS = new Set(['today', 'habits', 'diary', 'health', 'notes', 'chat', 'menu', 'profile', 'home', 'more', 'account', 'help', 'zero', 'diction']);
 const visibleDefs = () => (getPref('simple') ? DEFS.filter(d => SIMPLE_VIEWS.has(d.id)) : DEFS);
 
 // ---------- тема ----------
@@ -129,6 +132,7 @@ function go(id, { focus = false } = {}) {
   const sub = $('subnav');
   sub.hidden = siblings.length < 2;
   sub.replaceChildren(...siblings.map(d => el('button', { type: 'button', dataset: { view: d.id }, 'aria-current': d.id === def.id ? 'page' : false, textContent: d.sub, onclick: () => navigate(d.id) })));
+  paintChatBadge(chatApp.unreadCount());
   $('title').textContent = def.title;
   setPref('tab', def.id);
   window.scrollTo(0, 0);
@@ -136,6 +140,16 @@ function go(id, { focus = false } = {}) {
 }
 // Переход по действию человека (вкладка, ссылка, результат поиска): со сменой фокуса. Внутренние переходы (запуск, блокировка) идут через go() без неё.
 const navigate = id => go(id, { focus: true });
+
+// ---------- непрочитанные сообщения: число на вкладке «Сегодня» и на чипе «Чат» ----------
+function paintChatBadge(n) {
+  const v = n ? String(n) : '';
+  const tab = [...$('tabs').children].find(b => b.dataset.tab === 'today');
+  if (tab) { tab.dataset.badge = v; tab.title = n ? `Непрочитанных сообщений: ${n}` : ''; }
+  const chip = $('subnav').querySelector('[data-view="chat"]');
+  if (chip) { chip.dataset.badge = v; chip.title = n ? `Непрочитанных сообщений: ${n}` : ''; }
+}
+chatApp.onChat(({ unread }) => paintChatBadge(unread));
 
 // ---------- аватар в шапке: имя и цвет профиля ----------
 function paintAvatar(evs) {
@@ -273,6 +287,7 @@ async function enterApp() {
   markData();
   updateLockButton();
   appSync.start().catch(e => console.error(e));
+  chatApp.startPolling(false);                            // сообщения приходят, пока приложение открыто (сервиса push-уведомлений нет)
   startTabGuard();
   paintAvatar(store.state.events);
   if (freshSignIn) { freshSignIn = false; startTour(); }
