@@ -15,6 +15,7 @@ import { markShell, markData } from './perf.js';
 import { REQUIRE_ACCOUNT } from './config.js';
 import { profileCard } from './profile.js';
 import { autoCheckUpdate } from './view-update.js';
+import { createLockQuick } from './view-lock-quick.js';
 
 import { createTodayView } from './view-today.js';
 import { createHabitsView } from './view-habits.js';
@@ -202,6 +203,9 @@ function updateLockout() {
   if (vault.failState().waitMs > 0) { tick(); lockTimer = setInterval(tick, 500); }
 }
 
+// Быстрый вход по отпечатку на экране блокировки (только в приложении для Android; на сайте кнопки нет).
+const lockQuick = createLockQuick({ onUnlocked: () => enterApp(), onLockout: () => updateLockout() });
+
 function showLock() {
   appSync.stop();
   releaseDialogs();
@@ -216,7 +220,7 @@ function showLock() {
   if (navReady) { buildViews(); go(current); }
   closeSearch();
   updateLockout();
-  $('lock-input').focus();
+  if (lockQuick.refresh()) $('lock-bio').focus(); else $('lock-input').focus();           // с отпечатком поле пароля не фокусируем: иначе клавиатура закрывает окно отпечатка
 }
 
 function lockNow() {
@@ -325,6 +329,7 @@ document.addEventListener('visibilitychange', () => {
     document.body.classList.remove('privacy');
     if (vault.isUnlocked() && hiddenAt && Date.now() - hiddenAt >= autoLockMs()) lockNow();
     hiddenAt = 0;
+    if (!$('lock').hidden) lockQuick.prompt();             // вернулись к закрытому приложению: сразу предлагаем отпечаток
   }
 });
 for (const ev of ['pointerdown', 'keydown']) addEventListener(ev, () => { lastActive = Date.now(); }, { passive: true });
@@ -428,7 +433,7 @@ navigator.storage?.persist?.().catch(() => {});
 // В приложении файлы уже внутри APK: офлайн-кэш сайта не нужен (и мешал бы обновлениям)
 if (!isNative && 'serviceWorker' in navigator) navigator.serviceWorker.register('sw.js').catch(() => {});
 
-if (vault.status() === 'locked') showLock(); else enterApp();
+if (vault.status() === 'locked') { showLock(); lockQuick.prompt(); } else enterApp();
 
 // вернулись в приложение — пересчитать «сегодня» (мог смениться день)
 document.addEventListener('visibilitychange', () => { if (!document.hidden && vault.status() !== 'locked') store.refresh(); });

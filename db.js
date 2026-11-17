@@ -6,6 +6,7 @@
 import * as vault from './vault.js';
 import * as clock from './clock.js';
 import { LockedError } from './vault.js';
+import { disableQuickUnlock } from './quick-unlock.js';
 
 const DB_NAME = 'lifeos';
 const STORE = 'events';
@@ -187,10 +188,12 @@ export async function disableLock(password) {
   const all = await getAll();             // расшифрованные события
   await writeRaw(all);                    // записываем открытыми
   vault.remove();                         // и только после этого убираем пароль
+  await disableQuickUnlock();             // пароль, сохранённый для входа по отпечатку, больше не нужен
 }
 
 // Полная очистка: данные, пароль, профиль, настройки, привязка к аккаунту.
 export async function wipeAll() {
+  await disableQuickUnlock();             // пароль в хранилище телефона не должен пережить стирание данных (и сначала, пока настройки ещё на месте)
   await idb('readwrite', s => s.clear());
   try {
     const keys = [];

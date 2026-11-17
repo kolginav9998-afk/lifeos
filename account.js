@@ -48,6 +48,9 @@ export function createAccountService({ api, storage = globalThis.localStorage, n
   }
   const saveInfo = (server, username, authSalt, iter) => storage.setItem(KEY, JSON.stringify({ server, username, authSalt, authIter: iter, linkedAt: now() }));
   const forget = () => { sessionCache = null; storage.removeItem(KEY); storage.removeItem(SESS); };
+  // Вход по отпечатку хранит пароль на телефоне: после смены пароля, восстановления, выхода и удаления аккаунта его выключаем (quick-unlock.js).
+  // Сбой выключения не должен мешать самому действию.
+  const credentialsChanged = async () => { try { await deps.credentialsChanged?.(); } catch { /* не мешаем основному действию */ } };
 
   async function newAuth(password) {
     const salt = randomBytes(16);
@@ -126,12 +129,13 @@ export function createAccountService({ api, storage = globalThis.localStorage, n
       const s = await loadSession();
       if (a && s) { try { await api.logout(a.server, s.token); } catch { /* сеть недоступна — всё равно выходим локально */ } }
       forget();
+      await credentialsChanged();
     },
 
     // Смена пароля. С аккаунтом — вместе с сервером (сначала сервер, потом локально).
     async changePassword({ oldPassword, newPassword }) {
       const a = info();
-      if (!a) return vault.changePassword(oldPassword, newPassword);
+      if (!a) { const r = await vault.changePassword(oldPassword, newPassword); await credentialsChanged(); return r; }
       const s = await loadSession();
       if (!s) throw new ApiError(401, 'unauthorized');
       const newMeta = await vault.prepareNewMeta(oldPassword, newPassword);    // здесь же проверяется старый пароль
@@ -140,6 +144,7 @@ export function createAccountService({ api, storage = globalThis.localStorage, n
       await api.password(a.server, s.token, { oldAuthKey, newAuthKey: na.key, newAuthSalt: na.salt, newAuthIter: na.iter, newMeta });
       vault.commitMeta(newMeta);
       saveInfo(a.server, a.username, na.salt, na.iter);
+      await credentialsChanged();
       return { ok: true };
     },
 
@@ -169,6 +174,7 @@ export function createAccountService({ api, storage = globalThis.localStorage, n
       await vault.installUnlocked(meta, raw);
       saveInfo(base, user, na.salt, na.iter);
       await saveSession(f.token, f.expiresAt);
+      await credentialsChanged();
       return { ok: true };
     },
 
@@ -180,6 +186,7 @@ export function createAccountService({ api, storage = globalThis.localStorage, n
       const authKey = await deriveAuthKey(password, unb64(a.authSalt), a.authIter);
       await api.deleteAccount(a.server, s.token, authKey);
       forget();
+      await credentialsChanged();
     },
   };
 }

@@ -74,8 +74,11 @@ export async function quickUnlockAvailable() {
   return unavailable('unavailable');
 }
 
+// Есть ли вообще плагин: только в приложении для Android. На сайте — нет (экраны тогда пишут «работает только в приложении»).
+export const quickUnlockSupported = () => !!plugin();
+
 // Включён ли вход по отпечатку на этом устройстве (быстрая проверка без обращения к системе).
-export const quickUnlockEnabled = () => !!getPref(FLAG) && !!plugin();
+export const quickUnlockEnabled = () => !!getPref(FLAG) && quickUnlockSupported();
 
 async function verify(p, kind) {
   try { await withTimeout(p.verifyIdentity({ ...PROMPT[kind], reason: PROMPT[kind].description, maxAttempts: 3, useFallback: false }), 120000); }
