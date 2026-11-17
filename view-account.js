@@ -11,6 +11,8 @@ import { saveTextFile } from './platform.js';
 import { getPref, setPref } from './prefs.js';
 import { profileCard, saveProfileRecord, AVATARS, COLORS, COLOR_NAMES } from './profile.js';
 import { createUpdateCard } from './view-update.js';
+import { createQuickCard, quickSignInButton } from './view-account-quick.js';
+import { quickUnlockEnabled } from './quick-unlock.js';
 
 const LAST_SERVER = 'lifeos.account.lastServer';
 const STATE_TEXT = {
@@ -71,7 +73,7 @@ export function createAccountView({ go, onVaultChange = () => {}, gate = false, 
       await saveTextFile(`lifeos-before-join-${new Date().toISOString().slice(0, 10)}.enc.json`, file);
       const prefs = localStorage.getItem('lifeos.prefs.v1');
       await db.wipeAll();
-      if (prefs) localStorage.setItem('lifeos.prefs.v1', prefs);
+      if (prefs) { try { localStorage.setItem('lifeos.prefs.v1', JSON.stringify({ ...JSON.parse(prefs), quickUnlock: false })); } catch { /* не критично */ } }      // быстрый вход выключен вместе со стиранием
       await account.link(auth, password);
       await store.refresh();
       await sync.start();                                                    // подписка на записи включена до возврата данных
@@ -151,15 +153,22 @@ export function createAccountView({ go, onVaultChange = () => {}, gate = false, 
     const user = field(`${ID}-user`, { type: 'text', placeholder: 'Логин', autocapitalize: 'off', required: true });
     const pass = field(`${ID}-pass`, { type: 'password', placeholder: 'Пароль', autocomplete: 'current-password' });
     const btn = el('button', { id: `${ID}-login`, type: 'submit', class: 'primary', textContent: 'Войти' });
-    const form = el('form', { id: `${ID}-login-form`, class: 'form-stack' }, user, revealable(pass), btn,
+    const signIn = async (username, password) => {
+      const auth = await account.authenticate({ server: checked.server, username, password });
+      await afterLogin(auth, password, btn);
+      render();
+    };
+    // Вход по отпечатку: подставляем сохранённые логин и пароль и входим обычным путём (если пароль не подошёл, быстрый вход выключается).
+    const bio = quickSignInButton(`${ID}-bio`, async cred => {
+      user.value = cred.username; pass.value = cred.password;
+      setBusy(btn, true, 'Вхожу…');
+      try { await signIn(cred.username, cred.password); } finally { setBusy(btn, false); }
+    }, { isStale: e => e?.code === 'bad_credentials' });
+    const form = el('form', { id: `${ID}-login-form`, class: 'form-stack' }, user, revealable(pass), btn, bio,
       el('button', { type: 'button', class: 'link', id: `${ID}-forgot`, textContent: 'Забыл пароль', onclick: () => { showRecover = !showRecover; render(); } }));
     form.onsubmit = async e => {
       e.preventDefault();
-      await guard(btn, 'Вхожу…', async () => {
-        const auth = await account.authenticate({ server: checked.server, username: user.value, password: pass.value });
-        await afterLogin(auth, pass.value, btn);
-        render();
-      });
+      await guard(btn, 'Вхожу…', () => signIn(user.value, pass.value));
     };
     return card('Войти в аккаунт', form);
   }
@@ -236,6 +245,7 @@ export function createAccountView({ go, onVaultChange = () => {}, gate = false, 
 
   // ---------- профиль ----------
   const updateUi = createUpdateCard({ openHelp });
+  const quick = gate ? null : createQuickCard({ username: () => account.info()?.username ?? '' });
   const helpCard = () => card('Справка',
     el('p', { class: 'muted', textContent: 'Как обновить приложение, что делать, если забыл пароль, как перенести данные на новый телефон.' }),
     el('div', { class: 'row' }, el('button', { id: 'acc-help', type: 'button', textContent: 'Открыть справку', onclick: () => openHelp() })));
@@ -304,13 +314,19 @@ export function createAccountView({ go, onVaultChange = () => {}, gate = false, 
     if (st.state === 'needs-login') {
       const pass = field('acc-relogin-pass', { type: 'password', placeholder: 'Пароль', autocomplete: 'current-password' });
       const btn = el('button', { id: 'acc-relogin', type: 'submit', class: 'primary', textContent: 'Войти заново' });
-      const f = el('form', { class: 'form-stack' }, revealable(pass), btn);
+      const relogin = async password => {
+        const auth = await account.authenticate({ server: a.server, username: a.username, password });
+        await account.link(auth, password); await startSync(false); toast('Вход выполнен'); render();
+      };
+      const bio = quickSignInButton('acc-relogin-bio', async cred => {
+        pass.value = cred.password;
+        setBusy(btn, true, 'Вхожу…');
+        try { await relogin(cred.password); } finally { setBusy(btn, false); }
+      }, { isStale: e => e?.code === 'bad_credentials' });
+      const f = el('form', { class: 'form-stack' }, revealable(pass), btn, bio);
       f.onsubmit = async e => {
         e.preventDefault();
-        await guard(btn, 'Вхожу…', async () => {
-          const auth = await account.authenticate({ server: a.server, username: a.username, password: pass.value });
-          await account.link(auth, pass.value); await startSync(false); toast('Вход выполнен'); render();
-        });
+        await guard(btn, 'Вхожу…', () => relogin(pass.value));
       };
       cards.push(card('Сессия закончилась', f));
     }
@@ -324,7 +340,12 @@ export function createAccountView({ go, onVaultChange = () => {}, gate = false, 
     chForm.onsubmit = async e => {
       e.preventDefault();
       if (n1.value !== n2.value) return toast('Новые пароли не совпадают');
-      await guard(chBtn, 'Меняю…', async () => { await account.changePassword({ oldPassword: o.value, newPassword: n1.value }); o.value = n1.value = n2.value = ''; toast('Пароль изменён'); });
+      await guard(chBtn, 'Меняю…', async () => {
+        const wasQuick = quickUnlockEnabled();
+        await account.changePassword({ oldPassword: o.value, newPassword: n1.value }); o.value = n1.value = n2.value = '';
+        toast(wasQuick ? 'Пароль изменён. Вход по отпечатку выключен: включи его заново в карточке «Быстрый вход».' : 'Пароль изменён');
+        quick?.refresh();
+      });
     };
 
     // новый код восстановления
@@ -369,10 +390,11 @@ export function createAccountView({ go, onVaultChange = () => {}, gate = false, 
     }
     if (account.isLinked()) {
       const [first, ...rest] = linkedCards();
-      root.replaceChildren(profileSection(), first, updateUi.root, helpCard(), ...rest);
+      root.replaceChildren(profileSection(), first, quick.root, updateUi.root, helpCard(), ...rest);
     } else {
-      root.replaceChildren(profileSection(), updateUi.root, helpCard(), ...unlinkedCards());
+      root.replaceChildren(profileSection(), quick.root, updateUi.root, helpCard(), ...unlinkedCards());
     }
+    quick.refresh();
   }
   render();
 

@@ -6,9 +6,10 @@ import * as clock from './clock.js';
 import { createApi } from './api.js';
 import { createAccountService } from './account.js';
 import { createSync } from './sync.js';
+import { disableQuickUnlock } from './quick-unlock.js';
 
 export const api = createApi();
-export const account = createAccountService({ api, deps: { enableLock: pw => db.enableLock(pw) } });
+export const account = createAccountService({ api, deps: { enableLock: pw => db.enableLock(pw), credentialsChanged: () => disableQuickUnlock() } });
 
 const STATE_KEY = 'lifeos.sync.state.v1';
 const listeners = new Set();

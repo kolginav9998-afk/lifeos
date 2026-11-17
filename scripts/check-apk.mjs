@@ -129,7 +129,9 @@ export function summarize(manifest) {
 
 // Что разрешено. Всё остальное — ошибка: новое разрешение или открытый компонент не должны появляться незаметно.
 export const POLICY = {
-  permissions: ['android.permission.INTERNET', 'android.permission.REQUEST_INSTALL_PACKAGES', 'android.permission.RECEIVE_BOOT_COMPLETED', 'android.permission.POST_NOTIFICATIONS'],
+  permissions: ['android.permission.INTERNET', 'android.permission.REQUEST_INSTALL_PACKAGES', 'android.permission.RECEIVE_BOOT_COMPLETED', 'android.permission.POST_NOTIFICATIONS',
+    'android.permission.USE_BIOMETRIC'],                                // окно отпечатка: быстрый вход (docs/SECURITY.md, «Быстрый вход по отпечатку»)
+  optionalPermissions: ['android.permission.USE_FINGERPRINT'],         // старое разрешение для отпечатка на Android 8 и старше: его может принести библиотека androidx.biometric; допустимо, но не обязательно
   ownPermission: 'DYNAMIC_RECEIVER_NOT_EXPORTED_PERMISSION',           // служебное разрешение androidx.core, уровень signature
   toleratedPermissions: ['android.permission.WAKE_LOCK'],             // лишнее, но безвредное: только предупреждение
   exported: ['MainActivity'],                                          // единственный открытый компонент
@@ -151,7 +153,7 @@ export function audit(sum, policy = POLICY) {
 
   const own = `${sum.package}.${policy.ownPermission}`;
   for (const p of sum.permissions) {
-    if (policy.permissions.includes(p) || p === own) continue;
+    if (policy.permissions.includes(p) || policy.optionalPermissions?.includes(p) || p === own) continue;
     if (policy.toleratedPermissions.includes(p)) warnings.push(`лишнее разрешение ${p} (не убралось при сборке манифеста)`);
     else errors.push(`неожиданное разрешение ${p}: если оно нужно, добавь его в POLICY (scripts/check-apk.mjs) и объясни в docs/SECURITY.md`);
   }

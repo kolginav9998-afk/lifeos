@@ -2,7 +2,8 @@
 """Правки созданного Capacitor Android-проекта (запускается в CI после `cap add android`). Все правки идемпотентны: повторный запуск ничего не меняет.
 1) Безопасность манифеста: нет облачного копирования и переноса данных (allowBackup=false + правила для Android 12+ и старше),
    запрет передачи данных по http (usesCleartextTraffic=false + network_security_config), у каждого компонента явный exported,
-   лишние разрешения и служебный приёмник библиотек убраны. В конце манифест перечитывается и проверяется (assert).
+   лишние разрешения и служебный приёмник библиотек убраны; для быстрого входа по отпечатку добавлено разрешение USE_BIOMETRIC (плагин сам его не объявляет)
+   и явно закрыты два окна: окно отпечатка плагина и служебное окно androidx.biometric. В конце манифест перечитывается и проверяется (assert).
 2) Подпись и сборка: release-сборка подписывается постоянным ключом из signing/debug.keystore (отпечаток тот же, что у прежних debug-сборок,
    поэтому новую версию можно ставить поверх старой). Если включён личный ключ (переменные LIFEOS_KEYSTORE_FILE и др.), берётся он.
    Проверка lintVital не должна ронять сборку.
@@ -69,16 +70,31 @@ if 'TimedNotificationPublisher' not in s:
     assert '    </application>' in s, 'в манифесте нет </application>'
     s = s.replace('    </application>', extra + '    </application>', 1)
 
+# Быстрый вход по отпечатку (плагин NativeBiometric): окно отпечатка плагина и служебное окно библиотеки androidx.biometric открываются только самим приложением.
+# tools:replace перебивает значение из манифестов библиотек, если оно там другое (иначе слияние манифестов остановило бы сборку); если там значения нет, ничего не меняется.
+if 'ee.forgr.biometric.AuthActivity' not in s:
+    extra = (
+        '\n        <!-- Быстрый вход по отпечатку: эти окна открывает только само приложение -->\n'
+        '        <activity android:name="ee.forgr.biometric.AuthActivity" android:exported="false" tools:replace="android:exported" />\n'
+        '        <activity android:name="androidx.biometric.DeviceCredentialHandlerActivity" android:exported="false" tools:replace="android:exported" />\n'
+    )
+    assert '    </application>' in s, 'в манифесте нет </application>'
+    s = s.replace('    </application>', extra + '    </application>', 1)
+
 # Разрешения: INTERNET (синхронизация, проверка обновлений) и REQUEST_INSTALL_PACKAGES (обновление изнутри).
 # WAKE_LOCK плагин уведомлений объявляет, но в коде не использует: убираем. RECEIVE_BOOT_COMPLETED и POST_NOTIFICATIONS нужны (напоминания после перезагрузки и сами уведомления).
+# USE_BIOMETRIC нужен окну отпечатка (быстрый вход): плагин NativeBiometric его не объявляет, его README требует вписать разрешение в манифест приложения.
 install_perm = '<uses-permission android:name="android.permission.REQUEST_INSTALL_PACKAGES" />'
 wake_remove = '<uses-permission android:name="android.permission.WAKE_LOCK" tools:node="remove" />'
+bio_perm = '<uses-permission android:name="android.permission.USE_BIOMETRIC" />'
 if install_perm not in s:
     anchor = '<uses-permission android:name="android.permission.INTERNET" />'
     assert anchor in s, 'в манифесте нет разрешения INTERNET'
     s = s.replace(anchor, anchor + '\n    ' + install_perm, 1)
 if wake_remove not in s:
     s = s.replace(install_perm, install_perm + '\n    ' + wake_remove, 1)
+if bio_perm not in s:
+    s = s.replace(wake_remove, wake_remove + '\n    ' + bio_perm, 1)
 manifest.write_text(s, encoding='utf-8')
 
 res_xml = root / 'app/src/main/res/xml'
@@ -141,7 +157,10 @@ def audit_manifest(path):
             assert ex in ('true', 'false'), f'{kind} {name}: не указан android:exported'
             assert ex == 'false' or name == '.MainActivity', f'{kind} {name}: экспортируется, а должен только .MainActivity'
     perms = {p.get(ANDROID_NS + 'name') for p in r.findall('uses-permission') if p.get(TOOLS_NS + 'node') != 'remove'}
-    assert perms == {'android.permission.INTERNET', 'android.permission.REQUEST_INSTALL_PACKAGES'}, f'разрешения в манифесте: {sorted(perms)}'
+    assert perms == {'android.permission.INTERNET', 'android.permission.REQUEST_INSTALL_PACKAGES', 'android.permission.USE_BIOMETRIC'}, f'разрешения в манифесте: {sorted(perms)}'
+    activities = {c.get(ANDROID_NS + 'name'): c.get(ANDROID_NS + 'exported') for c in app.findall('activity')}
+    for name in ('ee.forgr.biometric.AuthActivity', 'androidx.biometric.DeviceCredentialHandlerActivity'):
+        assert activities.get(name) == 'false', f'окно {name} должно быть явно закрыто (exported=false)'
     removed = {p.get(ANDROID_NS + 'name') for p in r.findall('uses-permission') if p.get(TOOLS_NS + 'node') == 'remove'}
     assert 'android.permission.WAKE_LOCK' in removed, 'WAKE_LOCK не помечен к удалению'
 

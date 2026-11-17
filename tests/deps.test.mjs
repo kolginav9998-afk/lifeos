@@ -44,7 +44,7 @@ test('циклических зависимостей между модулям�
 test('слои: логика не импортирует экраны, интерфейс и хранилище', () => {
   const UI_LAYER = new Set(['ui.js', 'store.js', 'db.js', 'platform.js', 'vault.js', 'app.js', 'app-sync.js', 'notify.js', 'errlog.js']);
   // Чистая логика — все модули, кроме экранов (view-*), слоя интерфейса и перечисленных исключений. Новые модули попадают под правило сами.
-  const IMPURE = ['account.js', 'backup.js', 'breathing.js', 'bt-ui.js', 'focus.js', 'freewrite.js', 'speaking.js', 'sw.js'];
+  const IMPURE = ['account.js', 'backup.js', 'breathing.js', 'bt-ui.js', 'focus.js', 'freewrite.js', 'quick-unlock.js', 'speaking.js', 'sw.js'];
   const PURE = files.filter(f => !UI_LAYER.has(f) && !f.startsWith('view-') && !f.startsWith('c-') && !IMPURE.includes(f));
   const bad = [];
   for (const f of PURE) {
