@@ -81,6 +81,28 @@ export function makePaycfg(raw, prev = null, now = Date.now()) {
 export const payOf = events => { const e = events.find(x => x.type === 'paycfg' && x.id === PAYCFG_ID); return e ? normalizePay(e.payload) : null; };
 export const payEvent = events => events.find(x => x.type === 'paycfg' && x.id === PAYCFG_ID) ?? null;
 
+// ---------- цена в часах работы ----------
+// Чистая ставка часа «на руки»: грубая ставка минус налог по настройкам. Это оценка, а не бухгалтерия.
+// Почасовой режим — час стоит baseMinor; при окладе берём указанную часовую ставку (hourlyMinor). Если ставки нет — час не посчитать без графика.
+export function netHourlyMinor(pay) {
+  if (!pay || typeof pay !== 'object') return null;
+  const p = normalizePay(pay);
+  const gross = p.mode === 'hourly' ? p.baseMinor : p.hourlyMinor;
+  if (!(gross > 0)) return null;
+  return Math.max(0, gross - monthTax(p.tax, gross));
+}
+// Сколько часов работы стоит сумма (округляем до десятых вверх, чтобы не обнадёживать). null — ставку посчитать нельзя.
+export function workHours(amountMinor, pay) {
+  const rate = netHourlyMinor(pay);
+  if (!rate || !Number.isSafeInteger(amountMinor) || amountMinor <= 0) return null;
+  return Math.ceil(amountMinor * 10 / rate) / 10;
+}
+// Подпись вида «≈ 6 ч работы» или null, если настроек нет или ставка нулевая.
+export function workHoursText(amountMinor, pay) {
+  const h = workHours(amountMinor, pay);
+  return h === null ? null : `≈ ${String(h).replace('.', ',')} ч работы`;
+}
+
 // ---------- итог месяца (что пришло на самом деле) ----------
 export function makePaymonth(f, prev = null, now = Date.now()) {
   if (!isYm(f?.ym)) throw new Error('Месяц указан неверно');
