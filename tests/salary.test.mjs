@@ -3,7 +3,7 @@ import test from 'node:test';
 import assert from 'node:assert/strict';
 import { normalizeCfg, cfgFromTemplate } from '../schedule.js';
 import { TAX_PRESETS, presetTax, normalizeTax, checkTax, bracketsError, parsePercent, fmtPercent, taxOnAmount, monthTax, describeTax, MAX_RATE_BP } from '../salary-tax.js';
-import { normalizePay, checkPay, makePaycfg, payOf, makePaymonth, paymonthsOf, parseMinor, parseMult, fmtMult, fmtMoney, minorToInput, splitOvertime, computeMonth, payoutPlan, upcomingPayouts, incomeDraft, plural, ROUNDING, roundingId, DISCLAIMER } from '../salary.js';
+import { workCost, normalizePay, checkPay, makePaycfg, payOf, makePaymonth, paymonthsOf, parseMinor, parseMult, fmtMult, fmtMoney, minorToInput, splitOvertime, computeMonth, payoutPlan, upcomingPayouts, incomeDraft, plural, ROUNDING, roundingId, DISCLAIMER } from '../salary.js';
 import { monthSeries, whatIf, insights } from '../salary-insights.js';
 import { makeIncome, MAX_MINOR } from '../money.js';
 
@@ -200,4 +200,13 @@ test('аналитика: «а что если», ряд месяцев, выв�
   const heavy = computeMonth({ ...args, days: new Map([day('2026-11-17', '09:00', '22:00'), day('2026-11-18', '09:00', '22:00')]) }); assert.ok(insights({ cur: heavy, pay: pay0(), today: '2026-12-01' }).some(i => i.id === 'ot-norm' && i.tone === 'warn'));
   assert.deepEqual([plural(1, 'день', 'дня', 'дней'), plural(2, 'день', 'дня', 'дней'), plural(5, 'день', 'дня', 'дней'), plural(11, 'день', 'дня', 'дней'), plural(21, 'день', 'дня', 'дней'), plural(22, 'день', 'дня', 'дней')], ['день', 'дня', 'дней', 'дней', 'день', 'дня']);
   assert.match(DISCLAIMER, /приблизительный.*не бухгалтерия и не налоговая консультация/);
+});
+
+test('сколько работы стоит покупка: цена делится на ставку на руки за час', () => {
+  // на руки 140 000 ₽ за месяц при норме 160 ч: 875 ₽ в час; покупка за 8750 ₽ = 10 часов; в месяце 20 рабочих дней по 8 часов
+  const c = workCost(875_000, 14_000_000, 160 * 60, 20);
+  assert.equal(c.perHourMinor, 87_500); assert.equal(c.minutes, 600); assert.equal(c.hours, 10); assert.equal(c.days, 1.25);
+  assert.equal(workCost(100, 14_000_000, 160 * 60).minutes, 0, 'копейки стоят меньше минуты');
+  assert.equal(workCost(875_000, 14_000_000, 160 * 60).days, 600 / 480, 'без числа рабочих дней день равен 8 часам');
+  for (const bad of [[0, 1, 1], [-5, 1, 1], [100, 0, 1], [100, 1, 0], ['x', 1, 1], [null, 1, 1], [100, NaN, 1]]) assert.equal(workCost(...bad), null, JSON.stringify(bad));
 });

@@ -16,6 +16,14 @@ export const ROUNDING = [
 export const roundingId = ot => ROUNDING.find(r => r.roundMin === ot.roundMin && r.roundDir === ot.roundDir)?.rid ?? 'min';
 const LEAVE = ['vacation', 'sick', 'unpaid'];
 const pad = n => String(n).padStart(2, '0');
+// Сколько рабочего времени «стоит» покупка: цена делится на ставку «на руки» за час (чистый доход месяца, делённый на часы нормы месяца).
+// Возвращает null, если считать нечем (нет дохода или нормы). Дни считаются по средней длине рабочего дня месяца (норма / число рабочих дней), без неё по 8 часов.
+export function workCost(priceMinor, netMinor, normMin, workdays = 0) {
+  const price = Number(priceMinor), net = Number(netMinor), norm = Number(normMin), wd = Number(workdays);
+  if (!(price > 0) || !(net > 0) || !(norm > 0)) return null;
+  const perHour = net / (norm / 60), minutes = Math.round((price / perHour) * 60), dayMin = wd > 0 ? norm / wd : 480;
+  return { perHourMinor: Math.round(perHour), minutes, hours: minutes / 60, days: minutes / dayMin };
+}
 export const plural = (n, one, few, many) => { const a = Math.abs(n) % 100, b = a % 10; return a > 10 && a < 20 ? many : b > 1 && b < 5 ? few : b === 1 ? one : many; };
 const num = (v, lo, hi, dflt) => (v !== '' && v !== null && v !== undefined && Number.isFinite(Number(v)) && Number(v) >= lo && Number(v) <= hi ? Number(v) : dflt);
 const int = (v, lo, hi, dflt) => { const n = num(v, lo, hi, null); return n !== null && Number.isInteger(n) ? n : dflt; };

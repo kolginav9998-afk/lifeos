@@ -74,7 +74,14 @@ jobs:
           python3 scripts/patch-android.py android
       - name: Собрать release-APK (не отлаживаемый)
         working-directory: android
-        run: ./gradlew --no-daemon assembleRelease
+        run: |
+          # Maven Central иногда отвечает 429 «слишком много запросов» (общие адреса раннеров GitHub). Это не ошибка кода: повторяем сборку до трёх раз.
+          for i in 1 2 3; do
+            ./gradlew --no-daemon assembleRelease && exit 0
+            echo "::warning::Сборка не удалась (попытка $i из 3). Если это 429 от хранилища библиотек, повторяем через минуту."
+            sleep 60
+          done
+          exit 1
       - name: Подготовить файл и показать отпечаток подписи
         run: |
           mkdir -p out

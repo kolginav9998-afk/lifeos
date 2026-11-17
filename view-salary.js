@@ -8,7 +8,7 @@ import { monthLabel, makeIncome } from './money.js';
 import { cfgOf, workdaysOf, shiftYm, fmtDur, dayMonthText, cfgFromTemplate, makeWorkcfg, autoWorkcfg } from './schedule.js';
 import { ensureCalendar } from './calendar-ru.js';
 import { httpFetch } from './platform.js';
-import { payOf, paymonthsOf, computeMonth, payoutPlan, incomeDraft, makePaymonth, makePaycfg, normalizePay, pmId, fmtMoney, fmtMult, parseMinor, CURRENCIES, ROUNDING, roundingId, DISCLAIMER, plural } from './salary.js';
+import { workCost, payOf, paymonthsOf, computeMonth, payoutPlan, incomeDraft, makePaymonth, makePaycfg, normalizePay, pmId, fmtMoney, fmtMult, parseMinor, CURRENCIES, ROUNDING, roundingId, DISCLAIMER, plural } from './salary.js';
 import { TAX_PRESETS, presetTax, fmtPercent, describeTax } from './salary-tax.js';
 import { createHoursPanel } from './view-salary-hours.js';
 import { createSettingsPanel } from './view-salary-settings.js';
@@ -65,6 +65,20 @@ export function createSalaryView(ctx = {}) {
     el('form', { id: 'sal-x-form', class: 'form-stack', onsubmit: e => { e.preventDefault(); addExtra(); } }, el('strong', { textContent: 'Разовая премия или доплата за этот месяц' }), lab('Название', xName), lab('Сумма', xAmt),
       el('label', { class: 'check-label' }, xTax, ' Облагается налогом'), xErr, el('button', { type: 'submit', id: 'sal-x-add', class: 'chip', textContent: 'Добавить в расчёт' }), xList));
   const disclaimer = el('p', { id: 'sal-disclaimer', class: 'muted', textContent: DISCLAIMER });
+  // «Сколько часов работы стоит покупка»: цена в часах твоей работы по ставке «на руки»
+  const buyAmt = el('input', { id: 'sal-buy-amt', type: 'text', inputMode: 'decimal', autocomplete: 'off', placeholder: 'Цена покупки', 'aria-label': 'Цена покупки' });
+  const buyOut = el('p', { id: 'sal-buy-out', class: 'muted', role: 'status' });
+  const buyCard = el('div', { id: 'sal-buy', class: 'card form-stack' }, el('h3', { textContent: 'Сколько часов работы стоит покупка' }),
+    el('p', { class: 'muted', textContent: 'Введи цену, и я переведу её в часы твоей работы по ставке «на руки». Помогает решить, нужна ли вещь.' }), buyAmt, buyOut);
+  function paintBuy() {
+    const v = buyAmt.value.trim();
+    if (!v || !st?.res) { buyOut.textContent = ''; return; }
+    let minor;
+    try { minor = parseMinor(v); } catch { buyOut.textContent = 'Введи цену числом, например 4500'; return; }
+    const c = workCost(minor, st.res.month.net, st.res.normMin, st.res.workdays);
+    buyOut.textContent = c ? `Это около ${fmtDur(c.minutes)} работы${c.days >= 0.1 ? ` (примерно ${c.days.toFixed(1).replace('.', ',')} рабочего дня)` : ''}. Твоя ставка на руки около ${money(c.perHourMinor)} в час.` : 'Посчитать не получается: за этот месяц нет дохода или нормы часов.';
+  }
+  buyAmt.addEventListener('input', paintBuy);
   const calcBox = el('div', { id: 'sal-calc', class: 'form-stack' });
 
   function compute() {
@@ -99,7 +113,8 @@ export function createSalaryView(ctx = {}) {
     const pm = st.closed.get(ym), diff = pm && pm.actualNetMinor !== null ? pm.actualNetMinor - pm.computed.netMinor : null;
     compare.textContent = diff === null ? '' : `Расчёт был ${money(pm.computed.netMinor)}, пришло ${money(pm.actualNetMinor)}: ${diff ? `${diff > 0 ? 'больше' : 'меньше'} на ${money(Math.abs(diff))}` : 'сошлось'}.`;
     fill(xList, (pm?.extras ?? []).map((x, i) => el('li', {}, `${x.name}: ${money(x.amountMinor)}${x.taxable ? '' : ' (без налога)'} `, el('button', { type: 'button', class: 'link', textContent: 'убрать', 'aria-label': `Убрать из расчёта: ${x.name}`, onclick: () => savePm({ extras: pm.extras.filter((_, k) => k !== i) }) }))));
-    fill(calcBox, hero, brk, otCard, fc, actions, disclaimer);
+    fill(calcBox, hero, brk, otCard, fc, buyCard, actions, disclaimer);
+    paintBuy();
   }
   const snap = r => ({ grossMinor: r.month.gross, taxMinor: r.month.tax, netMinor: r.month.net, taxableMinor: r.month.taxable, overtimeMin: r.month.overtime.min, overtimeMinor: r.month.overtime.pay, workedMin: r.month.workedMin });
   async function savePm(patch) {

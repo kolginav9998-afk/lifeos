@@ -193,6 +193,8 @@ await waitText(page, '#sal-net', /^149\s263\s₽$/);                            
 await page.click('#sal-x-list button');
 await waitText(page, '#sal-net', /^140\s563\s₽$/);
 const pms = await evs('paymonth'); assert.equal(pms.length, 1); assert.equal(pms[0].payload.actualNetMinor, 14_000_000);
+await tab(page, 'salary'); await page.fill('#sal-buy-amt', '8000'); await waitText(page, '#sal-buy-out', /Это около \d+ ч .*мин работы.*ставка на руки около/);          // покупка в часах работы
+await page.fill('#sal-buy-amt', 'abc'); await waitText(page, '#sal-buy-out', /Введи цену числом/); await page.fill('#sal-buy-amt', '');
 await tab(page, 'money'); await page.click('#kind-income');
 await waitText(page, '#exp-list', /\+140\s563\s₽/);
 
