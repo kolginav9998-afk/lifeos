@@ -18,7 +18,10 @@ import { statusMap, SATISFIED } from './curriculum.js';
 import { dictionOf, dictionStreak, bestStreak } from './diction.js';
 import { statesOf } from './academy.js';
 import { isMastered } from './srs.js';
-import { TEST_BY_ID, fmtPrimary, primaryOf } from './bt-core.js';
+import { TEST_BY_ID, fmtPrimary, primaryOf, runsOf } from './bt-core.js';
+import { LOGIC_IDS, WINDOW_DAYS, logicIndexNow } from './iq-index.js';
+import { cfgOf, workdaysOf, monthSummary, fmtDur } from './schedule.js';
+import { payOf, paymonthsOf, computeMonth, fmtMoney } from './salary.js';
 
 // ---------- слова и числа ----------
 const MONTH_GEN = ['января', 'февраля', 'марта', 'апреля', 'мая', 'июня', 'июля', 'августа', 'сентября', 'октября', 'ноября', 'декабря'];
@@ -80,7 +83,8 @@ const countGroups = list => {
   return [...m].map(([group, count]) => ({ group, count })).sort((a, b) => b.count - a.count || byText(a.group, b.group));
 };
 
-const validList = events => (Array.isArray(events) ? events : []).filter(e => e && typeof e.type === 'string' && e.payload && typeof e.payload === 'object');   // новый массив: вход не меняется
+const isText = x => typeof x === 'string';                                                                            // (не «e.type === …»: тест реестра принял бы это за тип записи)
+const validList = events => (Array.isArray(events) ? events : []).filter(e => e && isText(e.type) && e.payload && typeof e.payload === 'object');   // новый массив: вход не меняется
 
 function makeCtx(events, now, range) {
   const today = todayStr(now), list = validList(events).sort(canonical);
@@ -100,7 +104,8 @@ export function appFacts(events, now = Date.now()) { const list = validList(even
 
 // ---------- плитки ----------
 const tile = (key, label, value, hint, extra) => ({ key, label, value: String(value), ...(hint ? { hint } : {}), ...extra });
-const money = (key, label, minor, hint) => tile(key, label, formatMoney(minor), hint, { minor });                      // экран прячет сумму, если включено «Скрывать суммы»
+// Суммы помечены private: экран прячет их, если включено «Скрывать суммы»; в итог «Поделиться» они не попадают.
+const money = (key, label, minor, hint, cur = 'RUB') => tile(key, label, cur === 'RUB' ? formatMoney(minor) : fmtMoney(minor, cur), hint, { private: true, minor });
 const SHARE = { share: true };                                                                                       // плитки с пометкой попадают в итог «Поделиться»: только числа без денег и здоровья
 const NONE = '—';
 
@@ -217,6 +222,36 @@ function testTiles(c) {
   ];
 }
 
+function workTiles(c) {
+  const cfg = cfgOf(c.events);
+  if (!cfg) return [];
+  const ym = c.today.slice(0, 7), days = workdaysOf(c.events), m = monthSummary(ym, cfg, days, c.today), out = [
+    tile('work.days', 'Рабочих дней в этом месяце', num(m.workdays), m.left ? `осталось: ${num(m.left)}` : 'все рабочие дни месяца позади'),
+    tile('work.hours', 'Отмечено часов в этом месяце', fmtDur(m.actualMin), m.recorded ? `дней с отметкой: ${num(m.recorded)}` : 'пока не отмечено ни одного дня'),
+    tile('work.plan', 'По графику в этом месяце', fmtDur(m.plannedMin), m.normMin ? `норма месяца: ${fmtDur(m.normMin)}` : ''),
+  ];
+  const pay = payOf(c.events);
+  if (pay) {                                                                                                         // так же, как на экране «Зарплата»: тот же расчёт, поэтому цифры совпадают
+    const closed = paymonthsOf(c.events), prior = new Map([...closed].map(([k, v]) => [k, v.computed.taxableMinor])), t = new Date(c.now);
+    const r = computeMonth({ ym, cfg, pay, days, today: c.today, nowMin: t.getHours() * 60 + t.getMinutes(), extras: closed.get(ym)?.extras ?? [], prior });
+    out.push(money('work.pay.accrued', 'Начислено к сегодняшнему дню', r.accrued.gross, 'до налога', pay.currency),
+      money('work.pay.net', 'На руки к сегодняшнему дню', r.accrued.net, 'оценка по твоим настройкам', pay.currency),
+      money('work.pay.month', 'На руки за месяц (оценка)', r.month.net, 'расчёт приблизительный', pay.currency));
+  }
+  return out;
+}
+
+// «Условный индекс логики» из iq-index.js: только по твоим результатам, не IQ и не диагноз; число показывается вместе с разбросом.
+function logicTiles(c) {
+  const r = logicIndexNow(runsOf(c.events), c.now);
+  if (!r) return [];
+  return [
+    tile('logic.index', 'Условный индекс логики', num(r.index), 'из 100; не IQ и не диагноз, только для сравнения с собой'),
+    tile('logic.range', 'Примерный разброс', `${num(r.lo)}–${num(r.hi)}`, 'при малом числе заданий границы шире'),
+    tile('logic.items', 'Заданий в расчёте', num(r.items), `за последние ${WINDOW_DAYS} дней`),
+  ];
+}
+
 function homeTiles(c) {
   const m = homeModel(c.events, c.today), s = summaryOf(m);
   let wears = 0, washes = 0;
@@ -251,12 +286,16 @@ export const SECTIONS = [
     emptyText: 'Запиши вес или отметь самочувствие: появятся цифры. Это только числа, не советы.', emptyAction: 'Открыть здоровье' }),
   sec('money', { title: 'Деньги', icon: 'money', screen: 'money', has: c => ['income', 'expense', 'goal', 'goalmove'].some(t => c.of(t).length > 0), tiles: moneyTiles,
     emptyText: 'Запиши первый расход или доход: появятся итоги месяца и копилки.', emptyAction: 'Записать расход' }),
+  sec('work', { title: 'Работа и зарплата', icon: 'calendar', screen: 'schedule', has: c => cfgOf(c.events) !== null, tiles: workTiles,
+    emptyText: 'Выбери график работы: появятся смены месяца и отмеченные часы. Зарплату можно настроить там же.', emptyAction: 'Настроить график' }),
   sec('workouts', { title: 'Тренировки', icon: 'dumbbell', screen: 'workouts', has: c => doneWorkouts(c.events).length > 0, tiles: workoutTiles,
     emptyText: 'Заверши первую тренировку: появятся количество и личные рекорды.', emptyAction: 'Начать тренировку' }),
   sec('learning', { title: 'Учёба', icon: 'growth', screen: 'learn', has: c => hasGroup(c, 'Учёба'), tiles: learningTiles,
     emptyText: 'Пройди первый урок или повтори карточки: появятся минуты практики и успехи.', emptyAction: 'Открыть учёбу' }),
   sec('tests', { title: 'Тесты и проверки', icon: 'tests', screen: 'tests', has: c => c.of('testrun').length > 0, tiles: testTiles,
     emptyText: 'Пройди первую проверку: здесь появятся последние результаты. Это не оценка ума, а сравнение с самим собой.', emptyAction: 'Пройти проверку' }),
+  sec('logic', { title: 'Условный индекс логики', icon: 'target', screen: 'tests', has: c => runsOf(c.events).some(r => LOGIC_IDS.some(id => r.tests[id] && !r.tests[id].skipped)), tiles: logicTiles,
+    emptyText: 'Пройди проверку логики: индекс появится, когда за последние три месяца решено не меньше шести заданий. Это не IQ.', emptyAction: 'Открыть проверки' }),
   sec('home', { title: 'Дом', icon: 'home', screen: 'home', has: c => c.of('item').length > 0, tiles: homeTiles,
     emptyText: 'Добавь первую вещь и отмечай «Надел» и «Постирал»: появятся числа.', emptyAction: 'Добавить вещь' }),
 ];
