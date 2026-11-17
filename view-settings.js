@@ -19,6 +19,7 @@ import { tasksToIcs } from './ics.js';
 import { dataChecks } from './datacheck.js';
 import { storageStatus } from './storageinfo.js';
 import { clockHint } from './devicetime.js';
+import { quickUnlockEnabled } from './quick-unlock.js';
 
 const TYPE_NAMES = { task: 'задачи', habit: 'привычки', habit_log: 'отметки привычек', expense: 'расходы', income: 'доходы', note: 'заметки' };
 const AUTOLOCK = [[0, 'сразу при сворачивании'], [1, 'через 1 минуту'], [5, 'через 5 минут'], [15, 'через 15 минут'], [60, 'через час'], [-1, 'никогда']];
@@ -91,7 +92,11 @@ export function createSettingsView({ lockNow, applyTheme, applyMode = () => {}, 
       e.preventDefault();
       if (n1.value !== n2.value) return toast('Новые пароли не совпадают');
       setBusy(chBtn, true, 'Меняю…');
-      try { await account.changePassword({ oldPassword: o.value, newPassword: n1.value }); toast('Пароль изменён'); o.value = n1.value = n2.value = ''; }
+      try {
+        const wasQuick = quickUnlockEnabled();
+        await account.changePassword({ oldPassword: o.value, newPassword: n1.value });
+        toast(wasQuick ? 'Пароль изменён. Вход по отпечатку выключен: включи его заново в Аккаунте, в карточке «Быстрый вход».' : 'Пароль изменён'); o.value = n1.value = n2.value = '';
+      }
       catch (err) { toast(err instanceof vault.WrongPasswordError ? 'Текущий пароль неверный' : describeError(err)); }
       finally { setBusy(chBtn, false); }
     };
