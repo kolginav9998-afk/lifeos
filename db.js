@@ -200,6 +200,7 @@ export async function wipeAll() {
     for (let i = 0; i < localStorage.length; i++) { const k = localStorage.key(i); if (k && k.startsWith('lifeos.')) keys.push(k); }
     keys.forEach(k => localStorage.removeItem(k));
   } catch { /* хранилище недоступно */ }
+  try { indexedDB.deleteDatabase('lifeos-chat'); } catch { /* кэша переписки нет */ }          // расшифрованная переписка прежнего аккаунта не должна пережить стирание
   vault.lock();
   state.corrupt = []; state.mirrorOff = false;
 }

@@ -33,6 +33,7 @@ export function createAccountService({ api, storage = globalThis.localStorage, n
   const okIter = n => { if (!Number.isInteger(n) || n < floor || n > KDF_MAX) throw new ApiError(0, 'bad_kdf'); return n; };
   const KEY = 'lifeos.account.v1';
   const SESS = 'lifeos.account.sess';
+  const OWNER = 'lifeos.owner.v1';                         // чьи данные лежат на устройстве; выход из аккаунта его не стирает, стирание данных (db.wipeAll) стирает
   const read = k => { try { return JSON.parse(storage.getItem(k) || 'null'); } catch { return null; } };
   let sessionCache = null;
 
@@ -49,7 +50,10 @@ export function createAccountService({ api, storage = globalThis.localStorage, n
     try { const s = await vault.open(rec); sessionCache = { token: s.token, expiresAt: s.expiresAt }; } catch { sessionCache = null; }
     return sessionCache;
   }
-  const saveInfo = (server, username, authSalt, iter) => storage.setItem(KEY, JSON.stringify({ server, username, authSalt, authIter: iter, linkedAt: now() }));
+  const saveInfo = (server, username, authSalt, iter) => {
+    storage.setItem(KEY, JSON.stringify({ server, username, authSalt, authIter: iter, linkedAt: now() }));
+    storage.setItem(OWNER, JSON.stringify({ u: username, s: server }));
+  };
   const forget = () => { sessionCache = null; storage.removeItem(KEY); storage.removeItem(SESS); };
   // Вход по отпечатку хранит пароль на телефоне: после смены пароля, восстановления, выхода и удаления аккаунта его выключаем (quick-unlock.js).
   // Сбой выключения не должен мешать самому действию.
@@ -62,14 +66,16 @@ export function createAccountService({ api, storage = globalThis.localStorage, n
   const checkUser = name => { const u = normalizeUsername(name); if (!USER_RE.test(u)) throw new ApiError(400, 'bad_username'); return u; };
 
   return {
-    info, isLinked, loadSession, session: () => sessionCache, token: () => sessionCache?.token ?? null, forget,
+    info, isLinked, loadSession,
+    // Владелец данных на этом устройстве { u: логин, s: сервер } или null (данных ещё нет или они появились до аккаунта). Если вошёл другой человек, данные нельзя переносить в его аккаунт.
+    owner: () => read(OWNER) ?? (info() ? { u: info().username, s: info().server } : null), session: () => sessionCache, token: () => sessionCache?.token ?? null, forget,
     clearMemory() { sessionCache = null; },
 
     async checkServer(url) {
       const server = normalizeServerUrl(url);
       const s = await api.status(server);
       if (s.app !== 'lifeos-sync') throw new ApiError(0, 'not_lifeos');
-      return { server, registered: !!s.registered, setupCodeRequired: !!s.setupCodeRequired };
+      return { server, registered: !!s.registered, setupCodeRequired: !!s.setupCodeRequired, inviteRequired: !!s.inviteRequired };
     },
 
     // Создать аккаунт. Если защиты паролем ещё нет — она включается (тем же паролем) и данные шифруются.

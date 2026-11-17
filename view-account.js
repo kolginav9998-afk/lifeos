@@ -30,6 +30,7 @@ export function createAccountView({ go, onVaultChange = () => {}, gate = false, 
   let checked = null;             // результат проверки сервера
   let recoveryCode = null;        // показанный код (пока не подтверждён)
   let afterCode = null;           // что сделать, когда код подтверждён
+  let pendingSwitch = null;       // вход в ДРУГОЙ аккаунт на устройстве с данными прежнего: ждём подтверждения стирания
   let pendingJoin = null;         // вход на устройстве с чужими данными: ждём подтверждения
   let showRecover = false;
 
@@ -88,12 +89,33 @@ export function createAccountView({ go, onVaultChange = () => {}, gate = false, 
     const raw = await db.raw.all();
     const sealed = raw.find(r => vault.isSealed(r));
     const anyLocal = raw.length > 0;
+    const ow = account.owner();
+    // Данные на устройстве принадлежат другому аккаунту: присоединять их к этому нельзя (чужие записи попали бы к другому человеку). Только стереть и войти заново.
+    if (anyLocal && ow && (ow.u !== auth.username || ow.s !== auth.server)) { pendingSwitch = { auth, password, owner: ow.u, count: raw.length }; render(); return; }
     if (!anyLocal) { await account.link(auth, password); await store.refresh(); await startSync(false); toast('Вход выполнен'); return; }
     let compat = 'different';
     if (vault.status() === 'unlocked' && sealed && !raw.some(r => !vault.isSealed(r))) compat = await account.compatibility(auth, password, sealed);
     if (compat === 'same') { await account.link(auth, password); await store.refresh(); await startSync(true); toast('Вход выполнен'); return; }
     pendingJoin = { auth, password, count: raw.length };
     render();
+  }
+
+  // ---------- вход в другой аккаунт на этом устройстве ----------
+  async function switchAccount(auth, password) {
+    await db.wipeAll();                                   // данные, пароль защиты, настройки, привязка и владелец; быстрый вход выключается сам
+    await account.link(auth, password);
+    await store.refresh();
+    await startSync(false);
+    toast(`Вход выполнен: ${auth.username}`);
+  }
+  function switchCard() {
+    const p = pendingSwitch;
+    const go = el('button', { id: `${ID}-switch-go`, type: 'button', class: 'danger', textContent: 'Стереть данные этого устройства и войти' });
+    go.onclick = () => guard(go, 'Работаю…', async () => { await switchAccount(p.auth, p.password); pendingSwitch = null; render(); });
+    return card('Войти в другой аккаунт?',
+      el('p', { id: `${ID}-switch-msg`, textContent: `На этом устройстве лежат данные аккаунта «${p.owner}» (записей: ${p.count}). Чтобы войти в «${p.auth.username}», их нужно стереть с устройства: чужие данные не должны попасть в другой аккаунт.` }),
+      el('p', { class: 'muted', textContent: `Данные аккаунта «${p.owner}» остаются на сервере в зашифрованном виде и вернутся, когда ты войдёшь в него снова. Если перед выходом не все записи успели отправиться на сервер, они пропадут: сначала войди в тот аккаунт и сохрани архив («Меню» → «Настройки»).` }),
+      go, el('button', { id: `${ID}-switch-cancel`, type: 'button', textContent: 'Отмена', onclick: () => { pendingSwitch = null; render(); } }));
   }
 
   // ---------- неподключённое состояние ----------
@@ -118,28 +140,36 @@ export function createAccountView({ go, onVaultChange = () => {}, gate = false, 
         el('li', { textContent: 'На других устройствах: тот же адрес, «Войти».' }))));
       return cards;
     }
+    if (pendingSwitch) { cards.push(switchCard()); return cards; }
     if (pendingJoin) { cards.push(joinCard()); return cards; }
     cards.push(checked.registered ? loginCard() : registerCard());
-    if (checked.registered) cards.push(recoverCard());
+    if (checked.registered) { if (checked.inviteRequired) cards.push(inviteBox()); cards.push(recoverCard()); }
     return cards;
   }
 
-  function registerCard() {
-    const user = field(`${ID}-user`, { type: 'text', placeholder: 'Логин (3–64 символа)', autocapitalize: 'off', required: true });
-    const p1 = field(`${ID}-pass`, { type: 'password', placeholder: 'Пароль', autocomplete: 'new-password' });
-    const p2 = field(`${ID}-pass2`, { type: 'password', placeholder: 'Повтори пароль', autocomplete: 'new-password' });
-    const setup = field(`${ID}-setup`, { type: 'text', placeholder: 'Код установки сервера', hidden: !checked.setupCodeRequired });
-    const meter = el('div', { id: `${ID}-strength`, class: 'strength', 'aria-live': 'polite' });
+  function registerCard({ invite = false } = {}) {
+    const P = invite ? `${ID}-inv` : ID;                    // у карточки приглашения свои идентификаторы: она стоит рядом со входом
+    const user = field(`${P}-user`, { type: 'text', placeholder: 'Логин (3–64 символа)', autocapitalize: 'off', required: true });
+    const p1 = field(`${P}-pass`, { type: 'password', placeholder: 'Пароль', autocomplete: 'new-password' });
+    const p2 = field(`${P}-pass2`, { type: 'password', placeholder: 'Повтори пароль', autocomplete: 'new-password' });
+    const setup = field(`${P}-setup`, { type: 'text', placeholder: 'Код установки сервера', hidden: !checked.setupCodeRequired });
+    const code = field(`${P}-code`, { type: 'text', placeholder: 'Код приглашения (XXXX-XXXX-XXXX)', autocapitalize: 'characters', spellcheck: false, autocomplete: 'off', required: true, value: inviteFromUrl() });
+    const dirty = vault.status() !== 'none' || !!account.owner();                    // на устройстве уже есть данные или защита
+    const wipe = el('input', { id: `${P}-wipe`, type: 'checkbox' });
+    const wipeRow = el('label', { class: 'row' }, wipe, el('span', { textContent: `На этом устройстве лежат данные${account.owner() ? ` аккаунта «${account.owner().u}»` : ''}. Для нового аккаунта их нужно стереть (на сервере они сохранятся). Я согласен(на).` }));
+    const meter = el('div', { id: `${P}-strength`, class: 'strength', 'aria-live': 'polite' });
     p1.addEventListener('input', () => { const st = vault.passwordStrength(p1.value); meter.className = 'strength s' + st.score; meter.textContent = p1.value ? `Надёжность: ${st.label}` : ''; });
-    const btn = el('button', { id: `${ID}-register`, type: 'submit', class: 'primary', textContent: 'Создать аккаунт' });
-    const form = el('form', { id: `${ID}-reg-form`, class: 'form-stack' },
+    const btn = el('button', { id: `${P}-register`, type: 'submit', class: 'primary', textContent: invite ? 'Создать аккаунт по приглашению' : 'Создать аккаунт' });
+    const form = el('form', { id: `${P}-reg-form`, class: 'form-stack' },
       el('p', { class: 'muted', textContent: vault.status() === 'none' ? 'Этот же пароль включит защиту на устройстве: данные зашифруются. Забытый пароль восстанавливается только по коду восстановления.' : 'Введи текущий пароль защиты на этом устройстве: аккаунт будет с тем же паролем.' }),
-      user, revealable(p1), meter, vault.status() === 'none' ? revealable(p2) : null, checked.setupCodeRequired ? setup : null, btn);
+      invite ? code : null, user, revealable(p1), meter, vault.status() === 'none' || (invite && dirty) ? revealable(p2) : null, !invite && checked.setupCodeRequired ? setup : null, invite && dirty ? wipeRow : null, btn);
     form.onsubmit = async e => {
       e.preventDefault();
-      if (vault.status() === 'none' && p1.value !== p2.value) return toast('Пароли не совпадают');
+      if ((vault.status() === 'none' || (invite && dirty)) && p1.value !== p2.value) return toast('Пароли не совпадают');
+      if (invite && dirty && !wipe.checked) return toast('Отметь согласие стереть данные этого устройства');
       await guard(btn, 'Создаю…', async () => {
-        const r = await account.register({ server: checked.server, username: user.value, password: p1.value, setupCode: setup.value || undefined });
+        if (invite && dirty) await db.wipeAll();                // новый человек начинает с чистого устройства: чужие данные не попадут в его аккаунт
+        const r = await account.register({ server: checked.server, username: user.value, password: p1.value, setupCode: invite ? undefined : setup.value || undefined, invite: invite ? code.value : undefined });
         recoveryCode = r.recoveryCode;
         afterCode = async () => { await startSync(true); toast('Аккаунт создан. Данные отправляются на сервер.'); };
         await store.refresh();
@@ -147,7 +177,12 @@ export function createAccountView({ go, onVaultChange = () => {}, gate = false, 
         render();
       });
     };
-    return card('Создать аккаунт', form);
+    return card(invite ? 'Создать аккаунт по приглашению' : 'Создать аккаунт', form);
+  }
+  // Код приглашения из ссылки (?invite=КОД) подставляется сам и раскрывает форму.
+  const inviteFromUrl = () => { try { return new URLSearchParams(location.search).get('invite') ?? ''; } catch { return ''; } };
+  function inviteBox() {
+    return el('details', { id: `${ID}-inv-box`, open: !!inviteFromUrl() }, el('summary', { textContent: 'У меня есть приглашение' }), registerCard({ invite: true }));
   }
 
   function loginCard() {
@@ -219,6 +254,7 @@ export function createAccountView({ go, onVaultChange = () => {}, gate = false, 
     return el('details', { id: `${ID}-server-box`, open: !!open }, el('summary', { textContent: 'Сервер' }), el('div', { class: 'form-stack' }, server, check));
   }
   function gateCards() {
+    if (pendingSwitch) return [switchCard()];
     if (pendingJoin) return [joinCard()];
     if (!checked) {
       if (DEFAULT_SERVER && !checkError) {
@@ -231,7 +267,7 @@ export function createAccountView({ go, onVaultChange = () => {}, gate = false, 
         DEFAULT_SERVER ? retry : null, serverDetails(!DEFAULT_SERVER))];
     }
     const cards = [checked.registered ? loginCard() : registerCard()];
-    if (checked.registered) cards.push(recoverCard());
+    if (checked.registered) { if (checked.inviteRequired) cards.push(inviteBox()); cards.push(recoverCard()); }
     cards.push(el('div', { class: 'gate-foot' }, el('p', { id: `${ID}-msg`, class: 'muted', textContent: checked.registered ? 'Аккаунт уже создан на этом сервере. Войди в него.' : 'Аккаунта ещё нет. Создай его: это нужно один раз.' }), serverDetails(false)));
     return cards;
   }
@@ -375,7 +411,11 @@ export function createAccountView({ go, onVaultChange = () => {}, gate = false, 
       el('details', {}, el('summary', { textContent: 'Удалить аккаунт на сервере' }), df)));
 
     const out = el('button', { id: 'acc-logout', type: 'button', textContent: 'Выйти (данные останутся на устройстве)' });
-    out.onclick = () => guard(out, 'Выхожу…', async () => { sync.stop(); await account.logout(); checked = null; onVaultChange(); toast('Вы вышли из аккаунта'); render(); onLoggedOut(); });
+    out.onclick = () => guard(out, 'Выхожу…', async () => {
+      try { await sync.syncNow(); } catch { /* нет связи: выйдем, но предупредим ниже */ }
+      const left = sync.status.pending;
+      if (left > 0 && !out.dataset.sure) { out.dataset.sure = '1'; out.textContent = `Не отправлено записей: ${left}. Выйти всё равно?`; toast('Не все записи успели уйти на сервер. Подключись к интернету или сохрани архив, потом выходи'); return; }
+      sync.stop(); await account.logout(); checked = null; onVaultChange(); toast('Вы вышли из аккаунта'); render(); onLoggedOut(); });
     cards.push(card('Выход', el('p', { class: 'muted', textContent: 'Выход не стирает данные на этом устройстве и не удаляет аккаунт. Пока не войдёшь снова, приложение не откроется.' }), out));
     return cards;
   }
@@ -386,7 +426,7 @@ export function createAccountView({ go, onVaultChange = () => {}, gate = false, 
     if (recoveryCode) { root.replaceChildren(recoveryCard(recoveryCode, afterCode)); return; }
     if (gate) {
       if (account.isLinked()) { onAuthenticated(); return; }       // вошли или создали аккаунт: открываем приложение
-      root.replaceChildren(...gateCards(), ...(pendingJoin ? [] : [gateHelp()]));
+      root.replaceChildren(...gateCards(), ...(pendingJoin || pendingSwitch ? [] : [gateHelp()]));
       return;
     }
     if (account.isLinked()) {
