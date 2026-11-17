@@ -31,9 +31,9 @@ export function createHabitsView() {
   heavy.onchange = () => { setPref('heavyDay', heavy.checked); render(); };
   const heavyRow = el('label', { class: 'check-label card tight' }, heavy, ' Тяжёлый день: показывать только минимум');
 
-  const name = el('input', { id: 'habit-name', type: 'text', placeholder: 'Привычка, например «Python»', maxLength: 120, required: true, autocomplete: 'off' });
+  const name = el('input', { id: 'habit-name', type: 'text', placeholder: 'Привычка, например «Зарядка»', maxLength: 120, required: true, autocomplete: 'off' });
   const anchor = el('input', { id: 'habit-anchor', type: 'text', placeholder: 'После чего? Например «после завтрака»', maxLength: 200, autocomplete: 'off' });
-  const minimum = el('input', { id: 'habit-min', type: 'text', placeholder: 'Версия на 2 минуты: «открыть редактор»', maxLength: 200, autocomplete: 'off' });
+  const minimum = el('input', { id: 'habit-min', type: 'text', placeholder: 'Версия на 2 минуты: «сделать пять приседаний»', maxLength: 200, autocomplete: 'off' });
   const identity = el('input', { id: 'habit-identity', type: 'text', placeholder: 'Кем я становлюсь: «я человек, который двигается каждый день»', maxLength: 120, autocomplete: 'off' });
   const plan = el('input', { id: 'habit-plan', type: 'text', placeholder: 'Если помешает: «если нет времени, то хотя бы 5 минут»', maxLength: 200, autocomplete: 'off' });
   const formDays = daysPicker();
@@ -56,7 +56,7 @@ export function createHabitsView() {
 
   const reviewBox = el('details', { id: 'habit-review', class: 'card', hidden: true });
   const list = el('div', { id: 'habit-list' });
-  const empty = emptyState({ art: 'habits', title: 'Привычек пока нет', text: 'Начни с одной маленькой: серия растёт, когда не пропускаешь второй раз подряд.', action: { label: 'Создать привычку', icon: 'plus', onClick: () => { addBox.open = true; name.focus(); } } });
+  const empty = emptyState({ art: 'habits', title: 'Привычек пока нет', text: 'Здесь будут твои отметки на каждый день. Начни с одной маленькой привычки: серия растёт, когда не пропускаешь два дня подряд.', action: { label: 'Создать привычку', icon: 'plus', onClick: () => { addBox.open = true; name.focus(); } } });
   empty.hidden = true;
   const archivedList = el('div', { id: 'habit-archive' });
   const archivedBlock = el('details', { hidden: true }, el('summary', { textContent: 'В архиве' }), archivedList);

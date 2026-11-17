@@ -113,9 +113,9 @@ export function createHealthView() {
   }
 
   const list = el('div', { id: 'health-list' });
-  const empty = emptyState({ art: 'heart', title: 'Замеров пока нет', text: 'Добавь первый: вес, давление или своё: график появится сам.', action: { label: 'Добавить замер', icon: 'plus', onClick: () => value.focus() } });
+  const empty = emptyState({ art: 'heart', title: 'Замеров пока нет', text: 'Здесь будут графики твоих замеров. Добавь первый: вес, давление или свой показатель.', action: { label: 'Добавить замер', icon: 'plus', onClick: () => value.focus() } });
   empty.hidden = true;
-  const csv = el('button', { id: 'health-csv', type: 'button', textContent: 'Скачать замеры (CSV)', onclick: () => saveTextFile(`health-${todayStr()}.csv`, measuresToCsv(store.state.events), 'text/csv').catch(e => toast(e.message)) });
+  const csv = el('button', { id: 'health-csv', type: 'button', textContent: 'Скачать замеры таблицей (CSV)', onclick: () => saveTextFile(`health-${todayStr()}.csv`, measuresToCsv(store.state.events), 'text/csv').catch(e => toast(e.message)) });
   const breathHost = el('div', { id: 'breath-host', class: 'overlay', hidden: true, tabIndex: -1, role: 'dialog', 'aria-modal': 'true', 'aria-label': 'Дыхание' });
   const breathCard = el('div', { class: 'card tight row' }, el('span', { class: 'grow', textContent: 'Дыхание 4–6: успокоиться за пару минут' }),
     el('button', { type: 'button', id: 'breath-start', class: 'chip', textContent: 'Начать', onclick: () => { openBreathing(breathHost); breathHost.focus({ preventScroll: true }); } }));

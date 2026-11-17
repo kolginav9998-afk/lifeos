@@ -94,15 +94,15 @@ export function createMoneyView({ exportCsv }) {
   };
 
   const list = el('ul', { id: 'exp-list', class: 'list' });
-  const empty = emptyState({ art: 'money', title: 'Пока без записей', text: 'Добавь первую трату или доход: сумма, категория и дата.', action: { label: 'Добавить', icon: 'plus', onClick: () => amount.focus() } });
+  const empty = emptyState({ art: 'money', title: 'Пока без записей', text: 'Здесь будут траты и доходы месяца, а выше — сумма и график. Добавь первую запись: сумма, категория и дата.', action: { label: 'Добавить', icon: 'plus', onClick: () => amount.focus() } });
   empty.hidden = true;
-  const csv = el('button', { type: 'button', id: 'csv-btn', textContent: 'Скачать CSV для Excel', onclick: () => exportCsv() });
+  const csv = el('button', { type: 'button', id: 'csv-btn', textContent: 'Скачать таблицу для Excel (CSV)', onclick: () => exportCsv() });
   root.append(seg, nav, summary, form, list, empty, el('div', { class: 'row' }, csv));
 
   async function remove(ev) {
     const old = await store.remove(ev.id);
     if (editing && editing.id === ev.id) { stopEdit(); render(); }
-    if (old) toast(`${K().label} удалён`.replace('Доход удалён', 'Доход удалён'), { actionLabel: 'Отменить', onAction: () => store.save(old) });
+    if (old) toast(`${K().label} удалён`, { actionLabel: 'Отменить', onAction: () => store.save(old) });
   }
 
   async function addQuick(f) {
