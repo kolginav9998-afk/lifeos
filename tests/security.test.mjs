@@ -113,7 +113,8 @@ test('политика: «правильный» release проходит, лю�
 // ---------- правки проекта Android на настоящем проекте от `cap add android` ----------
 const capCli = path.join(root, 'node_modules/@capacitor/cli/bin/capacitor');
 const havePython = spawnSync('python3', ['--version']).status === 0;
-// `cap sync` останавливается, если пакет из package.json не стоит в node_modules (так бывает после обновления кода без `npm ci`): тогда проверку пропускаем с понятной причиной.
+// Если пакет из package.json не стоит в node_modules (так бывает после обновления кода без `npm ci`), `cap sync` молча его пропускает и плагин в проект Android не попадает:
+// тогда проверку пропускаем с понятной причиной, а не падаем на ожидании плагина. В сборке APK (apk.yml) перед тестами всегда идёт `npm ci`, там проверка выполняется.
 const missingDeps = Object.keys(JSON.parse(read('package.json')).dependencies ?? {}).filter(d => !fs.existsSync(path.join(root, 'node_modules', d, 'package.json')));
 function snapshot(dir, base = dir, out = {}) {
   for (const e of fs.readdirSync(dir, { withFileTypes: true })) {
