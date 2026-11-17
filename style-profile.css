@@ -53,7 +53,8 @@
 
 /* окно «Поделиться итогом» */
 #pr-share-win{gap:var(--s3)}
-#pr-share-win #pr-share-title{font-size:var(--t20);outline:none}
+#pr-share-win .sess-top{flex-wrap:wrap;gap:var(--s2) var(--s3)}
+#pr-share-win #pr-share-title{flex:1 1 auto;min-width:0;font-size:var(--t20);outline:none;overflow-wrap:anywhere}
 #pr-share-win #pr-share-note{margin:0}
 #pr-share-win textarea{min-height:40vh;font-size:var(--t16);line-height:1.5;resize:vertical}
 #pr-share-win .row button{flex:1 1 150px;min-height:48px}
