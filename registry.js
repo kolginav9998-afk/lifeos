@@ -57,6 +57,10 @@ export const REGISTRY = {
   ritual: { label: 'Вечерний ритуал', group: 'Рефлексия', module: 'reflect.js', privacy: 'numbers', analytics: false, fields: 'date, steps' },
   joy: { label: 'Радость', group: 'Рефлексия', module: 'reflect.js', privacy: 'text', analytics: false, fields: 'date, text' },
   charger: { label: 'Что заряжает', group: 'Рефлексия', module: 'reflect.js', privacy: 'text', analytics: false, fields: 'text' },
+  workcfg: { label: 'График работы (настройки)', group: 'График работы', module: 'schedule.js', privacy: 'numbers', analytics: true, fields: 'pattern{kind, week[]|cycle[], start}, shifts[{key, name, letter, from, to, breakMin, color, night}], normMode, normHours, normByMonth{}, extraOff[], maxStreak, minRestH, tplId' },
+  workday: { label: 'День графика (отметка)', group: 'График работы', module: 'schedule.js', privacy: 'numbers', analytics: true, fields: 'date, kind (work|off|vacation|sick|unpaid), shift, planned{from, to}, actual{from, to, startedAt}, breakMin, note' },
+  paycfg: { label: 'Настройки зарплаты', group: 'Зарплата', module: 'salary.js', privacy: 'money', analytics: false, fields: 'mode (salary|hourly), baseMinor, currency, hourlyMinor, ot{basis, multMille, tier1Min, tier1MultMille, roundMin, roundDir}, tax{kind, rateBp, basis, brackets[]}, taxFreeMinor, allowances[], deductions[], leavePct{}, nightPct, advance{day, pct}, salaryDay' },
+  paymonth: { label: 'Итог месяца по зарплате', group: 'Зарплата', module: 'salary.js', privacy: 'money', analytics: false, fields: 'ym, computed{grossMinor, taxMinor, netMinor, taxableMinor, overtimeMin, overtimeMinor, workedMin}, actualNetMinor, extras[{name, amountMinor, taxable}], note' },
 };
 
 export const PRIVACY_LABEL = { text: 'личный текст', health: 'здоровье', money: 'деньги', people: 'люди', numbers: 'числа и отметки', learning: 'учёба', system: 'служебное' };
@@ -94,7 +98,7 @@ export const RELATIONS = [
   ['item', 'itemlog', 'item', 'история вещи: надел, постирал, починил'],
 ];
 // Типы, привязанные к календарному дню полем date (в диаграмме идут от узла «день»).
-export const BY_DAY = ['checkin', 'diary', 'measure', 'workout', 'focus', 'thought', 'intention', 'dayreview', 'joy', 'ritual', 'parked', 'speak', 'breath', 'diction', 'dictself', 'testrun', 'expense', 'income', 'medlog', 'habit_log', 'lesson'];
+export const BY_DAY = ['checkin', 'diary', 'measure', 'workout', 'focus', 'thought', 'intention', 'dayreview', 'joy', 'ritual', 'parked', 'speak', 'breath', 'diction', 'dictself', 'testrun', 'expense', 'income', 'medlog', 'habit_log', 'lesson', 'workday'];
 
 export function erMarkdown() {
   const L = ['# Связи между данными (ER-диаграмма)', '', '_Файл создан из `registry.js` (`RELATIONS` и `BY_DAY`) и сверяется с ним тестом: правь реестр, а не этот файл._', '',

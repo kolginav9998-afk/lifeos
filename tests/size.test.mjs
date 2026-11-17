@@ -6,7 +6,7 @@ import path from 'node:path';
 import { startupText } from '../perf.js';
 
 const root = path.resolve(import.meta.dirname, '..');
-const BUDGET_TOTAL = 2_300_000;            // байт: весь веб-код (js, css, html, манифест). Поднят с 1,4 МБ осознанно в R4.0: учебные курсы с нуля, курс дикции и справка (ADR-18)
+const BUDGET_TOTAL = 3_200_000;            // байт: весь веб-код (js, css, html, манифест). Поднят с 1,4 до 2,3 МБ в R4.0 (курсы с нуля, дикция, справка), до 3,2 МБ в R4.1 (дом, график и зарплата, тесты, профиль, чат; ADR-18)
 const BUDGET_FILE = 64_000;                // байт: один файл
 const files = [...fs.readdirSync(root).filter(f => f.endsWith('.js')), 'index.html', ...fs.readdirSync(root).filter(f => /^style.*\.css$/.test(f)), 'manifest.webmanifest'];   // таблиц стилей несколько: у каждой свой предел
 const sizes = files.map(f => [f, fs.statSync(path.join(root, f)).size]).sort((a, b) => b[1] - a[1]);

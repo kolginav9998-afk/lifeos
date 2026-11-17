@@ -3,6 +3,7 @@ import { el, fill, copyText } from './ui.js';
 import { todayStr } from './events.js';
 import { getPref } from './prefs.js';
 import { dayBrief, briefText, daySummary, summaryText, tenMinutes, tenText } from './daycards.js';
+import { workLine } from './schedule.js';
 
 export function createDayCards() {
   let events = [];
@@ -24,7 +25,8 @@ export function createDayCards() {
     tenCard?.addEventListener('toggle', () => { tenOpen = tenCard.open; });
     brief.addEventListener('toggle', () => { briefOpen = brief.open; });
     summary.addEventListener('toggle', () => { summaryOpen = summary.open; });
-    fill(root, brief, tenCard, summary);
+    const wl = workLine(events, today);                                                  // «Сегодня смена 09:00–18:00» или «Сегодня выходной» (если график задан)
+    fill(root, wl ? el('p', { id: 'work-today', class: 'card tight', textContent: wl }) : null, brief, tenCard, summary);
   }
   return { root, update(evs) { events = evs; render(); } };
 }
