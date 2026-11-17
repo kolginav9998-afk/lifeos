@@ -124,11 +124,12 @@ function snapshot(dir, base = dir, out = {}) {
   }
   return out;
 }
-test('patch-android.py: настоящий проект Capacitor правится верно и повторный запуск ничего не меняет', { skip: !fs.existsSync(capCli) || !havePython ? 'нет Capacitor CLI или python3' : missingDeps.length ? `не установлены пакеты: ${missingDeps.join(', ')} (выполни npm ci)` : false }, () => {
+test('patch-android.py: настоящий проект Capacitor правится верно и повторный запуск ничего не меняет', { skip: !fs.existsSync(capCli) || !havePython ? 'нет Capacitor CLI или python3' : missingDeps.length ? `не установлены пакеты: ${missingDeps.join(', ')} (выполни npm ci)` : false }, (t) => {
   const tmp = fs.mkdtempSync(path.join(os.tmpdir(), 'lifeos-cap-'));
   try {
     for (const f of ['package.json', 'capacitor.config.json']) fs.copyFileSync(path.join(root, f), path.join(tmp, f));
-    fs.symlinkSync(path.join(root, 'node_modules'), path.join(tmp, 'node_modules'), 'dir');
+    try { fs.symlinkSync(path.join(root, 'node_modules'), path.join(tmp, 'node_modules'), 'dir'); }
+    catch (e) { if (e.code === 'EPERM') { t.skip('Windows без прав на симлинк (режим разработчика выключен)'); return; } throw e; }
     fs.mkdirSync(path.join(tmp, 'dist')); fs.writeFileSync(path.join(tmp, 'dist/index.html'), '<!doctype html><html><head></head><body></body></html>');
     const env = { ...process.env, CI: 'true' };
     execFileSync(process.execPath, [capCli, 'add', 'android'], { cwd: tmp, env, stdio: 'pipe' });
