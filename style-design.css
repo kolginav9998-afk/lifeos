@@ -1,14 +1,14 @@
 /* Оформление, раунд 2 (дизайн-система): значки, режимы, пустые экраны. Подключается сразу после style.css. */
 /* ===== design2 ===== */
 /* Токены: оттенки состояний выводятся из основных цветов (работают в обеих темах); палитра графиков и шкала настроения */
-:root{--ease:cubic-bezier(.2,.8,.2,1);--s1:4px;--s2:8px;--s3:12px;--s4:16px;--s5:24px;--s6:32px;--s7:48px;--s8:64px;--r4:4px;--r8:8px;--r12:12px;--r16:16px;--t12:.75rem;--t14:.875rem;--t16:1rem;--t20:1.25rem;--t24:1.5rem;--t32:2rem;--t40:2.5rem;--md-learn:#2f6df0;--md-fin:#0b7f75;--md-ana:#0a7c9c;--md-sec:#4a5a96;--hi:#fff;--tint-accent:color-mix(in srgb,var(--accent) 13%,transparent);--tint-ok:color-mix(in srgb,var(--ok) 14%,transparent);--tint-danger:color-mix(in srgb,var(--danger) 13%,transparent);--tint-warn:color-mix(in srgb,var(--warn) 15%,transparent);--shadow-sm:0 1px 2px rgba(25,28,70,.06),0 6px 14px -8px rgba(25,28,70,.14);--toast-bg:#1b1e3c;--toast-fg:#f4f5ff;--toast-act:#c4bcff;--c1:#7c5cff;--c2:#2f7df0;--c3:#12a594;--c4:#e8930c;--c5:#e0489a;--m1:#d9605c;--m2:#e09a3a;--m3:#cfae2e;--m4:#7fb552;--m5:#3fa878}
-@media (prefers-color-scheme: dark){:root:not([data-theme=light]){--hi:rgba(255,255,255,.12);--md-learn:#6fa4f5;--md-fin:#4fc4b0;--md-ana:#62cfe6;--md-sec:#9aa8d8;--shadow-sm:0 1px 0 rgba(255,255,255,.05) inset;--toast-bg:#2a2d3d;--c1:#9a8bff;--c2:#6aa7ff;--c3:#3fd0bd;--c4:#f5b84a;--c5:#ff7ab8;--m1:#e8888b;--m2:#e9a867;--m3:#e4cb6a;--m4:#9fcf72;--m5:#5cc79c}}
-:root[data-theme=dark]{--hi:rgba(255,255,255,.12);--md-learn:#6fa4f5;--md-fin:#4fc4b0;--md-ana:#62cfe6;--md-sec:#9aa8d8;--shadow-sm:0 1px 0 rgba(255,255,255,.05) inset;--toast-bg:#2a2d3d;--c1:#9a8bff;--c2:#6aa7ff;--c3:#3fd0bd;--c4:#f5b84a;--c5:#ff7ab8;--m1:#e8888b;--m2:#e9a867;--m3:#e4cb6a;--m4:#9fcf72;--m5:#5cc79c}
+:root{--ease:cubic-bezier(.2,.8,.2,1);--s1:4px;--s2:8px;--s3:12px;--s4:16px;--s5:24px;--s6:32px;--s7:48px;--s8:64px;--r4:4px;--r8:8px;--r12:12px;--r16:16px;--t12:.75rem;--t14:.875rem;--t16:1rem;--t20:1.25rem;--t24:1.5rem;--t32:2rem;--t40:2.5rem;--md-learn:#3a62c4;--md-fin:#0f7a6d;--md-ana:#15758e;--md-sec:#4d5a8c;--hi:#fff;--tint-accent:color-mix(in srgb,var(--accent) 13%,transparent);--tint-ok:color-mix(in srgb,var(--ok) 14%,transparent);--tint-danger:color-mix(in srgb,var(--danger) 13%,transparent);--tint-warn:color-mix(in srgb,var(--warn) 15%,transparent);--shadow-sm:0 1px 2px rgba(22,25,60,.05),0 6px 14px -8px rgba(22,25,60,.12);--toast-bg:#242637;--toast-fg:#f2f3fa;--toast-act:#b8b1f2;--c1:#7463d6;--c2:#3d77c9;--c3:#149c8b;--c4:#d98d1a;--c5:#cf4f8d;--m1:#d05f5b;--m2:#d6953c;--m3:#c4ab33;--m4:#7cae52;--m5:#3ba373}
+@media (prefers-color-scheme: dark){:root:not([data-theme=light]){--hi:rgba(255,255,255,.12);--md-learn:#7fa8ec;--md-fin:#54bfab;--md-ana:#67c3d6;--md-sec:#98a5d2;--shadow-sm:0 1px 0 rgba(255,255,255,.05) inset;--toast-bg:#2b2e3e;--c1:#9a8ff0;--c2:#6ca3ec;--c3:#46c6b4;--c4:#ecb054;--c5:#f07fae;--m1:#df8484;--m2:#dfa465;--m3:#d8c468;--m4:#9cc670;--m5:#58c296}}
+:root[data-theme=dark]{--hi:rgba(255,255,255,.12);--md-learn:#7fa8ec;--md-fin:#54bfab;--md-ana:#67c3d6;--md-sec:#98a5d2;--shadow-sm:0 1px 0 rgba(255,255,255,.05) inset;--toast-bg:#2b2e3e;--c1:#9a8ff0;--c2:#6ca3ec;--c3:#46c6b4;--c4:#ecb054;--c5:#f07fae;--m1:#df8484;--m2:#dfa465;--m3:#d8c468;--m4:#9cc670;--m5:#58c296}
 
 /* основа: типографика и ритм (шаг 4 px: 8 · 12 · 14 · 16) */
 body{-webkit-font-smoothing:antialiased;line-height:1.5}
 h1,h2,h3{line-height:1.2}
-h2{font-size:var(--t12)}
+h2{font-size:var(--t12);font-weight:600;letter-spacing:.08em}
 p{text-wrap:pretty}h1,h2,h3,.empty-t{text-wrap:balance}
 ::selection{background:color-mix(in srgb,var(--accent) 32%,transparent)}
 ::placeholder{color:color-mix(in srgb,var(--muted) 80%,transparent)}
@@ -57,6 +57,15 @@ button.primary,.add-row button{box-shadow:inset 0 1px 0 rgba(255,255,255,.2),0 1
 button.danger,.chip.danger{background:var(--tint-danger);border-color:transparent;color:var(--danger)}
 button.link{background:none;font-weight:600;text-decoration-thickness:1px;text-underline-offset:3px}
 button.back-link{text-decoration:none;display:inline-flex;align-items:center;gap:2px;padding:6px 8px 6px 2px;align-self:flex-start}
+/* наведение указателем: мягкий отклик (чуть ярче, тонировка акцентом), без резких цветов */
+@media (hover:hover){
+  button:hover:not(:disabled),.btn:hover{filter:brightness(1.045)}
+  .subnav button:hover:not(:disabled):not([aria-current=page]),.chip:hover:not(:disabled):not(.static){background:color-mix(in srgb,var(--mode-accent) 10%,var(--soft))}
+  .item .del:hover,.entry .del:hover{background:var(--tint-danger);color:var(--danger)}
+  .track-card:hover:not(:disabled){box-shadow:var(--shadow)}
+}
+/* недоступные кнопки приглушены и без тени */
+button:disabled{box-shadow:none}
 .chip{display:inline-flex;align-items:center;gap:6px;min-height:36px;padding:5px 12px;font-size:var(--t14);font-weight:500;line-height:1.25;border-radius:var(--r8)}
 .chip svg{flex:none;opacity:.9}
 .chip.static{background:transparent;border:1px solid var(--line);font-weight:600}
@@ -150,7 +159,7 @@ input[type=checkbox]:checked::after{transform:rotate(-45deg) scale(1)}
 /* сообщения */
 .toast{display:flex;align-items:center;gap:10px;padding:12px 12px 14px 14px;border-radius:var(--r12);background:var(--toast-bg);color:var(--toast-fg);border:1px solid rgba(255,255,255,.1);box-shadow:var(--shadow-lg)}
 .toast-ic{display:grid;flex:none;color:var(--toast-act)}
-.toast[data-kind=error] .toast-ic{color:#ff9aa0}
+.toast[data-kind=error] .toast-ic{color:#f5a3a8}
 .toast-msg{flex:1;min-width:0;line-height:1.3}
 .toast button{flex:none;min-height:34px;padding:4px 12px;border-radius:10px;background:rgba(255,255,255,.12);color:var(--toast-act);font-weight:700}
 .toast-bar{position:absolute;left:14px;right:14px;bottom:5px;height:2px;border-radius:2px;background:currentColor;opacity:.28;transform-origin:left}

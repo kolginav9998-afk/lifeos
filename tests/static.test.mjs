@@ -86,7 +86,7 @@ test('исходник иконки на месте, все размеры Andro
 });
 
 test('replaceChildren не получает null: DOM рисует его как текст «null» (используй fill из ui.js)', () => {
-  const root = path.resolve(path.dirname(new URL(import.meta.url).pathname), '..');
+  const root = path.resolve(import.meta.dirname, '..');   // pathname у file-URL на Windows даёт «C:\C:\…»
   for (const f of fs.readdirSync(root).filter(n => n.endsWith('.js'))) {
     const s = fs.readFileSync(path.join(root, f), 'utf8');
     for (const m of s.matchAll(/\.replaceChildren\(/g)) {
