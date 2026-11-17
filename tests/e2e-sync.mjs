@@ -57,9 +57,9 @@ assert.equal(server.store.getAccount().username, 'владелец');
 assert.ok(server.store.stats().count >= 3, 'записи на сервере');
 
 // сервер видит только шифртекст
-const dump = JSON.stringify(server.store.db.all('SELECT * FROM records'));
+const dump = JSON.stringify(server.store.db.all('SELECT * FROM recs'));
 for (const s of ['хлеб', 'жильё', 'зарплату', 'task', 'note']) assert.ok(!dump.includes(s), `на сервере нет открытого «${s}»`);
-const acc = JSON.stringify(server.store.db.all('SELECT * FROM account'));
+const acc = JSON.stringify(server.store.db.all('SELECT * FROM accts'));
 assert.ok(!acc.includes(PW), 'пароль на сервер не попал');
 
 // ===== 2. Устройство B: вход, данные подтянулись =====

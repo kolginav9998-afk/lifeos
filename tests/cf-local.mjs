@@ -53,6 +53,7 @@ const call = async (m, p, { body, token } = {}) => {
   return { status: r.status, body: await r.json().catch(() => null) };
 };
 const metaOf = () => ({ v: 2, kdf: 'PBKDF2-SHA256', iter: 600000, salt: b64(16), wrap: { iv: b64(12), ct: b64(48) } });
+await new Promise(r => setTimeout(r, 2500));                    // пауза после перебора пароля выше закончилась: приглашения проверяются с тем же ограничением
 const owner = C.svc.token();
 assert.equal((await call('POST', '/v1/register', { body: { username: 'Анна', authKey: b64(32), authSalt: b64(16), authIter: 600000, meta: metaOf() } })).status, 409, 'без приглашения нельзя');
 const inv = await call('POST', '/v1/invites', { token: owner });

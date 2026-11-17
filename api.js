@@ -50,5 +50,18 @@ export function createApi({ fetchImpl = (...a) => globalThis.fetch(...a), timeou
     pull: (base, token, since, limit = 500) => call(base, 'GET', `/v1/sync?since=${since}&limit=${limit}`, { token }),
     push: (base, token, records) => call(base, 'POST', '/v1/sync', { token, body: { records } }),
     deleteAccount: (base, token, authKey) => call(base, 'DELETE', '/v1/account', { token, body: { authKey } }),
+    // общение между людьми на одном сервере (R4.3, docs/SOCIAL_API.md, раздел 9)
+    createInvite: (base, token) => call(base, 'POST', '/v1/invites', { token }),
+    listInvites: (base, token) => call(base, 'GET', '/v1/invites', { token }),
+    revokeInvite: (base, token, id) => call(base, 'DELETE', `/v1/invites/${Number(id)}`, { token }),
+    contacts: (base, token) => call(base, 'GET', '/v1/contacts', { token }),
+    removeContact: (base, token, name) => call(base, 'DELETE', `/v1/contacts/${encodeURIComponent(name)}`, { token }),
+    setKeys: (base, token, body) => call(base, 'POST', '/v1/keys', { token, body }),
+    chatSend: (base, token, body) => call(base, 'POST', '/v1/chat/send', { token, body }),
+    chatInbox: (base, token, after = 0, limit = 100) => call(base, 'GET', `/v1/chat/inbox?after=${Math.max(0, Number(after) | 0)}&limit=${Math.max(1, Math.min(200, Number(limit) | 0))}`, { token }),
+    chatHide: (base, token, withName) => call(base, 'POST', '/v1/chat/hide', { token, body: { with: withName } }),
+    adminAccounts: (base, token) => call(base, 'GET', '/v1/admin/accounts', { token }),
+    adminSetDisabled: (base, token, name, disabled) => call(base, 'POST', `/v1/admin/accounts/${encodeURIComponent(name)}/${disabled ? 'disable' : 'enable'}`, { token }),
+    adminDelete: (base, token, name) => call(base, 'DELETE', `/v1/admin/accounts/${encodeURIComponent(name)}`, { token }),
   };
 }

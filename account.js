@@ -18,6 +18,9 @@ export function describeError(e) {
     account_exists: 'На этом сервере аккаунт уже создан. Войди в него.', bad_setup_code: 'Неверный код установки сервера',
     bad_username: 'Имя: 3–64 символа (буквы, цифры, . _ @ + -)', unauthorized: 'Сессия закончилась, войди снова',
     no_account: 'На сервере нет аккаунта', quota: 'На сервере закончилось место', bad_token: 'Код восстановления устарел, начни заново',
+    bad_invite: 'Приглашение не подошло: оно неверное, уже использовано, отозвано или просрочено. Попроси новое.', accounts_limit: 'На сервере уже создано максимальное число аккаунтов',
+    disabled: 'Этот аккаунт отключён владельцем сервера', too_many_invites: 'Уже есть пять действующих приглашений. Отзови ненужное или подожди.', rate: 'Слишком много сообщений за минуту. Подожди немного.',
+    admin_has_users: 'Сначала удалите остальные аккаунты на сервере: администратора можно удалить только последним', not_found: 'Не найдено',
   };
   return map[e.code] || `Ошибка сервера (${e.code})`;
 }
@@ -70,7 +73,7 @@ export function createAccountService({ api, storage = globalThis.localStorage, n
     },
 
     // Создать аккаунт. Если защиты паролем ещё нет — она включается (тем же паролем) и данные шифруются.
-    async register({ server, username, password, setupCode }) {
+    async register({ server, username, password, setupCode, invite }) {
       const base = normalizeServerUrl(server);
       const user = checkUser(username);
       const weak = vault.checkPassword(password);
@@ -88,7 +91,7 @@ export function createAccountService({ api, storage = globalThis.localStorage, n
         meta = { ...meta, v: 2, rec: r.rec, changedAt: now() }; recovery = r.server; code = r.code;
       }
       const auth = await newAuth(password);
-      const res = await api.register(base, { username: user, authKey: auth.key, authSalt: auth.salt, authIter: auth.iter, meta, ...(recovery ? { recovery } : {}), ...(setupCode ? { setupCode } : {}) });
+      const res = await api.register(base, { username: user, authKey: auth.key, authSalt: auth.salt, authIter: auth.iter, meta, ...(recovery ? { recovery } : {}), ...(setupCode ? { setupCode } : {}), ...(invite ? { invite } : {}) });
       if (code) vault.commitMeta(meta);
       saveInfo(base, user, auth.salt, auth.iter);
       await saveSession(res.token, res.expiresAt);

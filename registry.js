@@ -47,6 +47,8 @@ export const REGISTRY = {
   resource: { label: 'Отметка о внешнем курсе', group: 'Учёба', module: 'zero-resources.js', privacy: 'learning', analytics: false, fields: 'id, status (not_started|in_progress|completed|abandoned), note, date' },
   testrun: { label: 'Прохождение проверки', group: 'Проверки', module: 'bt-core.js', privacy: 'numbers', analytics: true, fields: 'date, mode, tests{metrics, trials}, state, startedAt, durationMs' },
   experiment: { label: 'Личный эксперимент', group: 'Проверки', module: 'experiments.js', privacy: 'text', analytics: false, fields: 'title, change, metric, days, blockDays, startDate, order, cancelled' },
+  meeting: { label: 'Встреча (приглашение через чат)', group: 'Люди и цели', module: 'meet.js', privacy: 'people', analytics: false, fields: 'meetId, with, role (host|guest), type (date|business|friends|family|other), title, status (proposed|answered|confirmed|declined|cancelled), when{date, time}, place, note, duration, updatedAt' },
+  chatkey: { label: 'Ключ чата (закрытый ключ шифрования переписки)', group: 'Люди и цели', module: 'chat-crypto.js', privacy: 'people', analytics: false, fields: 'pub, priv (закрытый ключ ECDH P-256: только в зашифрованном журнале, в выгрузки для чтения не попадает)' },
   person: { label: 'Человек', group: 'Люди и цели', module: 'people.js', privacy: 'people', analytics: false, fields: 'name, birthday, birthYear, cadenceDays, lastContact, note' },
   okr: { label: 'Цель квартала', group: 'Люди и цели', module: 'okr.js', privacy: 'text', analytics: false, fields: 'title, why, due, krs[text, target, current, unit], status' },
   intention: { label: 'Намерение дня', group: 'Рефлексия', module: 'reflect.js', privacy: 'text', analytics: false, fields: 'date, text' },
