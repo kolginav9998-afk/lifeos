@@ -28,7 +28,9 @@ export function normalizeAuto(raw) {
   if (!kind || !/^[a-z][a-z0-9_]{0,39}$/.test(type)) return null;
   const field = clean(raw.field, 40);
   if (kind === 'sum' && !/^[A-Za-z][\w$]{0,39}$/.test(field)) return null;
-  const from = isYmd(raw.from) ? raw.from : null, to = isYmd(raw.to) ? raw.to : null;
+  const has = v => v !== undefined && v !== null && v !== '';
+  if ((has(raw.from) && !isYmd(raw.from)) || (has(raw.to) && !isYmd(raw.to))) return null;
+  const from = has(raw.from) ? raw.from : null, to = has(raw.to) ? raw.to : null;
   if (from && to && from > to) return null;
   return { kind, type, ...(kind === 'sum' ? { field } : {}), ...(from ? { from } : {}), ...(to ? { to } : {}) };
 }
