@@ -60,6 +60,40 @@ async function idb(mode, fn) {
   }
 }
 
+// ---- дубль «меты» ключа (vault.js): переживает очистку localStorage ----
+// Отдельная крошечная база, чтобы не трогать версию основной. Одна запись — сериализованная мета.
+const META_DB = 'lifeos-vault';
+const META_STORE = 'kv';
+const META_KEY = 'meta';
+function metaOpen() {
+  return new Promise((resolve, reject) => {
+    if (!globalThis.indexedDB) return reject(new Error('IndexedDB недоступен'));
+    const req = indexedDB.open(META_DB, 1);
+    req.onupgradeneeded = () => { const d = req.result; if (!d.objectStoreNames.contains(META_STORE)) d.createObjectStore(META_STORE); };
+    req.onsuccess = () => resolve(req.result);
+    req.onerror = () => reject(req.error || new Error('IndexedDB: ошибка открытия'));
+    req.onblocked = () => reject(new Error('IndexedDB заблокирован'));
+  });
+}
+async function metaIdb(mode, fn) {
+  try {
+    const d = await metaOpen();
+    const value = await new Promise((resolve, reject) => {
+      const t = d.transaction(META_STORE, mode);
+      const out = fn(t.objectStore(META_STORE));
+      t.oncomplete = () => { d.close(); resolve(out?.result); };
+      t.onerror = () => { d.close(); reject(t.error); };
+      t.onabort = () => { d.close(); reject(t.error); };
+    });
+    return { ok: true, value };
+  } catch (e) { console.error(e); return { ok: false, value: undefined }; }
+}
+vault.registerMetaMirror({
+  write: async json => { await metaIdb('readwrite', s => s.put(json, META_KEY)); },
+  clear: async () => { await metaIdb('readwrite', s => s.delete(META_KEY)); },
+  read: async () => { const r = await metaIdb('readonly', s => s.get(META_KEY)); return r.ok ? r.value ?? null : null; },
+});
+
 export function lsRead() {
   if (state.mirrorOff) return [];
   try { const v = JSON.parse(localStorage.getItem(LS_KEY) || '[]'); return Array.isArray(v) ? v : []; }
@@ -195,6 +229,7 @@ export async function disableLock(password) {
 export async function wipeAll() {
   await disableQuickUnlock();             // пароль в хранилище телефона не должен пережить стирание данных (и сначала, пока настройки ещё на месте)
   await idb('readwrite', s => s.clear());
+  await metaIdb('readwrite', s => s.clear());   // и дубль меты ключа, иначе стёртая защита «воскреснет»
   try {
     const keys = [];
     for (let i = 0; i < localStorage.length; i++) { const k = localStorage.key(i); if (k && k.startsWith('lifeos.')) keys.push(k); }

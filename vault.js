@@ -70,6 +70,13 @@ function recordFail(now = Date.now()) {
 const clearFails = () => storage.removeItem(FAILS);
 
 // ---------- мета ----------
+// Дубль меты в IndexedDB: localStorage могут очистить отдельно («данные сайтов»),
+// и тогда без копии зашифрованные записи не прочитать никогда. Прямой импорт db.js
+// невозможен (он уже импортирует vault), поэтому db.js регистрирует здесь «зеркало».
+let metaMirror = null;
+export function registerMetaMirror(mirror) { metaMirror = mirror; }
+const mirrorCall = (fn, arg) => { try { Promise.resolve(fn?.(arg)).catch(e => console.error(e)); } catch (e) { console.error(e); } };
+
 export function parseMeta(m) {
   const okWrap = w => w && typeof w.iv === 'string' && typeof w.ct === 'string';
   if (!m || typeof m !== 'object' || (m.v !== 1 && m.v !== 2) || !m.salt || !okWrap(m.wrap) || !Number.isInteger(m.iter) || m.iter < MIN_ITER || m.iter > MAX_ITER) throw new Error('Повреждены данные входа');
@@ -78,7 +85,18 @@ export function parseMeta(m) {
 }
 function readMeta() { return parseMeta(readJson(META)); }
 export function getMeta() { return hasVault() ? readMeta() : null; }
-const writeMeta = m => storage.setItem(META, JSON.stringify(m));
+const writeMeta = m => { const json = JSON.stringify(m); storage.setItem(META, json); mirrorCall(metaMirror?.write, json); };
+
+// Восстановить мету из дубля в IndexedDB, если localStorage очищен. Правда — только если копия есть и читается.
+export async function restoreMeta() {
+  if (hasVault() || !metaMirror?.read) return false;
+  try {
+    const json = await metaMirror.read();
+    if (typeof json !== 'string' || !json) return false;
+    storage.setItem(META, JSON.stringify(parseMeta(JSON.parse(json))));
+    return true;
+  } catch { return false; }
+}
 
 // Собрать мету: ключ данных `raw`, обёрнутый ключом из пароля (и, если есть, прежним блоком кода восстановления).
 export async function makeMeta(password, raw, { iterations = PBKDF2_ITER, rec = null, createdAt = Date.now() } = {}) {
@@ -143,6 +161,7 @@ export async function create(password, { iterations = PBKDF2_ITER } = {}) {
 }
 
 export async function unlock(password, now = Date.now()) {
+  await restoreMeta();                                   // localStorage могли очистить: пробуем дубль из IndexedDB
   const meta = readMeta();
   const { waitMs } = failState(now);
   if (waitMs > 0) throw new TooManyAttemptsError(waitMs);
@@ -214,7 +233,7 @@ export async function installUnlocked(meta, raw) { writeMeta(parseMeta(meta)); d
 // Проверка пароля без разблокировки (для подтверждения опасных действий).
 export async function verify(password) { await unwrapRaw(password, readMeta()); }
 
-export function remove() { storage.removeItem(META); storage.removeItem(FAILS); dek = null; }
+export function remove() { storage.removeItem(META); storage.removeItem(FAILS); dek = null; mirrorCall(metaMirror?.clear); }
 
 // ---------- запись <-> зашифрованная запись ----------
 export const isSealed = rec => !!(rec && typeof rec.ct === 'string');
