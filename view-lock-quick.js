@@ -7,7 +7,7 @@ import { quickUnlockEnabled, quickUnlockRun, QuickUnlockError } from './quick-un
 
 export function createLockQuick({ onUnlocked, onLockout }) {
   let busy = false;
-  let quietUntil = 0;                       // сразу после закрытия окна отпечатка само оно снова не открывается: возврат в приложение не должен зациклить окно
+  let quietUntil = 0;                       // до этого времени окно отпечатка само не открывается (после неудачи или отмены), иначе возврат из окна зациклил бы его
   const say = text => { $('lock-msg').textContent = text; };
 
   // Показать или спрятать кнопку. Возвращает true, если вход по отпечатку включён.
@@ -27,11 +27,12 @@ export function createLockQuick({ onUnlocked, onLockout }) {
       say('');
       await onUnlocked();
     } catch (e) {
+      quietUntil = Date.now() + 2500;           // окно закрыто без входа: возвращение в приложение из окна отпечатка не должно сразу открыть его снова
       if (e instanceof vault.TooManyAttemptsError) { say(''); onLockout(); }
       else if (e instanceof QuickUnlockError) { say(e.reason === 'cancelled' ? '' : e.message); if (e.reason === 'stale') onLockout(); refresh(); }   // «пароль изменился», «не читается»: вход уже выключен, кнопку убираем
       else say('Ошибка: ' + (e?.message || e));
     } finally {
-      busy = false; quietUntil = Date.now() + 2500; $('lock-bio').disabled = false;
+      busy = false; $('lock-bio').disabled = false;
     }
   }
 
