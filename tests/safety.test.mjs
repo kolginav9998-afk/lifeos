@@ -42,21 +42,34 @@ test('целостность при запуске: хранилище не от
   assert.ok(integrityHint({ idbOk: false, idbError: 'я'.repeat(500) }).text.length < 400, 'длинный текст ошибки обрезается');
 });
 
-test('второе окно: соседи считаются, чужие записи сообщаются, уход замечается', async () => {
+test('второе окно: соседи считаются, чужие записи сообщаются, уход замечается', async (t) => {
   const name = `lifeos-test-${Math.random().toString(36).slice(2)}`, got = { a: [], b: [], wroteA: 0, wroteB: 0 };
+  // если проверка упадёт посередине, каналы всё равно закроются — иначе процесс не завершится
+  const guards = [];
+  t.after(() => { for (const g of guards) try { g.stop(); } catch { /* уже закрыт */ } });
+  // сообщения BroadcastChannel приходят с задержкой; под параллельной нагрузкой фиксированные паузы ненадёжны —
+  // ждём условие с опросом (до 5 с), а не фиксированное время
+  const until = async (ok, what) => {
+    for (let i = 0; i < 100 && !ok(); i++) await sleep(50);
+    assert.ok(ok(), what);
+  };
   const a = createTabGuard({ name, ttl: 5000, onOthers: n => got.a.push(n), onRemoteWrite: () => got.wroteA++ });
+  guards.push(a);
   assert.equal(a.count(), 0, 'пока окно одно');
   const b = createTabGuard({ name, ttl: 5000, onOthers: n => got.b.push(n), onRemoteWrite: () => got.wroteB++ });
-  await sleep(60);
-  assert.equal(a.count(), 1); assert.equal(b.count(), 1); assert.deepEqual(got.a, [1]); assert.deepEqual(got.b, [1]);
-  b.announceWrite(); await sleep(40);
-  assert.equal(got.wroteA, 1, 'первое окно узнало о записи во втором'); assert.equal(got.wroteB, 0, 'своё сообщение не приходит обратно');
-  a.announceWrite(); a.announceWrite(); await sleep(40);
-  assert.equal(got.wroteB, 2);
+  guards.push(b);
+  await until(() => a.count() === 1 && b.count() === 1, 'окна увидели друг друга');
+  assert.deepEqual(got.a, [1]); assert.deepEqual(got.b, [1]);
+  b.announceWrite(); await until(() => got.wroteA === 1, 'первое окно узнало о записи во втором');
+  assert.equal(got.wroteB, 0, 'своё сообщение не приходит обратно');
+  a.announceWrite(); a.announceWrite(); await until(() => got.wroteB === 2, 'второе окно узнало о двух записях');
   const c = createTabGuard({ name, ttl: 5000, onOthers: () => {}, onRemoteWrite: () => {} });
-  await sleep(60); assert.equal(a.count(), 2); assert.equal(c.count(), 2);
-  c.stop(); await sleep(40); assert.equal(a.count(), 1, 'закрытое окно пропало из счёта'); assert.deepEqual(got.a.slice(-2), [2, 1]);
-  b.stop(); await sleep(40); assert.equal(a.count(), 0); a.stop();
+  guards.push(c);
+  await until(() => a.count() === 2 && c.count() === 2, 'третье окно учтено');
+  c.stop(); await until(() => a.count() === 1, 'закрытое окно пропало из счёта');
+  assert.deepEqual(got.a.slice(-2), [2, 1]);
+  b.stop(); await until(() => a.count() === 0, 'все соседи ушли');
+  a.stop();
   assert.equal(tabState.others, 0);
 });
 

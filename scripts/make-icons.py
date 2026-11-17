@@ -27,14 +27,7 @@ def circle_mask(size, r_frac, feather_frac=0.0):
     """Круг радиуса r_frac*size (0..0.5) с мягким краем шириной feather_frac*size."""
     s = size * SS
     m = Image.new('L', (s, s), 0)
-    d = ImageDraw.Draw(m)
-    steps = 40 if feather_frac else 1
-    for i in range(steps):
-        t = i / max(steps - 1, 1)
-        r = (r_frac - feather_frac * t) * s
-        a = int(255 * (1 - t)) if feather_frac else 255
-        # рисуем от внешнего к внутреннему, наращивая непрозрачность
-    # проще: градиент по расстоянию
+    # градиент непрозрачности по расстоянию от центра: 255 внутри r_in, 0 за r_out
     px = m.load()
     c = s / 2
     r_in = (r_frac - feather_frac) * s

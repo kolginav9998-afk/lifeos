@@ -47,7 +47,8 @@ test('ZIP: файл достаётся и из несжатого, и из сж�
   // CLI: debug-манифест обязан провалить проверку (положительный контроль), код выхода 1
   const tmp = fs.mkdtempSync(path.join(os.tmpdir(), 'lifeos-apk-'));
   fs.writeFileSync(path.join(tmp, 'debug.apk'), deflated);
-  const r = spawnSync('node', [path.join(root, 'scripts/check-apk.mjs'), path.join(tmp, 'debug.apk')], { encoding: 'utf8', env: { ...process.env, ANDROID_HOME: tmp, ANDROID_SDK_ROOT: tmp } });
+  // Запускаем тем же Node, что и тесты: на Windows в PATH может не быть исполняемого 'node'.
+  const r = spawnSync(process.execPath, [path.join(root, 'scripts/check-apk.mjs'), path.join(tmp, 'debug.apk')], { encoding: 'utf8', env: { ...process.env, ANDROID_HOME: tmp, ANDROID_SDK_ROOT: tmp } });
   assert.equal(r.status, 1); assert.match(r.stdout, /отлаживаем/); assert.match(r.stdout, /Отлаживаемое: ДА/);
   fs.rmSync(tmp, { recursive: true, force: true });
 });
@@ -130,8 +131,8 @@ test('patch-android.py: настоящий проект Capacitor правитс
     fs.symlinkSync(path.join(root, 'node_modules'), path.join(tmp, 'node_modules'), 'dir');
     fs.mkdirSync(path.join(tmp, 'dist')); fs.writeFileSync(path.join(tmp, 'dist/index.html'), '<!doctype html><html><head></head><body></body></html>');
     const env = { ...process.env, CI: 'true' };
-    execFileSync('node', [capCli, 'add', 'android'], { cwd: tmp, env, stdio: 'pipe' });
-    execFileSync('node', [capCli, 'sync', 'android'], { cwd: tmp, env, stdio: 'pipe' });
+    execFileSync(process.execPath, [capCli, 'add', 'android'], { cwd: tmp, env, stdio: 'pipe' });
+    execFileSync(process.execPath, [capCli, 'sync', 'android'], { cwd: tmp, env, stdio: 'pipe' });
     fs.cpSync(path.join(root, 'assets/android-res'), path.join(tmp, 'android/app/src/main/res'), { recursive: true });
     const patch = envx => execFileSync('python3', [path.join(root, 'scripts/patch-android.py'), 'android'], { cwd: tmp, env: { ...env, ANDROID_VERSION_CODE: '77', ANDROID_VERSION_NAME: 'R4.0', ANDROID_APP_NAME: 'Тест', ...envx }, stdio: 'pipe' });
     patch();
