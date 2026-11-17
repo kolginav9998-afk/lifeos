@@ -1,4 +1,4 @@
-import { el, fill, toast, dateRu, sparkline, icon, emptyState } from './ui.js';
+import { el, fill, toast, dateRu, sparkline, icon, emptyState, copyText } from './ui.js';
 import { createHealthExtras } from './view-health-extra.js';
 import { sleepReasons } from './diary.js';
 import { todayStr } from './events.js';
@@ -9,7 +9,7 @@ import { saveTextFile } from './platform.js';
 import * as store from './store.js';
 import { openBreathing } from './breathing.js';
 import { sleepPanel, REGULARITY_TEXT } from './reports.js';
-import { WHEN, MEDS_NOTE, makeMed, medsOf, makeMedLog, medLogId, takenOn } from './meds.js';
+import { WHEN, MEDS_NOTE, makeMed, medsOf, makeMedLog, medLogId, takenOn, pharmacyList, pharmacyText, daysLeft, courseDone } from './meds.js';
 import { EMOTIONS, THOUGHT_NOTE, PROMPTS, makeThought, thoughtsOf, relief, reliefStats } from './thoughts.js';
 
 const num = x => String(Math.round(x * 100) / 100).replace('.', ',');
@@ -46,8 +46,9 @@ export function createHealthView() {
   const mDose = el('input', { id: 'med-dose', type: 'text', maxLength: 40, placeholder: 'Доза (как назначено)', autocomplete: 'off' });
   const mWhen = el('select', { id: 'med-when', 'aria-label': 'Когда' }, ...Object.entries(WHEN).map(([v, t]) => el('option', { value: v, textContent: t })));
   const mErr = el('p', { class: 'error', id: 'med-err' });
-  const medForm = el('form', { class: 'form-stack' }, mName, mDose, mWhen, el('button', { type: 'submit', id: 'med-add', class: 'primary', textContent: 'Добавить' }), mErr);
-  medForm.onsubmit = async e => { e.preventDefault(); try { await store.save(makeMed({ name: mName.value, dose: mDose.value, when: mWhen.value })); mName.value = ''; mDose.value = ''; mErr.textContent = ''; } catch (err) { mErr.textContent = err.message; } };
+  const mEnd = el('input', { id: 'med-end', type: 'date', 'aria-label': 'Конец курса (необязательно)' });
+  const medForm = el('form', { class: 'form-stack' }, mName, mDose, mWhen, el('label', { class: 'muted' }, 'Конец курса (необязательно): ', mEnd), el('button', { type: 'submit', id: 'med-add', class: 'primary', textContent: 'Добавить' }), mErr);
+  medForm.onsubmit = async e => { e.preventDefault(); try { await store.save(makeMed({ name: mName.value, dose: mDose.value, when: mWhen.value, endDate: mEnd.value })); mName.value = ''; mDose.value = ''; mEnd.value = ''; mErr.textContent = ''; } catch (err) { mErr.textContent = err.message; } };
 
   // ----- профиль здоровья -----
   const hp = { h: el('input', { id: 'hp-height', type: 'text', inputMode: 'decimal', placeholder: 'Рост, см', autocomplete: 'off' }),
@@ -163,12 +164,22 @@ export function createHealthView() {
       const p = m.payload, on = taken.has(m.id);
       const cb = el('input', { type: 'checkbox', class: 'med-take', checked: on, disabled: !p.active, 'aria-label': `Принял сегодня: ${p.name}`,
         onchange: async () => { if (cb.checked) await store.save(makeMedLog(m.id, today)); else await store.remove(medLogId(m.id, today)); } });
+      const left = daysLeft(m, today);
+      const course = left === null ? '' : left > 0 ? ` · осталось ${left} дн.` : ' · курс завершён';
       return el('div', { class: `med${p.active ? '' : ' off'}`, dataset: { id: m.id } },
-        el('label', { class: 'check-label grow' }, cb, el('span', { textContent: ` ${p.name}${p.dose ? ' · ' + p.dose : ''} · ${WHEN[p.when]}` })),
+        el('label', { class: 'check-label grow' }, cb, el('span', { textContent: ` ${p.name}${p.dose ? ' · ' + p.dose : ''} · ${WHEN[p.when]}${course}` })),
+        el('button', { type: 'button', class: 'chip med-running', 'aria-pressed': p.runningOut === true ? 'true' : 'false', textContent: p.runningOut ? 'В списке в аптеку' : 'Заканчивается', onclick: () => store.save({ ...m, payload: { ...p, runningOut: !p.runningOut } }) }),
+        courseDone(m, today) && p.active ? el('button', { type: 'button', class: 'chip', textContent: 'Отметить «курс завершён»', onclick: () => store.save({ ...m, payload: { ...p, active: false } }) }) : null,
         el('button', { type: 'button', class: 'chip med-toggle', textContent: p.active ? 'Пауза' : 'Возобновить', onclick: () => store.save({ ...m, payload: { ...p, active: !p.active } }) }),
         el('button', { type: 'button', class: 'chip danger', 'aria-label': `Удалить: ${p.name}`, onclick: async () => { const old = await store.removeMany([m.id, ...events.filter(e => e.type === 'medlog' && e.payload.medId === m.id).map(e => e.id)]); toast('Удалено', { actionLabel: 'Вернуть', onAction: () => store.saveMany(old) }); } }, icon('x', 16)));
     });
-    medsCard.replaceChildren(el('strong', { textContent: 'Лекарства и добавки' }), el('p', { class: 'muted', textContent: MEDS_NOTE }),
+    const shop = pharmacyList(events);
+    const shopBlock = shop.length ? el('div', { id: 'meds-shop', class: 'card tight' },
+      el('strong', { textContent: 'Список в аптеку' }),
+      ...shop.map(m => el('p', { class: 'muted', textContent: `${m.payload.name}${m.payload.dose ? ` — ${m.payload.dose}` : ''}` })),
+      el('button', { type: 'button', id: 'meds-shop-copy', class: 'chip', textContent: 'Скопировать списком', onclick: () => copyText(pharmacyText(events), 'Список в аптеку скопирован') })) : null;
+    fill(medsCard, el('strong', { textContent: 'Лекарства и добавки' }), el('p', { class: 'muted', textContent: MEDS_NOTE }),
+      shopBlock,
       ...(rows.length ? rows : [el('p', { class: 'muted', textContent: 'Список пуст. Добавь то, что принимаешь регулярно, — будет удобно отмечать и показывать врачу.' })]),
       el('details', {}, el('summary', { textContent: 'Добавить' }), medForm));
   }
