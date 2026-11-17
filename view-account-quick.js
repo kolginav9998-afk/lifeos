@@ -57,10 +57,10 @@ export function createQuickCard({ username = () => '' } = {}) {
       kids.push(
         el('p', { class: 'muted', textContent: 'Вместо пароля приложи палец (или лицо, если телефон надёжно его распознаёт). Пароль остаётся запасным способом: его можно ввести всегда.' }),
         el('label', { class: 'check-label' }, sw, ' Вход по отпечатку'),
-        on ? el('p', { id: 'qu-state', class: 'ok', textContent: '✓ Включён. На экране блокировки можно приложить палец вместо пароля.' })
-          : blocked ? el('p', { id: 'qu-state', class: 'warn', textContent: avail.text })
-            : el('p', { id: 'qu-state', class: 'muted', textContent: asking ? '' : 'Выключен.' }),
-        asking ? form : null);
+        asking ? form
+          : on ? el('p', { id: 'qu-state', class: 'ok', textContent: '✓ Включён. На экране блокировки можно приложить палец вместо пароля.' })
+            : blocked ? el('p', { id: 'qu-state', class: 'warn', textContent: avail.text })
+              : el('p', { id: 'qu-state', class: 'muted', textContent: 'Выключен.' }));
     }
     root.replaceChildren(...kids.filter(Boolean));
   }
