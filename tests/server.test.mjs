@@ -120,6 +120,7 @@ test('вход: пауза после 5 неверных попыток, нез�
   assert.equal((await attempt('8.8.8.8', body.authKey)).status, 200, 'другой адрес не заблокирован');
   c.clock.advance(1100);
   assert.equal((await attempt('9.9.9.9', body.authKey)).status, 200, 'после паузы вход работает');
+  assert.deepEqual([c.store.getFails('ip:9.9.9.9').n, c.store.getFails('all').n], [0, 0], 'успешный вход сбрасывает и адрес, и общий счётчик');
   assert.equal((await attempt('9.9.9.9')).status, 401);
   assert.equal((await attempt('9.9.9.9')).status, 401);
   assert.equal(c.store.getFails('ip:9.9.9.9').n, 2, 'счётчик начат заново');
