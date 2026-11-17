@@ -211,7 +211,7 @@ export function weakKinds(zchecks) {
   }
   return [...agg.entries()]
     .map(([kind, a]) => ({ kind, ok: a.ok, n: a.n, err: 1 - a.ok / a.n }))
-    .filter(x => x.n >= WEAK_MIN_N && x.err > WEAK_ERR)
+    .filter(x => x.n >= WEAK_MIN_N && x.err > WEAK_ERR + 1e-9)      // 1e-9: «ровно 30 %» (0,30000000000000004 из-за дробей) слабым не считается
     .sort((x, y) => y.err - x.err || x.kind.localeCompare(y.kind));
 }
 

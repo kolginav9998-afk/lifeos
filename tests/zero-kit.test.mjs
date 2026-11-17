@@ -4,7 +4,7 @@ import test from 'node:test';
 import assert from 'node:assert/strict';
 import {
   choose, listen, typed, order, match, read, validateDrill, gradeDrill, normAnswer, pickCheckItems, shuffled,
-  lessonIndex, closureOf, graphProblems, scopeOf, validateZeroTrack, MIN_DRILLS, checkOf,
+  lessonIndex, closureOf, graphProblems, scopeOf, validateZeroTrack, MIN_DRILLS, checkOf, SPIRAL_MAX,
 } from '../zero-kit.js';
 import { TRACKS, validateTrack } from '../academy.js';
 
@@ -65,6 +65,31 @@ test('проверка урока: n заданий, разные виды, по
   assert.ok(new Set(a.map(d => d.t)).size >= 3, 'виды чередуются');
   assert.deepEqual(shuffled([1, 2, 3, 4, 5], 3), shuffled([1, 2, 3, 4, 5], 3));
   assert.equal(shuffled([1, 2, 3, 4, 5], 3).length, 5);
+});
+
+test('проверка урока со «спиралью»: задания из освоенных уроков подмешиваются, но не больше трети проверки', () => {
+  assert.equal(SPIRAL_MAX, 2, 'константа спирали: не больше двух заданий');
+  const drills = [...filler(6), typed('t1', 'a'), typed('t2', 'b'), order('o1', ['x', 'y']), read('r')];
+  const l = lesson('ez-01', { drills });
+  const spiral = Array.from({ length: 5 }, (_, i) => choose(`Старое ${i + 1}`, 'да', ['нет', 'не знаю']));
+  const plain = pickCheckItems(l, 7);
+  const inSpiral = items => items.filter(d => spiral.includes(d)).length;
+  const mixed = pickCheckItems(l, 7, 6, { spiral });
+  assert.equal(mixed.length, 6, 'размер проверки не меняется');
+  assert.deepEqual(mixed, pickCheckItems(l, 7, 6, { spiral }), 'то же зерно — тот же набор');
+  assert.equal(inSpiral(mixed), 2, 'подмешано два задания (треть из шести, но не больше SPIRAL_MAX)');
+  assert.ok(mixed.every(d => d.t !== 'read'));
+  assert.ok(mixed.every(d => l.drills.includes(d) || spiral.includes(d)), 'только задания урока и спирали');
+  assert.deepEqual(pickCheckItems(l, 7, 6, { spiral: [] }), plain, 'пустая спираль — поведение прежнее');
+  assert.deepEqual(pickCheckItems(l, 7, 6, {}), plain, 'без параметра — прежнее');
+  // доля: не больше трети проверки
+  assert.equal(inSpiral(pickCheckItems(l, 7, 5, { spiral })), 1, 'n=5 → одно задание');
+  assert.equal(inSpiral(pickCheckItems(l, 7, 3, { spiral })), 1, 'n=3 → одно задание');
+  assert.equal(inSpiral(pickCheckItems(l, 7, 2, { spiral })), 0, 'n=2 → спирали нет (треть меньше одного)');
+  // самооценка (read) в спирали игнорируется
+  assert.equal(inSpiral(pickCheckItems(l, 7, 6, { spiral: [read('cat')] })), 0);
+  // если заданий в спирали меньше лимита — берётся, сколько есть
+  assert.equal(inSpiral(pickCheckItems(l, 7, 6, { spiral: spiral.slice(0, 1) })), 1);
 });
 
 // ---------- граф ----------
