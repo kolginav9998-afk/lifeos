@@ -160,14 +160,14 @@ test('поиск: пустое, из одних связок и бессмысл
 
 test('знакомство: три карточки с действиями; открытие один раз на устройстве', () => {
   assert.equal(TOUR.length, 3);
-  assert.deepEqual(TOUR.map(c => c.title), ['Это твой профиль: имя и значок', 'Сохрани архив и код восстановления', 'Обновления приходят кнопкой в Профиле']);
+  assert.deepEqual(TOUR.map(c => c.title), ['Это твой профиль: цифры и значок', 'Сохрани архив и код восстановления', 'Обновления приходят кнопкой в Аккаунте']);
   assert.equal(new Set(TOUR.map(c => c.id)).size, 3);
   for (const c of TOUR) {
     assert.ok(c.text.length >= 30 && c.text.length <= 220, `${c.id}: короткий текст`);
     assert.ok(c.action.label && screens.has(c.action.go), `${c.id}: действие`);
     if (c.action.scrollTo) assert.ok(new RegExp(`\\bid: '${c.action.scrollTo}'`).test(sources), `${c.id}: есть элемент ${c.action.scrollTo}`);
   }
-  assert.equal(TOUR[0].action.go, 'account');
+  assert.equal(TOUR[0].action.go, 'profile'); assert.equal(TOUR[2].action.go, 'account');
   assert.deepEqual([TOUR[1].action.go, TOUR[1].action.scrollTo], ['more', 'archive-box'], 'архив');
   assert.equal(DEFAULTS.tourDone, false, 'по умолчанию знакомство ещё не показано');
 });

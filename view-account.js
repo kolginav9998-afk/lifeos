@@ -11,6 +11,7 @@ import { saveTextFile } from './platform.js';
 import { getPref, setPref } from './prefs.js';
 import { profileCard, saveProfileRecord, AVATARS, COLORS, COLOR_NAMES } from './profile.js';
 import { createUpdateCard } from './view-update.js';
+import { PROFILE_ID } from './events.js';
 
 const LAST_SERVER = 'lifeos.account.lastServer';
 const STATE_TEXT = {
@@ -251,7 +252,7 @@ export function createAccountView({ go, onVaultChange = () => {}, gate = false, 
     const err = el('p', { class: 'error', id: 'pf-err', role: 'alert' });
     const preview = el('div', { class: 'avatar', id: 'pf-preview', style: `--av:${c.hex}`, textContent: c.face });
     const repaint = () => {
-      const look = profileCard([{ id: 'profile', type: 'profile', payload: { name: name.value, avatar: pfAvatar, color: pfColor } }], account.info());
+      const look = profileCard([{ id: PROFILE_ID, type: 'profile', payload: { name: name.value, avatar: pfAvatar, color: pfColor } }], account.info());
       preview.textContent = look.face; preview.style.setProperty('--av', look.hex);
       avatarBtns[0].textContent = look.letters;
       for (const b of avatarBtns) b.setAttribute('aria-pressed', String(b.dataset.v === (pfAvatar || '')));
