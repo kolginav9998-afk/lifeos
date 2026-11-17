@@ -193,6 +193,7 @@ assert.equal((await evs('expense')).at(-1).payload.category, 'Подписки')
 await page.click('.sub .sub-toggle');
 await until(page, () => document.querySelector('.sub.off'));
 await page.click('.sub .sub-toggle');
+await until(page, () => !document.querySelector('.sub.off'));          // ждём перерисовку, иначе она стирает только что введённые поля формы
 await page.fill('#sub-name', 'Облако'); await page.fill('#sub-amt', '1200'); await page.selectOption('#sub-period', 'year'); await page.fill('#sub-month', '3'); await page.click('#sub-add');
 await until(page, () => document.querySelectorAll('.sub').length === 2);
 assert.match((await text('#sub-total')).replace(/[\u00a0\u202f]/g, ' '), /Активных: 2 · 399 ₽ в месяц/);
