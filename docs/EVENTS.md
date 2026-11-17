@@ -54,7 +54,7 @@ _Файл создан из `registry.js` и сверяется с ним тес
 |---|---|---|---|---|---|
 | `checkin` | Отметка дня (утро/вечер) | date, slot (m|e), оценки 1–5, сон, кофе, нагрузка, питание (veg, protein, sweets), note | здоровье | да | `diary.js` |
 | `measure` | Замер здоровья | kind, value, value2, date, time, unit, note | здоровье | да | `health.js` |
-| `med` | Лекарство или добавка | name, dose, when, note, active | здоровье | нет | `meds.js` |
+| `med` | Лекарство или добавка | name, dose, when, note, active, runningOut, endDate | здоровье | нет | `meds.js` |
 | `medlog` | Отметка «принял» | medId, date, takenAt | здоровье | нет | `meds.js` |
 | `workout` | Тренировка | date, name, exercises[sets], done, minutes, rpe, note | здоровье | да | `workouts.js` |
 | `breath` | Дыхание | date, seconds, before, after | здоровье | нет | `breathing.js` |

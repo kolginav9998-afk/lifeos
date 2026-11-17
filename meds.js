@@ -6,11 +6,14 @@ const ORDER = ['morning', 'day', 'evening', 'any', 'asneeded'];
 export const MEDS_NOTE = 'Приложение только напоминает и хранит список. Дозы и схемы назначает врач; не меняй и не отменяй лекарства без его согласия.';
 const clean = (s, n) => String(s ?? '').trim().slice(0, n);
 
-export function makeMed({ name, dose = '', when = 'any', note = '' }, now = Date.now()) {
+export function makeMed({ name, dose = '', when = 'any', note = '', endDate = '' }, now = Date.now()) {
   const n = clean(name, 60);
   if (!n) throw new Error('Назови лекарство или добавку');
   if (!WHEN[when]) throw new Error('Выбери время приёма');
-  return { id: `med:${newId()}`, type: 'med', ts: now, source: 'manual', confidence: 1, evidence: [], payload: { name: n, dose: clean(dose, 40), when, note: clean(note, 120), active: true } };
+  if (endDate && !isYmd(endDate)) throw new Error('Дата конца курса — в формате ГГГГ-ММ-ДД');
+  const payload = { name: n, dose: clean(dose, 40), when, note: clean(note, 120), active: true };
+  if (endDate) payload.endDate = endDate;   // необязательное: курс с концом
+  return { id: `med:${newId()}`, type: 'med', ts: now, source: 'manual', confidence: 1, evidence: [], payload };
 }
 export const medsOf = events => events.filter(e => e.type === 'med').sort((a, b) => ORDER.indexOf(a.payload.when) - ORDER.indexOf(b.payload.when) || a.payload.name.localeCompare(b.payload.name));
 export const medLogId = (medId, date) => `ml:${medId}:${date}`;
@@ -19,6 +22,20 @@ export function makeMedLog(medId, date, now = Date.now()) {
   return { id: medLogId(medId, date), type: 'medlog', ts: now, source: 'manual', confidence: 1, evidence: [], payload: { medId, date, takenAt: now } };
 }
 export const takenOn = (events, date) => new Set(events.filter(e => e.type === 'medlog' && e.payload.date === date).map(e => e.payload.medId));
+
+// Список в аптеку: лекарства с отметкой «заканчивается» (необязательный флаг runningOut; у старых записей его нет).
+export const pharmacyList = events => medsOf(events).filter(m => m.payload.runningOut === true);
+// Текст списка для копирования: по строке на лекарство, «Название — доза».
+export const pharmacyText = events => pharmacyList(events).map(m => `- ${m.payload.name}${m.payload.dose ? ` — ${m.payload.dose}` : ''}`).join('\n');
+
+// Курс с концом: сколько дней осталось до endDate включительно (сегодняшний день считается).
+// null — конца курса нет; 0 и меньше — курс завершён.
+export function daysLeft(med, today) {
+  const end = med?.payload?.endDate;
+  if (!end || !isYmd(end) || !isYmd(today)) return null;
+  return Math.round((Date.parse(end) - Date.parse(today)) / 86400000) + 1;
+}
+export const courseDone = (med, today) => { const left = daysLeft(med, today); return left !== null && left <= 0; };
 
 // Приём по дням: для активных лекарств «не по необходимости» — сколько дней из последних n отмечено.
 export function adherence(events, today, n = 14) {
