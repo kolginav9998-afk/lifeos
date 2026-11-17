@@ -136,14 +136,14 @@ export function createSettingsView({ lockNow, applyTheme, applyMode = () => {}, 
     const res = dataChecks(store.state.events, todayStr());
     checkOut.replaceChildren(...res.map(r => el('p', { class: r.level === 'warn' ? 'warn' : 'muted', dataset: { check: r.id }, textContent: (r.level === 'warn' ? '⚠ ' : r.level === 'ok' ? '✓ ' : '• ') + r.text })));
   } });
-  const csvBtn = el('button', { id: 'export-csv', type: 'button', textContent: 'Расходы и доходы для Excel (CSV)', onclick: () => exportCsv() });
-  const icsBtn = el('button', { id: 'export-ics', type: 'button', textContent: 'Задачи в календарь (.ics)', onclick: async () => {
+  const csvBtn = el('button', { id: 'export-csv', type: 'button', textContent: 'Расходы и доходы таблицей (для Excel)', onclick: () => exportCsv() });
+  const icsBtn = el('button', { id: 'export-ics', type: 'button', textContent: 'Задачи в календарь телефона', onclick: async () => {
     try { const r = tasksToIcs(store.state.events); if (!r.count) { toast('Нет задач со сроком — нечего выгружать'); return; } await saveTextFile(`lifeos-calendar-${todayStr()}.ics`, r.text, 'text/calendar'); toast(`В календарь: ${r.count}`); } catch (e) { toast('Не удалось: ' + (e.message || e)); }
   } });
-  const mdBtn = el('button', { id: 'export-md', type: 'button', textContent: 'Всё читаемо (Markdown)', onclick: () => saveTextFile(`lifeos-${stamp()}.md`, toMarkdown(store.state.events), 'text/markdown').catch(err => toast(err.message)) });
+  const mdBtn = el('button', { id: 'export-md', type: 'button', textContent: 'Все записи читаемым текстом', onclick: () => saveTextFile(`lifeos-${stamp()}.md`, toMarkdown(store.state.events), 'text/markdown').catch(err => toast(err.message)) });
   // «Книга года»: красивый Markdown из записей дневника за выбранный год
   const ybSel = el('select', { id: 'yearbook-year', 'aria-label': 'Год' });
-  const ybBtn = el('button', { id: 'export-yearbook', type: 'button', textContent: 'Книга года (Markdown)', onclick: () => saveTextFile(`lifeos-book-${ybSel.value}.md`, yearBook(store.state.events, ybSel.value), 'text/markdown').catch(err => toast(err.message)) });
+  const ybBtn = el('button', { id: 'export-yearbook', type: 'button', textContent: 'Книга года: дневник за год текстом', onclick: () => saveTextFile(`lifeos-book-${ybSel.value}.md`, yearBook(store.state.events, ybSel.value), 'text/markdown').catch(err => toast(err.message)) });
   const ybRow = el('div', { id: 'yearbook-row', class: 'row wrap', hidden: true }, ybSel, ybBtn);
   function renderYearbook() {
     const years = diaryYears(events);
@@ -305,7 +305,7 @@ export function createSettingsView({ lockNow, applyTheme, applyMode = () => {}, 
     card('Внешний вид и поведение',
       el('label', {}, 'Тема: ', theme),
       el('label', {}, 'Размер текста: ', fontSel),
-      el('label', { class: 'check-label' }, simple, ' Простой режим: только Сегодня, Дневник и Настройки, без лишних плашек'),
+      el('label', { class: 'check-label' }, simple, ' Простой режим: прячет лишние разделы и плашки, остаётся самое нужное на каждый день'),
       el('label', { class: 'check-label' }, parseDates, ' Понимать даты в тексте задачи («завтра», «10 числа»)'),
       el('label', { class: 'check-label' }, hideAmounts, ' Скрывать суммы на экране')),
     card('Напоминания', remindBox),
