@@ -132,10 +132,11 @@ export function illustration(name = 'tasks') {
   return svg;
 }
 // Пустое состояние: иллюстрация, одна дружелюбная фраза и главное действие. box.msg — заголовок (его можно менять, например «Ничего не найдено»).
-export function emptyState({ art = 'tasks', title, text = '', action = null, id } = {}) {
+// tone — тон пустоты: 'todo' (ещё не начато, нейтральный) или 'done' (всё сделано, тёплый); стили — в блоке polish.
+export function emptyState({ art = 'tasks', title, text = '', action = null, id, tone } = {}) {
   const msg = el('strong', { class: 'empty-t', textContent: title });
   const btn = action ? el('button', { type: 'button', class: 'primary empty-a', onclick: action.onClick }, action.icon ? icon(action.icon, 18) : null, action.label) : null;
-  const box = el('div', { class: 'empty', id }, illustration(art), msg, text ? el('p', { class: 'empty-p', textContent: text }) : null, btn);
+  const box = el('div', { class: `empty${tone ? ' ' + tone : ''}`, id }, illustration(art), msg, text ? el('p', { class: 'empty-p', textContent: text }) : null, btn);
   box.msg = msg;
   return box;
 }

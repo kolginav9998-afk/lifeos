@@ -134,7 +134,10 @@ export function createMoneyView({ exportCsv }) {
     budgetLine.hidden = !isExp;
     if (budget) {
       const left = budget - s.total;
-      budgetLine.textContent = `Бюджет ${moneyText(budget)} · ${left >= 0 ? 'осталось ' + moneyText(left) : 'превышен на ' + moneyText(-left)}`;
+      // остаток бюджета — число-герой экрана: крупная цифра с градиентом (стили — в блоке polish)
+      budgetLine.replaceChildren(
+        document.createTextNode(`Бюджет ${moneyText(budget)} · ${left >= 0 ? 'осталось ' : 'превышен на '}`),
+        el('strong', { class: 'budget-left', textContent: moneyText(Math.abs(left)) }));
       budgetBar.hidden = false;
       budgetBar.classList.toggle('over', left < 0);
       budgetBar.firstChild.style.setProperty('--w', Math.min(100, Math.round((s.total / budget) * 100)) + '%');

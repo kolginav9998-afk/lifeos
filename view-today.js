@@ -48,6 +48,7 @@ export function createTodayView({ go }) {
   let editorEl = null;                  // редактор переживает перерисовки, чтобы не терять введённое
   let skipParse = false;
   let events = [];
+  let justAddedId = null;               // только что добавленная задача: строка появляется с fade+slide (стили — в polish)
 
   const root = el('section', { id: 'view-today', class: 'view' });
 
@@ -261,7 +262,11 @@ export function createTodayView({ go }) {
     if (q) { text = q.text; d = q.due; r = q.repeat; }
     const pr = high.checked ? 'high' : 'normal';
     input.value = ''; due.value = ''; rep.value = ''; high.checked = false; skipParse = false; updateHint(); updateCapture();   // чистим сразу — быстрый ввод не теряется
-    try { await store.save(makeTask(text, Date.now(), { due: d, repeat: r, priority: pr })); }
+    try {
+      const t = makeTask(text, Date.now(), { due: d, repeat: r, priority: pr });
+      justAddedId = t.id;                                       // новая строка появится с анимацией (класс ставится в item())
+      await store.save(t);
+    }
     catch (err) { toast('Не удалось добавить: ' + err.message); }
   });
 
@@ -294,7 +299,7 @@ export function createTodayView({ go }) {
   const minimum = el('div', { id: 'minimum', class: 'card', hidden: true }, el('div', { class: 'mini-head' }, el('h3', { textContent: 'Минимум на сегодня' }),
     el('button', { type: 'button', id: 'heavy-off', class: 'chip', textContent: 'Выйти из режима', onclick: () => { setPref('heavyDay', false); render(); } })),
     el('p', { class: 'muted', textContent: 'Тяжёлый день: только самое важное. Три дела, остальное подождёт. Привычки — в минимальной версии.' }), minList);
-  const empty = emptyState({ id: 'empty', art: 'tasks', title: 'Задач пока нет', text: 'Здесь будет список дел: на сегодня, с датой и без срока. Напиши первую задачу в строку выше — кольцо начнёт заполняться.', action: { label: 'Добавить задачу', icon: 'plus', onClick: () => input.focus() } });
+  const empty = emptyState({ id: 'empty', art: 'tasks', title: 'Задач пока нет', text: 'Здесь будет список дел: на сегодня, с датой и без срока. Напиши первую задачу в строку выше — кольцо начнёт заполняться.', tone: 'todo', action: { label: 'Добавить задачу', icon: 'plus', onClick: () => input.focus() } });
   empty.hidden = true;
   const doneList = el('ul', { id: 'done-list', class: 'list' });
   const doneCount = el('span', { id: 'done-count', textContent: '0' });
@@ -324,8 +329,12 @@ export function createTodayView({ go }) {
   root.append(hero, quietBox, actionBox, whatsNew, summary, hintsBox, deviceHints.root, parkedBox, moneyNudge.root, intentionBox, planCard, dayCards.root, onboarding, wotd, focusHost, form, minimum, review, journal, ...Object.values(sections).map(s => s.sec), empty, doneBlock);
 
   // ----- элементы списка -----
-  async function removeTask(ev) {
+  async function removeTask(ev, li) {
     if (editingId === ev.id) { editingId = null; editorEl = null; }
+    if (li && !matchMedia('(prefers-reduced-motion: reduce)').matches) {   // удаляемая строка сначала растворяется (стили — в polish)
+      li.classList.add('leaving');
+      await new Promise(r => setTimeout(r, 240));
+    }
     const old = await store.remove(ev.id);
     if (old) toast('Задача удалена', { actionLabel: 'Отменить', onAction: () => store.save(old) });
   }
@@ -365,7 +374,7 @@ export function createTodayView({ go }) {
       return editorEl;
     }
     const lab = dueLabel(p.due, today);
-    const li = el('li', { class: 'item' + (p.done ? ' done' : '') + (lab.cls === 'overdue' && !p.done ? ' is-overdue' : '') });
+    const li = el('li', { class: 'item' + (p.done ? ' done' : '') + (lab.cls === 'overdue' && !p.done ? ' is-overdue' : '') + (ev.id === justAddedId ? ' appear' : ''), dataset: { id: ev.id } });
     const check = el('button', { class: 'check', type: 'button', 'aria-label': p.done ? 'Вернуть в работу' : 'Отметить сделанным' }, p.done ? icon('check', 16) : null);
     check.onclick = async () => {
       if (!p.done) {
@@ -387,7 +396,7 @@ export function createTodayView({ go }) {
       pressable(body, () => { editingId = ev.id; editorEl = null; render(); });          // имя кнопки — её видимый текст (название дела и срок)
     }
     if (meta.length) body.append(el('span', { class: 'meta' }, ...meta));
-    const del = el('button', { class: 'del', type: 'button', 'aria-label': 'Удалить', onclick: () => removeTask(ev) }, icon('x', 18));
+    const del = el('button', { class: 'del', type: 'button', 'aria-label': 'Удалить', onclick: () => removeTask(ev, li) }, icon('x', 18));
     li.append(check, body, del);
     return li;
   }
@@ -540,10 +549,14 @@ export function createTodayView({ go }) {
     doneList.replaceChildren(...g.done.slice(0, 50).map(e => item(e, today)));
     doneCount.textContent = g.done.length;
     clearDone.hidden = g.done.length === 0;
-    empty.hidden = heavy || g.openCount > 0 || allDone(events, today);   // когда кольцо закрыто, вместо холодной пустой подписи — тёплая карточка наверху
+    const allDoneNow = allDone(events, today);
+    empty.hidden = heavy || g.openCount > 0 || allDoneNow;   // когда кольцо закрыто, вместо холодной пустой подписи — тёплая карточка наверху
+    empty.classList.toggle('done', allDoneNow);              // два тона пустоты: «всё сделано» — тёплый, «ещё не начато» — нейтральный
+    empty.classList.toggle('todo', !allDoneNow);
     renderSummary(g, today);
     renderReview(today);
     renderJournal();
+    justAddedId = null;                                      // класс появления — только на первую перерисовку после добавления
   }
 
   return {

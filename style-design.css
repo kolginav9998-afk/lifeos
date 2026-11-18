@@ -293,3 +293,67 @@ body.tod-night{--glow1:color-mix(in srgb,var(--accent) 4%,transparent);--glow2:t
 /* воскресенье вечером — тёплое свечение, понедельник утром — холодное «свежее» (идут после времени суток и перекрывают его) */
 body.week-sun-eve{--glow1:color-mix(in srgb,#e8975a 10%,transparent);--glow2:color-mix(in srgb,#d97b8f 6%,transparent)}
 body.week-mon-morning{--glow1:color-mix(in srgb,#6fb0e8 9%,transparent);--glow2:color-mix(in srgb,#5cc8d8 5%,transparent)}
+
+/* ===== polish (w5) ===== */
+/* Микро-улучшения визуала: числа-герои, срочность формой, тона пустоты, живые отклики.
+   Все движения — только в блоке prefers-reduced-motion: no-preference (в конце блока). */
+
+/* число-герой экрана: крупная цифра с фирменным градиентом */
+#month-total{font-size:var(--t40);background:var(--grad);-webkit-background-clip:text;background-clip:text;color:transparent}
+#learn-count,.budget-left{background:var(--grad);-webkit-background-clip:text;background-clip:text;color:transparent}
+.budget-left{display:block;font-size:var(--t40);font-weight:700;line-height:1.2;letter-spacing:-.02em}
+
+/* просроченное: срочность читается формой (полоса слева), а не только цветом */
+.item.is-overdue{box-shadow:inset 3px 0 0 var(--danger),var(--shadow-sm)}
+
+/* мелкий текст меты — капителью, без грубого uppercase */
+.meta{font-variant-caps:small-caps;letter-spacing:.02em}
+
+/* балансировка переносов в текстах дел и записей */
+.item .text,.entry .text{text-wrap:balance}
+
+/* два тона пустоты: «всё сделано» — тёплый, «ещё не начато» — нейтральный */
+.empty{border-radius:var(--r16)}
+.empty.todo{background:var(--soft)}
+.empty.done{background:var(--tint-ok)}
+.empty.done .empty-t{color:var(--ok)}
+
+/* праздник в интерфейсе: чип дня рождения мягко светится */
+#bday-chip{box-shadow:0 0 0 1px color-mix(in srgb,var(--warn) 45%,transparent),0 0 14px -2px color-mix(in srgb,var(--warn) 45%,transparent)}
+
+/* выполненное опускается и приглушается (конечное состояние; само движение — ниже, с задержкой) */
+.item.done{opacity:.62;transform:translateY(1px)}
+
+/* тень говорит об интерактивности: статичные карточки — плоские, сворачиваемые — с тенью */
+.card{box-shadow:none}
+details.card{box-shadow:var(--shadow)}
+
+/* движение — только при разрешённой анимации */
+@media (prefers-reduced-motion: no-preference){
+  /* «сегодня» дышит в календарях: точки привычек и дни графика */
+  .dot.today,.cal-day.today{animation:todayBreathe 2.6s ease-in-out infinite}
+  @keyframes todayBreathe{50%{outline-color:color-mix(in srgb,var(--accent) 70%,transparent);outline-offset:3px}}
+  /* чип дня рождения: мягкое пульсирующее свечение */
+  #bday-chip{animation:bdayGlow 3s ease-in-out infinite}
+  @keyframes bdayGlow{50%{box-shadow:0 0 0 1px color-mix(in srgb,var(--warn) 60%,transparent),0 0 20px 0 color-mix(in srgb,var(--warn) 55%,transparent)}}
+  /* кольцевая вспышка вокруг галочки при отметке — ровно одна итерация */
+  .item.done .check{animation:tick .28s,checkRing .55s var(--ease) 1}
+  @keyframes checkRing{0%{box-shadow:0 0 0 0 color-mix(in srgb,var(--ok) 45%,transparent)}100%{box-shadow:0 0 0 12px transparent}}
+  /* «откладывание» выполненного: через 400 мс строка приглушается и опускается
+     (список перерисовывается целиком, поэтому вместо transition — анимация с задержкой) */
+  .item.done{animation:doneSettle .3s var(--ease) .4s 1 both}
+  @keyframes doneSettle{from{opacity:1;transform:none}to{opacity:.62;transform:translateY(1px)}}
+  /* новая строка появляется с fade+slide, удаляемая растворяется (классы ставит view-today.js) */
+  .item.appear{animation:rowIn .3s var(--ease)}
+  @keyframes rowIn{from{opacity:0;transform:translateY(-6px)}}
+  .item.leaving{animation:rowOut .24s ease-in forwards}
+  @keyframes rowOut{to{opacity:0;transform:translateX(10px)}}
+  /* hover-подъём отзывается плавно */
+  details.card,.track-card{transition:transform .18s var(--ease),box-shadow .18s var(--ease)}
+}
+
+/* hover-подъём — только точным указателем и только у интерактивных карточек */
+@media (hover:hover) and (pointer:fine){
+  details.card:hover,.track-card:hover:not(:disabled){transform:translateY(-1px);box-shadow:var(--shadow-lg)}
+}
+>>>>>>> w5-polish
