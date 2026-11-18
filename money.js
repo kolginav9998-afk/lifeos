@@ -1,5 +1,5 @@
 // Расходы. Суммы — целые копейки (никаких дробных чисел), валюта пока одна — рубль.
-import { todayStr, isYmd, newId } from './events.js';
+import { todayStr, isYmd, newId, addDays } from './events.js';
 
 export const DEFAULT_CATEGORIES = ['Жильё', 'Еда', 'Транспорт', 'Здоровье', 'Связь', 'Подписки', 'Одежда', 'Развлечения', 'Образование', 'Другое'];
 export const INCOME_CATEGORIES = ['Зарплата', 'Подработка', 'Подарок', 'Возврат', 'Другое'];
@@ -144,3 +144,115 @@ export function unusualExpense(events, expense, { days = 90, minCount = 5 } = {}
   return p.amountMinor >= Math.max(median * 3, median + 10000, 50000) ? { median, count: prev.length } : null;
 }
 export const unusualText = (u, category) => `Это заметно больше обычного для «${category}» (обычно около ${formatMoney(u.median)}). Если это опечатка, отмени запись.`;
+
+// ---------- день без трат ----------
+// Спокойный день — день без единой записи расхода. Будущие дни месяца не считаем: until — крайняя учитываемая дата.
+export function noSpendDates(events, ym, until = null) {
+  const spent = new Set(events.filter(e => e.type === 'expense' && monthOf(e.payload.date) === ym).map(e => e.payload.date));
+  const dim = new Date(Number(ym.slice(0, 4)), Number(ym.slice(5)), 0).getDate();
+  const out = [];
+  for (let d = 1; d <= dim; d++) {
+    const date = `${ym}-${String(d).padStart(2, '0')}`;
+    if (until && date > until) break;
+    if (!spent.has(date)) out.push(date);
+  }
+  return out;
+}
+// Серия спокойных дней подряд, включая сегодня. До первой записанной траты не углубляемся — прошлое без журнала не считаем.
+export function noSpendStreak(events, today) {
+  const dates = events.filter(e => e.type === 'expense').map(e => e.payload.date).sort();
+  if (!dates.length) return 0;
+  const spent = new Set(dates), first = dates[0];
+  let cursor = today, n = 0;
+  while (cursor >= first && !spent.has(cursor)) { n++; cursor = addDays(cursor, -1); }
+  return n;
+}
+// Лучшая неделя месяца: 7 дней подряд с наибольшим числом дней без трат (окно целиком не позже until).
+export function bestNoSpendWeek(events, ym, until = null) {
+  const free = new Set(noSpendDates(events, ym, until));
+  const dim = new Date(Number(ym.slice(0, 4)), Number(ym.slice(5)), 0).getDate();
+  let best = null;
+  for (let d = 1; d + 6 <= dim; d++) {
+    const from = `${ym}-${String(d).padStart(2, '0')}`, to = addDays(from, 6);
+    if (until && to > until) break;
+    let count = 0;
+    for (let x = from; x <= to; x = addDays(x, 1)) if (free.has(x)) count++;
+    if (!best || count > best.count) best = { count, from, to };
+  }
+  return best && best.count > 0 ? best : null;
+}
+export const noSpendSummary = (events, ym, today) => ({ count: noSpendDates(events, ym, today).length, streak: noSpendStreak(events, today), bestWeek: bestNoSpendWeek(events, ym, today) });
+
+// ---------- отказы с ценой ----------
+// «Не купил кофе — 250 ₽»: отложенные желания (wish) со статусом «передумал» и суммой. За месяц — сэкономлено, кнопка «в копилку».
+export const REFUSAL_TAG = 'из отказов';
+export function refusalSavings(events, ym) {
+  const dropped = events.filter(e => e.type === 'wish' && e.payload.status === 'dropped' && (e.payload.resolvedDate || '').startsWith(ym));
+  const savedMinor = dropped.reduce((s, w) => s + (w.payload.amountMinor || 0), 0);
+  const movedMinor = events.filter(e => e.type === 'goalmove' && e.payload.note === REFUSAL_TAG && monthOf(e.payload.date) === ym)
+    .reduce((s, e) => s + Math.max(0, e.payload.amountMinor || 0), 0);
+  return { count: dropped.length, savedMinor, movedMinor, dueMinor: Math.max(0, savedMinor - movedMinor) };
+}
+
+// ---------- список покупок → расход ----------
+// Черновик расхода из купленного желания: сумма подставляется сама, записи связываются по wishId.
+export function expenseFromWish(wish, now = Date.now()) {
+  const p = wish.payload;
+  if (p.status !== 'bought') throw new Error('Покупка ещё не отмечена купленной');
+  if (!(Number.isSafeInteger(p.amountMinor) && p.amountMinor > 0 && p.amountMinor <= MAX_MINOR)) throw new Error('У покупки нет суммы');
+  const ev = makeExpense({ amount: p.amountMinor, category: 'Другое', note: p.text, date: p.resolvedDate || todayStr(now) }, now);
+  return { ...ev, payload: { ...ev.payload, wishId: wish.id } };
+}
+// Купленные желания с суммой, по которым ещё нет расхода.
+export function wishDrafts(events) {
+  const linked = new Set(events.filter(e => e.type === 'expense' && e.payload.wishId).map(e => e.payload.wishId));
+  return events.filter(e => e.type === 'wish' && e.payload.status === 'bought' && Number.isSafeInteger(e.payload.amountMinor) && e.payload.amountMinor > 0 && !linked.has(e.id))
+    .sort((a, b) => (b.payload.resolvedDate || '').localeCompare(a.payload.resolvedDate || ''));
+}
+
+// ---------- продал вещь → доход ----------
+// Инвентарь живёт в home.js; здесь только предложение: поля для записи дохода, сумма подставлена из цены вещи.
+export function saleIncomeDraft({ name, priceMinor = null } = {}, date = null) {
+  const n = clean(name, 60);
+  if (!n) throw new Error('Назови вещь');
+  if (priceMinor !== null && !(Number.isSafeInteger(priceMinor) && priceMinor > 0 && priceMinor <= MAX_MINOR)) throw new Error('Сумма больше нуля');
+  return { amount: priceMinor, category: 'Другое', note: `Продано: ${n}`, date: date || todayStr() };
+}
+
+// ---------- цена одного надевания ----------
+// rows: [{name, priceMinor, wears}]. Выгодные — носят часто, цена надевания низкая; «мёртвые» — куплены и ни разу не надеты.
+export function wearRating(rows, { minWears = 3, limit = 5 } = {}) {
+  const priced = (Array.isArray(rows) ? rows : []).filter(r => Number.isSafeInteger(r.priceMinor) && r.priceMinor > 0);
+  const used = priced.filter(r => r.wears > 0).map(r => ({ name: r.name, wears: r.wears, priceMinor: r.priceMinor, costPerWear: Math.round(r.priceMinor / r.wears) }));
+  const worth = used.filter(r => r.wears >= minWears).sort((a, b) => a.costPerWear - b.costPerWear || b.wears - a.wears).slice(0, limit);
+  const dead = priced.filter(r => !r.wears).map(r => ({ name: r.name, wears: 0, priceMinor: r.priceMinor, costPerWear: null }))
+    .sort((a, b) => b.priceMinor - a.priceMinor || a.name.localeCompare(b.name)).slice(0, limit);
+  return { worth, dead };
+}
+
+// ---------- аудит подписок по факту ----------
+// Раз в месяц честный вопрос «пользуешься?». Ответы хранятся в настройках экрана (prefs), здесь — чистая логика.
+// subs: [{id, name, monthlyMinor}], answers: {id: 'use' | 'cancel'}.
+export const subAuditList = (subs, answers = {}) => subs.map(s => ({ ...s, verdict: answers[s.id] ?? null }));
+export const auditComplete = (subs, answers = {}) => subs.length > 0 && subs.every(s => answers[s.id] === 'use' || answers[s.id] === 'cancel');
+export const cancelCandidates = (subs, answers = {}) => subs.filter(s => answers[s.id] === 'cancel');
+
+// ---------- зарплатный ритуал ----------
+// В день выплаты (salaryDay из настроек зарплаты) — спокойный чек-лист распределения дохода.
+export function isPayday(pay, today) {
+  const day = Number(pay?.salaryDay) || 0;
+  if (!day || !isYmd(today)) return false;
+  const [y, m] = today.split('-').map(Number);
+  const dim = new Date(y, m, 0).getDate();
+  return Number(today.slice(8)) === Math.min(day, dim);
+}
+export function salaryChecklist(events, today, pay) {
+  const ym = monthOf(today);
+  const items = [
+    { key: 'income', text: 'Записать пришедшую зарплату в доходы', done: events.some(e => e.type === 'income' && monthOf(e.payload.date) === ym && e.payload.category === 'Зарплата') },
+    { key: 'budget', text: 'Проверить бюджет месяца', done: budgetOf(events) !== null },
+    { key: 'goals', text: 'Отложить хоть немного в копилку', done: events.some(e => e.type === 'goalmove' && monthOf(e.payload.date) === ym && e.payload.amountMinor > 0) },
+    { key: 'debts', text: 'Разобрать просроченные долги', done: !events.some(e => e.type === 'debt' && !e.payload.settled && e.payload.due && e.payload.due < today) },
+  ];
+  return { due: isPayday(pay, today), items, done: items.filter(i => i.done).length };
+}
