@@ -1,8 +1,12 @@
-import { el, toast, dateRu, icon, moneyText, pressable, emptyState } from './ui.js';
+import { el, fill, toast, dateRu, icon, moneyText, pressable, emptyState } from './ui.js';
 import { todayStr } from './events.js';
 import { makeEntry, updateExpense, summarizeMonth, shiftMonth, monthLabel, monthOf, categoriesUsed, makeBudget, budgetOf, parseAmount,
-  monthTotals, balanceOfMonth, frequentEntries, KINDS, unusualExpense, unusualText } from './money.js';
-import { payOf, workHoursText } from './salary.js';
+  monthTotals, balanceOfMonth, frequentEntries, KINDS, unusualExpense, unusualText,
+  noSpendDates, noSpendStreak, bestNoSpendWeek, refusalSavings, REFUSAL_TAG, wishDrafts, expenseFromWish, saleIncomeDraft,
+  wearRating, subAuditList, auditComplete, cancelCandidates, salaryChecklist } from './money.js';
+import { payOf, workHoursText, plural } from './salary.js';
+import { subsOf, monthlyCost, goalProgress, makeGoalMove } from './planning.js';
+import { homeModel } from './home.js';
 import { getPref, setPref } from './prefs.js';
 import * as store from './store.js';
 
@@ -104,7 +108,136 @@ export function createMoneyView({ exportCsv }) {
   const empty = emptyState({ art: 'money', title: 'Пока без записей', text: 'Здесь будут траты и доходы месяца, а выше — сумма и график. Добавь первую запись: сумма, категория и дата.', action: { label: 'Добавить', icon: 'plus', onClick: () => amount.focus() } });
   empty.hidden = true;
   const csv = el('button', { type: 'button', id: 'csv-btn', textContent: 'Скачать таблицу для Excel (CSV)', onclick: () => exportCsv() });
-  root.append(seg, nav, summary, form, list, empty, el('div', { class: 'row' }, csv));
+
+  // ----- связки: зарплатный ритуал, дни без трат, отказы, покупки, вещи, подписки -----
+  const ritualCard = el('div', { id: 'payday-ritual', class: 'card calm', hidden: true });
+  const nospendCard = el('div', { id: 'nospend', class: 'card', hidden: true });
+  const refusalCard = el('div', { id: 'refusals', class: 'card', hidden: true });
+  const draftsCard = el('div', { id: 'wish-drafts', class: 'card', hidden: true });
+  const soldCard = el('div', { id: 'sold-items', class: 'card', hidden: true });
+  const auditCard = el('div', { id: 'sub-audit', class: 'card', hidden: true });
+  const wearCard = el('div', { id: 'wear-rating', class: 'card', hidden: true });
+
+  // Зарплатный ритуал: в день выплаты (salaryDay из настроек) — чек-лист распределения дохода.
+  function renderRitual(today) {
+    const r = salaryChecklist(events, today, payOf(events));
+    ritualCard.hidden = !r.due || getPref('salaryRitualDone') === today;
+    if (ritualCard.hidden) return;
+    fill(ritualCard,
+      el('h3', { textContent: 'Зарплата пришла' }),
+      el('p', { class: 'muted', textContent: 'Минутка спокойствия: распределить доход по местам.' }),
+      ...r.items.map(i => el('p', { class: 'muted ritual-item', textContent: `${i.done ? '✓' : '○'} ${i.text}` })),
+      el('button', { type: 'button', class: 'chip', id: 'ritual-done', textContent: r.done === r.items.length ? 'Всё распределено' : 'Разобрались на сегодня', onclick: () => { setPref('salaryRitualDone', today); render(); } }));
+  }
+
+  // День без трат: автоопределение по журналу расходов, серия и лучшая неделя месяца.
+  function renderNoSpend(today) {
+    const has = events.some(e => e.type === 'expense');
+    nospendCard.hidden = kind !== 'expense' || !has;
+    if (nospendCard.hidden) return;
+    const cur = ym === monthOf(today), until = cur ? today : `${ym}-31`;
+    const count = noSpendDates(events, ym, until).length, bw = bestNoSpendWeek(events, ym, until);
+    fill(nospendCard, el('h3', { textContent: 'Дни без трат' }),
+      el('p', { class: 'muted', textContent: `За ${monthLabel(ym).toLowerCase()}: ${count} дн. без трат`
+        + (cur ? ` · серия ${noSpendStreak(events, today)} дн.` : '')
+        + (bw ? ` · лучшая неделя ${dateRu(bw.from)}–${dateRu(bw.to)}: ${bw.count} из 7` : '') }));
+  }
+
+  // Отказы с ценой: сэкономлено на передуманных покупках за месяц и кнопка «в копилку».
+  function renderRefusals(today) {
+    const r = refusalSavings(events, ym);
+    refusalCard.hidden = kind !== 'expense' || r.savedMinor <= 0;
+    if (refusalCard.hidden) return;
+    const openGoal = goalProgress(events, today).find(g => !g.done);
+    fill(refusalCard, el('h3', { textContent: 'Отказы с выгодой' }),
+      el('p', { class: 'muted', textContent: `За ${monthLabel(ym).toLowerCase()} не куплено лишнего на ${moneyText(r.savedMinor)} (${r.count} ${plural(r.count, 'отказ', 'отказа', 'отказов')})`
+        + (r.movedMinor ? ` · в копилке уже ${moneyText(r.movedMinor)}` : '') }),
+      r.dueMinor > 0 && ym === monthOf(today) ? el('button', { type: 'button', class: 'chip', id: 'refusal-piggy', textContent: `В копилку ${moneyText(r.dueMinor)}`, onclick: async () => {
+        if (!openGoal) { toast('Сначала создай копилку на экране «Планы»'); return; }
+        await store.save(makeGoalMove(openGoal.goal.id, r.dueMinor, { note: REFUSAL_TAG }));
+        toast(`В копилку «${openGoal.goal.payload.title}»: ${moneyText(r.dueMinor)}`);
+      } }) : null);
+  }
+
+  // Список покупок → расход: отмеченная купленной отложенная покупка становится готовым черновиком расхода.
+  function renderDrafts() {
+    const drafts = kind === 'expense' ? wishDrafts(events) : [];
+    draftsCard.hidden = drafts.length === 0;
+    if (!drafts.length) return;
+    fill(draftsCard, el('h3', { textContent: 'Купленное из отложенного' }),
+      el('p', { class: 'muted', textContent: 'Покупка состоялась — запиши расход, сумма уже подставлена.' }),
+      ...drafts.slice(0, 5).map(w => el('div', { class: 'row wish-draft', dataset: { id: w.id } },
+        el('span', { class: 'grow', textContent: `${w.payload.text} · ${moneyText(w.payload.amountMinor)}` }),
+        el('button', { type: 'button', class: 'chip wish-expense', textContent: 'Записать расход', onclick: async () => {
+          try {
+            const ev = expenseFromWish(w);
+            await store.save(ev);
+            toast(`Записано: ${moneyText(ev.payload.amountMinor)}`, { actionLabel: 'Отменить', onAction: () => store.remove(ev.id) });
+          } catch (x) { toast(x.message); }
+        } }))));
+  }
+
+  // Продал вещь → доход: вещи со статусом «продано» и ценой, по которым ещё нет дохода.
+  function renderSold(today) {
+    const linked = new Set(events.filter(e => e.type === 'income' && e.payload.itemId).map(e => e.payload.itemId));
+    const rows = kind === 'income' ? homeModel(events, today).items.filter(i => i.payload.status === 'sold' && i.payload.priceMinor > 0 && !linked.has(i.id)) : [];
+    soldCard.hidden = rows.length === 0;
+    if (!rows.length) return;
+    fill(soldCard, el('h3', { textContent: 'Проданные вещи' }),
+      el('p', { class: 'muted', textContent: 'Вещь продана — запиши доход, цена подставлена из карточки вещи.' }),
+      ...rows.slice(0, 5).map(i => el('div', { class: 'row sold-draft', dataset: { id: i.id } },
+        el('span', { class: 'grow', textContent: `${i.payload.name} · ${moneyText(i.payload.priceMinor)}` }),
+        el('button', { type: 'button', class: 'chip sold-income', textContent: 'Записать доход', onclick: async () => {
+          try {
+            const d = saleIncomeDraft({ name: i.payload.name, priceMinor: i.payload.priceMinor }, today);
+            const ev = makeEntry('income', d);
+            await store.save({ ...ev, payload: { ...ev.payload, itemId: i.id } });
+            toast(`Записано: ${moneyText(ev.payload.amountMinor)}`, { actionLabel: 'Отменить', onAction: () => store.remove(ev.id) });
+          } catch (x) { toast(x.message); }
+        } }))));
+  }
+
+  // Аудит подписок по факту: раз в месяц вопрос «пользуешься?» по каждой активной подписке.
+  function renderAudit(today) {
+    const ymNow = monthOf(today);
+    const subs = subsOf(events).filter(s => s.payload.active).map(s => ({ id: s.id, name: s.payload.name, monthlyMinor: monthlyCost(s.payload) }));
+    auditCard.hidden = subs.length === 0;
+    if (!subs.length) return;
+    const saved = getPref('subAudit');
+    const answers = saved && saved.ym === ymNow && saved.answers && typeof saved.answers === 'object' ? saved.answers : {};
+    const answer = (id, v) => { setPref('subAudit', { ym: ymNow, answers: { ...answers, [id]: v } }); render(); };
+    if (auditComplete(subs, answers)) {
+      const cand = cancelCandidates(subs, answers);
+      auditCard.hidden = cand.length === 0;
+      if (!cand.length) return;
+      const yearly = cand.reduce((s, c) => s + c.monthlyMinor * 12, 0);
+      fill(auditCard, el('h3', { textContent: 'Аудит подписок' }),
+        el('p', { class: 'muted', textContent: `Кандидаты на отмену: ${cand.map(c => c.name).join(', ')} — за год это ${moneyText(yearly)}. Подписки живут на экране «Планы».` }));
+      return;
+    }
+    fill(auditCard, el('h3', { textContent: 'Аудит подписок: пользуешься?' }),
+      el('p', { class: 'muted', textContent: 'Раз в месяц честно отмечаем, чем реально пользуемся.' }),
+      ...subAuditList(subs, answers).map(s => el('div', { class: 'row audit-row', dataset: { id: s.id } },
+        el('span', { class: 'grow', textContent: `${s.name} · ${moneyText(s.monthlyMinor)}/мес` }),
+        s.verdict ? el('span', { class: 'muted audit-verdict', textContent: s.verdict === 'use' ? 'пользуюсь' : 'не пользуюсь' }) : null,
+        el('button', { type: 'button', class: 'chip audit-use', textContent: 'Пользуюсь', onclick: () => answer(s.id, 'use') }),
+        el('button', { type: 'button', class: 'chip audit-cancel', textContent: 'Не пользуюсь', onclick: () => answer(s.id, 'cancel') }))));
+  }
+
+  // Цена одного надевания: выгодные вещи (часто носят) и «мёртвые» (куплены и лежат).
+  function renderWear(today) {
+    const m = homeModel(events, today);
+    const rows = m.items.filter(i => i.payload.status !== 'gone' && i.payload.priceMinor > 0)
+      .map(i => ({ name: i.payload.name, priceMinor: i.payload.priceMinor, wears: m.stats.get(i.id).wears }));
+    const r = wearRating(rows);
+    wearCard.hidden = !r.worth.length && !r.dead.length;
+    if (wearCard.hidden) return;
+    fill(wearCard, el('h3', { textContent: 'Цена одного надевания' }),
+      r.worth.length ? el('p', { class: 'muted wear-worth', textContent: 'Выгодные: ' + r.worth.map(x => `${x.name} — ${moneyText(x.costPerWear)} за раз`).join('; ') }) : null,
+      r.dead.length ? el('p', { class: 'muted wear-dead', textContent: 'Лежат без дела: ' + r.dead.map(x => `${x.name} (${moneyText(x.priceMinor)}, ни разу)`).join('; ') }) : null);
+  }
+
+  root.append(seg, nav, ritualCard, summary, form, nospendCard, refusalCard, draftsCard, soldCard, auditCard, wearCard, list, empty, el('div', { class: 'row' }, csv));
 
   async function remove(ev) {
     const old = await store.remove(ev.id);
@@ -119,6 +252,7 @@ export function createMoneyView({ exportCsv }) {
   }
 
   function render() {
+    const today = todayStr();
     const s = summarizeMonth(events, ym, kind);
     const pay = payOf(events);
     const isExp = kind === 'expense';
@@ -178,6 +312,7 @@ export function createMoneyView({ exportCsv }) {
     }));
     empty.hidden = s.items.length > 0;
     empty.msg.textContent = isExp ? 'В этом месяце расходов нет' : 'В этом месяце доходов нет';
+    renderRitual(today); renderNoSpend(today); renderRefusals(today); renderDrafts(); renderSold(today); renderAudit(today); renderWear(today);
     document.documentElement.classList.toggle('amounts-hidden', !!getPref('hideAmounts'));
   }
 

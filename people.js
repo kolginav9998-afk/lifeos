@@ -49,6 +49,69 @@ export const markContact = (p, date) => { if (!isYmd(date)) throw new Error('bad
 export const updateNote = (p, note) => ({ ...p, payload: { ...p.payload, note: clean(note, 500) } });
 export const peopleOf = events => events.filter(e => e.type === 'person').sort((a, b) => a.payload.name.localeCompare(b.payload.name));
 
+// ---------- журнал контактов ----------
+// Каждый контакт: {date, channel, topic} — «о чём говорили» помогает начать следующий разговор.
+// Журнал живёт в записи человека (опциональное поле contacts), старые записи без него читаются как раньше.
+export const CHANNELS = [['call', 'Звонок'], ['msg', 'Сообщение'], ['meet', 'Встреча вживую']];
+export const CHANNEL_LABEL = Object.fromEntries(CHANNELS);
+const CHANNEL_SET = new Set(CHANNELS.map(([k]) => k));
+export const MAX_CONTACTS = 50;                                  // храним последние 50, старые стираются молча
+
+// Записать контакт: дата, канал и тема. Поднимает lastContact, а для встречи ещё и lastMeet.
+export function logContact(p, { date, channel, topic = '' }) {
+  if (!isYmd(date)) throw new Error('bad date');
+  if (!CHANNEL_SET.has(channel)) throw new Error('Выбери, как общались');
+  const entry = { date, channel, topic: clean(topic, 200) };
+  const prev = Array.isArray(p.payload.contacts) ? p.payload.contacts.filter(c => isYmd(c?.date) && CHANNEL_SET.has(c?.channel)) : [];
+  const contacts = [...prev, entry].sort((a, b) => a.date.localeCompare(b.date)).slice(-MAX_CONTACTS);
+  const payload = { ...p.payload, contacts };
+  if (!payload.lastContact || date > payload.lastContact) payload.lastContact = date;
+  if (channel === 'meet' && (!payload.lastMeet || date > payload.lastMeet)) payload.lastMeet = date;
+  return { ...p, payload };
+}
+// «Встретились вживую» — отдельно от «написал»: это другой вид близости.
+export const markMeet = (p, date) => logContact(p, { date, channel: 'meet' });
+// Журнал контактов, новые сверху.
+export const contactsOf = p => (Array.isArray(p.payload?.contacts) ? p.payload.contacts : [])
+  .filter(c => isYmd(c?.date) && CHANNEL_SET.has(c?.channel)).slice().sort((a, b) => b.date.localeCompare(a.date));
+// Тема последнего разговора, в котором тему записали.
+export const lastTopic = p => contactsOf(p).find(c => c.topic)?.topic ?? null;
+// Последняя встреча вживую: из поля lastMeet или из журнала (что свежее).
+export function lastMeetOf(p) {
+  const fromLog = contactsOf(p).find(c => c.channel === 'meet')?.date ?? null;
+  const field = p.payload?.lastMeet && isYmd(p.payload.lastMeet) ? p.payload.lastMeet : null;
+  return [field, fromLog].filter(Boolean).sort().pop() ?? null;
+}
+// Сводка для карточки: когда писали, когда виделись вживую, о чём говорили в прошлый раз.
+export function contactSummary(p, today) {
+  const lc = p.payload?.lastContact && isYmd(p.payload.lastContact) ? p.payload.lastContact : null;
+  const lm = lastMeetOf(p);
+  return {
+    lastContact: lc, daysSinceContact: lc ? daysBetween(lc, today) : null,
+    lastMeet: lm, daysSinceMeet: lm ? daysBetween(lm, today) : null,
+    lastTopic: lastTopic(p),
+  };
+}
+// С кем давно не виделись вживую: прошло не меньше периода со встречи (или с добавления, если встреч не отмечали).
+export function dueMeets(events, today) {
+  return peopleOf(events).filter(e => e.payload.cadenceDays > 0).map(e => {
+    const lm = lastMeetOf(e);
+    return { person: e, days: daysBetween(lm || e.payload.createdDate, today), cadence: e.payload.cadenceDays, never: !lm };
+  }).filter(x => x.days >= x.cadence).sort((a, b) => b.days / b.cadence - a.days / a.cadence);
+}
+
+// ---------- долги человека ----------
+// Связка по имени (или по personId, если долг когда-нибудь получит такое поле): в карточке видны долги этого человека.
+const normName = s => String(s ?? '').trim().toLowerCase();
+export function personDebts(events, person) {
+  const pid = person.id, nm = normName(person.payload?.name);
+  const debts = events.filter(e => e.type === 'debt' && e.payload && (e.payload.personId === pid || (!e.payload.personId && normName(e.payload.who) === nm)));
+  const left = d => Math.max(0, (d.payload.amountMinor || 0) - (d.payload.paidMinor || 0));
+  const open = debts.filter(d => !d.payload.settled);
+  const sum = dir => open.filter(d => d.payload.direction === dir).reduce((s, d) => s + left(d), 0);
+  return { debts, open, oweMeMinor: sum('owe_me'), iOweMinor: sum('i_owe') };
+}
+
 // Ближайший день рождения не раньше today. 29 февраля в невисокий год отмечаем 28-го.
 export function nextBirthday(p, today) {
   if (!p.birthday) return null;
