@@ -356,4 +356,3 @@ details.card{box-shadow:var(--shadow)}
 @media (hover:hover) and (pointer:fine){
   details.card:hover,.track-card:hover:not(:disabled){transform:translateY(-1px);box-shadow:var(--shadow-lg)}
 }
->>>>>>> w5-polish
