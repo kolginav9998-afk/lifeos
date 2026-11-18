@@ -105,3 +105,50 @@ export function toMarkdown(events, now = Date.now()) {
   if (em) part('Данные на экстренный случай', emergencyLines(em.payload).map(([k, v]) => `- ${k}: ${esc(v)}`));
   return L.join('\n') + '\n';
 }
+
+// ---------- авточерновик итога дня ----------
+// Собирает факты дня в черновик текста: сделанные задачи, привычки, фокус, деньги, дневник.
+// Без таймера: вызывается кнопкой «Черновик итога дня», текст дальше правит человек.
+export function dayDraft(events, date = todayStr()) {
+  const L = [`Итог дня ${date}`, ''];
+  const facts = [];
+  const done = events.filter(e => e.type === 'task' && e.payload.done && Number.isFinite(e.payload.doneAt) && todayStr(e.payload.doneAt) === date);
+  for (const t of done.sort((a, b) => a.payload.doneAt - b.payload.doneAt)) facts.push(`сделано: ${esc(t.payload.text)}`);
+  const habitName = new Map(events.filter(e => e.type === 'habit').map(h => [h.id, h.payload.name]));
+  const logs = events.filter(e => e.type === 'habit_log' && e.payload.date === date);
+  for (const l of logs) facts.push(`привычка: ${esc(habitName.get(l.payload.habitId) ?? '?')} (${l.payload.level === 'min' ? 'минимум' : 'полностью'})`);
+  const focusMin = events.filter(e => e.type === 'focus' && e.payload.date === date).reduce((s, e) => s + (e.payload.minutes || 0), 0);
+  if (focusMin) facts.push(`фокус: ${focusMin} мин`);
+  const spent = events.filter(e => e.type === 'expense' && e.payload.date === date).reduce((s, e) => s + e.payload.amountMinor, 0);
+  if (spent) facts.push(`расходы: ${formatMoney(spent)}`);
+  const earned = events.filter(e => e.type === 'income' && e.payload.date === date).reduce((s, e) => s + e.payload.amountMinor, 0);
+  if (earned) facts.push(`доходы: ${formatMoney(earned)}`);
+  const dia = events.find(e => e.type === 'diary' && e.payload.date === date);
+  if (dia?.payload.highlight) facts.push(`главное: ${esc(dia.payload.highlight)}`);
+  if (dia?.payload.gratitude?.length) facts.push(`благодарность: ${dia.payload.gratitude.map(esc).join('; ')}`);
+  const notesN = events.filter(e => e.type === 'note' && todayStr(e.ts) === date).length;
+  if (notesN) facts.push(`заметок за день: ${notesN}`);
+  if (facts.length) L.push(...facts.map(f => `- ${f}`));
+  else L.push('_Фактов за день пока нет — допиши вручную._');
+  L.push('', 'Моё впечатление: ');
+  return L.join('\n') + '\n';
+}
+
+// ---------- git-friendly выгрузка дневника ----------
+// Один markdown-файл: каждый день — раздел с заголовком-путём `## YYYY/MM/DD.md`.
+// Такой файл легко разбить на папку (заголовок = путь) и хранить под git.
+export function diaryToGitMarkdown(events) {
+  const dia = events.filter(e => e.type === 'diary').sort((a, b) => a.payload.date.localeCompare(b.payload.date));
+  const L = ['# Дневник: выгрузка для git', '', 'Каждый раздел ниже — файл: заголовок вида `## YYYY/MM/DD.md` показывает путь.', ''];
+  for (const d of dia) {
+    const path = d.payload.date.replaceAll('-', '/');
+    L.push(`## ${path}.md`, '');
+    if (d.payload.highlight) L.push(`**Главное:** ${esc(d.payload.highlight)}`, '');
+    if (d.payload.text) L.push(d.payload.text, '');
+    if (d.payload.gratitude?.length) L.push('Благодарность: ' + d.payload.gratitude.map(esc).join('; '), '');
+    if (d.payload.tags?.length) L.push('Теги: ' + d.payload.tags.map(t => '#' + t).join(' '), '');
+  }
+  if (!dia.length) L.push('_Записей дневника пока нет._', '');
+  return L.join('\n');
+}
+
