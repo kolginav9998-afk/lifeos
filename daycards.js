@@ -100,6 +100,46 @@ export function summaryText(s) {
   return L.join('\n');
 }
 
+// ---------- тёплые мелочи вокруг сухих сводок ----------
+
+// «Вчера одной строкой» для утреннего брифа: короткий фактический пересказ вчерашнего дня. Если вчера ничего не отмечено — молчим.
+export function yesterdayLine(events, today) {
+  const s = daySummary(events, addDays(today, -1));
+  const parts = [];
+  if (s.tasksDone) parts.push(`задач сделано: ${s.tasksDone}`);
+  if (s.habitsPlanned) parts.push(`привычки: ${s.habitsDone} из ${s.habitsPlanned}`);
+  if (s.study) parts.push(`учёба ${s.study} мин`);
+  if (s.focus) parts.push(`фокус ${s.focus} мин`);
+  if (s.workout) parts.push(`тренировка ${s.workout} мин`);
+  if (s.mood !== null) parts.push(`настроение: ${f1(s.mood)} из 5`);
+  if (!parts.length) return null;
+  return `Вчера: ${parts.join(', ')}.`;
+}
+
+// Тёплый микро-итог вечером: одна человеческая фраза рядом с сухим итогом. Без оценок, давления и пафоса.
+export function warmSummaryLine(s) {
+  const did = s.tasksDone + s.habitsDone + s.study + s.focus + s.workout;
+  if (s.mood !== null && s.mood <= 2.5 && did > 0) return 'Даже в непростой день кое-что получилось — это дорогого стоит.';
+  if (did === 0) return 'Тихий день — тоже день. Хорошего вечера.';
+  if (s.tasksDone > 0 && s.left === 0) return 'Всё назначенное на сегодня сделано — можно спокойно выдыхать.';
+  return 'Сегодня кое-что получилось. Хорошего вечера.';
+}
+
+// Мост через неделю: в воскресенье тихо подсказываем, что ждёт на следующей (дни рождения, важные даты, дела по срокам).
+export function weekBridge(events, today) {
+  const [y, m, d] = today.split('-').map(Number);
+  if (new Date(y, m - 1, d).getDay() !== 0) return null;                       // только в воскресенье
+  const mon = addDays(today, 1), sun = addDays(today, 7);
+  const parts = [];
+  const bdays = upcomingBirthdays(events, mon, 6);
+  if (bdays.length) parts.push(`${bdays.length} ${plural(bdays.length, 'день рождения', 'дня рождения', 'дней рождения')} (${bdays.map(b => b.person.payload.name).join(', ')})`);
+  for (const x of upcomingImportant(events, mon, 6)) parts.push(`важный день у ${x.person.payload.name}${x.label ? ` — ${x.label}` : ''}`);
+  const due = rankTasks(events, today).filter(e => e.payload.due && e.payload.due >= mon && e.payload.due <= sun).length;
+  if (due) parts.push(`${due} ${plural(due, 'задача', 'задачи', 'задач')} по срокам`);
+  if (!parts.length) return null;
+  return `На следующей неделе тебя ждёт: ${parts.join('; ')}.`;
+}
+
 // ---------- «герой» экрана «Сегодня»: кольцо дел на сегодня ----------
 // Сделано сегодня и осталось (на сегодня и просроченное). Доля — сделанное от всего; если дел нет, кольцо пустое.
 export function heroOf(events, today) {

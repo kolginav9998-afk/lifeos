@@ -36,7 +36,7 @@ export function appendFreeWrite(events, date, text, now = Date.now()) {
 
 // ---------- книга года: читаемый Markdown из записей дневника ----------
 const MONTHS = ['январь', 'февраль', 'март', 'апрель', 'май', 'июнь', 'июль', 'август', 'сентябрь', 'октябрь', 'ноябрь', 'декабрь'];
-const MONTHS_GEN = ['января', 'февраля', 'марта', 'апреля', 'мая', 'июня', 'июля', 'августа', 'сентября', 'октября', 'ноября', 'декабря'];
+export const MONTHS_GEN = ['января', 'февраля', 'марта', 'апреля', 'мая', 'июня', 'июля', 'августа', 'сентября', 'октября', 'ноября', 'декабря'];
 const WD = ['воскресенье', 'понедельник', 'вторник', 'среда', 'четверг', 'пятница', 'суббота'];
 export const diaryYears = events => [...new Set(diaryEntries(events).map(e => e.payload.date.slice(0, 4)))].sort().reverse();
 export function yearBook(events, year, now = Date.now()) {

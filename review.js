@@ -1,5 +1,7 @@
 // Недельный обзор: что сделано, как с привычками, куда ушли деньги. Только факты из твоих данных.
-import { addDays, todayStr } from './events.js';
+import { addDays, todayStr, daysBetween } from './events.js';
+import { APP_NAME } from './config.js';
+import { MONTHS_GEN } from './writing.js';
 import { activeHabits, isScheduled } from './habits.js';
 import { spentBetween, sumBetween } from './money.js';
 import { logsOf } from './habits.js';
@@ -100,4 +102,59 @@ export function activeDays(events, today, days = 30) {
   let d = set.has(today) ? today : addDays(today, -1), streak = 0;                  // сегодня можно ещё не делать: серия не сгорает до конца дня
   while (set.has(d)) { streak++; d = addDays(d, -1); }
   return { count, of: days, streak };
+}
+
+// ---------- тёплые мелочи ----------
+const pluralRu = (n, one, few, many) => { const a = Math.abs(n) % 100, b = a % 10; return a > 10 && a < 20 ? many : b > 1 && b < 5 ? few : b === 1 ? one : many; };
+
+// Годовщина в приложении: дней с самой первой записи (любого типа).
+export function appAgeDays(events, today) {
+  const first = events.reduce((m, e) => Math.min(m, Number.isFinite(e.ts) ? e.ts : Infinity), Infinity);
+  if (first === Infinity) return null;
+  const days = daysBetween(todayStr(first), today);
+  return days >= 0 ? days : null;
+}
+// Тихая строка для обзора или брифа: без торжественности, показываем с первого месяца.
+export function anniversaryLine(events, today) {
+  const days = appAgeDays(events, today);
+  if (days === null || days < 30) return null;
+  return `Ты ведёшь ${APP_NAME} уже ${days} ${pluralRu(days, 'день', 'дня', 'дней')}.`;
+}
+
+// Редкая открытка «первый раз за долгое время»: что-то случилось сегодня впервые за N дней.
+// Не система достижений и не повод для давления — одна мягкая строка. Совсем первый раз не отмечаем: тогда не с чем сравнивать.
+const FIRST_TIME_KINDS = [
+  ['Первая тренировка', e => (e.type === 'workout' && e.payload?.done ? e.payload.date : null)],
+  ['Первый урок', e => (e.type === 'lesson' ? e.payload.date : null)],
+  ['Первая сессия фокуса', e => (e.type === 'focus' ? e.payload.date : null)],
+  ['Первая радость в копилке', e => (e.type === 'joy' ? e.payload.date : null)],
+];
+export function firstTimeSince(events, today, { gap = 30 } = {}) {
+  let best = null;
+  for (const [label, pick] of FIRST_TIME_KINDS) {
+    const dates = events.map(pick).filter(Boolean);
+    if (!dates.includes(today)) continue;
+    const prev = dates.filter(d => d < today).sort().at(-1);
+    if (!prev) continue;
+    const days = daysBetween(prev, today);
+    if (days >= gap && (!best || days > best.days)) best = { days, text: `${label} за ${days} ${pluralRu(days, 'день', 'дня', 'дней')} — здорово, что получилось вернуться.` };
+  }
+  return best;
+}
+
+// Тёплая вырезка месяца: до пяти лучших моментов одним текстом, удобно скопировать или перечитать.
+// Сначала радости из копилки (самые свежие); если их меньше пяти — дополняем «что получилось» из вечерних обзоров.
+export function monthClip(events, ym) {
+  if (!/^\d{4}-\d{2}$/.test(String(ym))) throw new Error('bad month');
+  const inMonth = d => typeof d === 'string' && d.startsWith(ym + '-');
+  const joys = events.filter(e => e.type === 'joy' && inMonth(e.payload.date)).sort((a, b) => b.payload.date.localeCompare(a.payload.date) || b.ts - a.ts);
+  const rows = joys.slice(0, 5).map(e => ({ date: e.payload.date, text: e.payload.text }));
+  if (rows.length < 5) {
+    const wins = events.filter(e => e.type === 'dayreview' && inMonth(e.payload.date) && e.payload.win).sort((a, b) => b.payload.date.localeCompare(a.payload.date));
+    for (const e of wins) { if (rows.length >= 5) break; rows.push({ date: e.payload.date, text: e.payload.win }); }
+  }
+  if (!rows.length) return null;
+  rows.sort((a, b) => a.date.localeCompare(b.date));
+  const [y, m] = ym.split('-').map(Number);
+  return [`Тёплые моменты ${MONTHS_GEN[m - 1]} ${y}:`, ...rows.map(r => `— ${r.date.slice(8)}.${r.date.slice(5, 7)}: ${String(r.text).replace(/\r?\n/g, ' ')}`)].join('\n');
 }
