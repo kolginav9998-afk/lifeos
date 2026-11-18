@@ -365,3 +365,27 @@ details.card{box-shadow:var(--shadow)}
 .geek-undo-text{flex:1 1 auto;min-width:0;overflow-wrap:anywhere}
 .geek-diff-row{border-top:1px solid var(--soft);padding-top:var(--s2)}
 .geek-diff-fields{margin:0 0 var(--s2) var(--s4)}
+/* ===== вкладка «Запросы» в панели поиска (query.js) ===== */
+.search-tabs{display:flex;gap:6px;margin-bottom:8px}
+.search-tab{border:1px solid var(--line);background:var(--soft);border-radius:999px;padding:4px 14px;min-height:36px;font-size:.85rem;color:var(--muted)}
+.search-tab.on{background:var(--accent);border-color:var(--accent);color:#fff;font-weight:600}
+.query-hint{font-size:.8rem;margin:2px 0 6px}
+.query-row{display:flex;gap:6px;flex-wrap:wrap;margin-top:8px;align-items:center}
+.query-row input{flex:1;min-width:140px}
+.query-views{display:flex;flex-wrap:wrap;gap:6px;margin-top:8px;align-items:center;font-size:.85rem}
+.query-view{display:inline-flex;padding:0;overflow:hidden}
+.query-view-run{border:0;background:none;padding:4px 6px 4px 12px;min-height:34px;font:inherit;color:inherit}
+.query-view-del{border:0;background:none;padding:4px 10px 4px 6px;min-height:34px;font:inherit;color:var(--muted)}
+.query-meta{display:flex;justify-content:space-between;align-items:center;gap:8px;margin-top:10px;flex-wrap:wrap}
+.query-table{width:100%;border-collapse:collapse;font-size:.85rem;margin-top:6px}
+.query-table th,.query-table td{text-align:left;padding:4px 6px;border-bottom:1px solid var(--line);vertical-align:top}
+.query-table th{font-size:.75rem;color:var(--muted);font-weight:600}
+.query-why{border:1px solid var(--line);background:var(--soft);border-radius:50%;width:26px;height:26px;min-height:26px;font-size:.8rem;color:var(--muted)}
+.query-explain{border:1px solid var(--line);border-radius:var(--r,12px);padding:10px;margin-top:10px;font-size:.85rem}
+.query-explain ul,.query-explain ol{margin:6px 0;padding-left:20px}
+.query-ok{color:var(--ok,#3a9b5c)}
+.query-no{color:var(--danger)}
+.query-re-hit{display:flex;gap:10px;align-items:baseline;padding:4px 0;font-size:.85rem}
+.query-re-hit .kind{font-size:.75rem;color:var(--accent);min-width:74px}
+.query-out .error,.query-re .error{font-size:.85rem;margin-top:8px}
+
