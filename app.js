@@ -14,6 +14,8 @@ import * as notify from './notify.js';
 import { markShell, markData } from './perf.js';
 import { REQUIRE_ACCOUNT } from './config.js';
 import { profileCard } from './profile.js';
+import { heroOf } from './daycards.js';
+import { todayStr } from './events.js';
 import { autoCheckUpdate } from './view-update.js';
 import { createLockQuick } from './view-lock-quick.js';
 
@@ -98,6 +100,10 @@ function applyTheme() {
   const t = getPref('theme');
   const root = document.documentElement;
   if (t === 'light' || t === 'dark') root.setAttribute('data-theme', t); else root.removeAttribute('data-theme');
+  const accent = getPref('accent');
+  if (accent && accent !== 'iris') root.setAttribute('data-accent', accent); else root.removeAttribute('data-accent');
+  const density = getPref('density');
+  if (density && density !== 'normal') root.setAttribute('data-density', density); else root.removeAttribute('data-density');
   const bg = getComputedStyle(root).getPropertyValue('--bg').trim();
   if (bg) document.querySelector('meta[name=theme-color]')?.setAttribute('content', bg);
 }
@@ -145,6 +151,20 @@ function paintAvatar(evs) {
   b.style.setProperty('--av', c.hex);
   b.title = c.name || c.login || 'Профиль';
   b.setAttribute('aria-label', `Профиль: ${c.name || c.login || 'без имени'}`);
+}
+
+// ---------- линия прогресса дня под шапкой: доля выполненных дел на сегодня ----------
+function updateDayLine(evs) {
+  const box = $('day-line');
+  if (!box) return;
+  const h = heroOf(evs, todayStr());
+  box.hidden = h.total === 0;
+  const pct = Math.round(h.fraction * 100);
+  box.style.setProperty('--w', String(pct));
+  box.setAttribute('aria-valuemin', '0');
+  box.setAttribute('aria-valuemax', '100');
+  box.setAttribute('aria-valuenow', String(pct));
+  box.setAttribute('aria-label', `Дела на сегодня: ${h.done} из ${h.total}`);
 }
 
 // ---------- состояние синхронизации в шапке ----------
@@ -275,6 +295,7 @@ async function enterApp() {
   appSync.start().catch(e => console.error(e));
   startTabGuard();
   paintAvatar(store.state.events);
+  updateDayLine(store.state.events);
   if (freshSignIn) { freshSignIn = false; startTour(); }
   if (!entered) {
     entered = true; handleUrlParams();
@@ -418,7 +439,7 @@ function build() {
   watchHeadings($('view')); watchHeadings($('gate'));     // уровни заголовков без пропусков
   keepFocusIn($('gate-body'), gatePick);
 
-  store.onChange(evs => { for (const v of Object.values(views)) v.update(evs); renderSearch(); paintAvatar(evs); notify.resyncSoon(); });
+  store.onChange(evs => { for (const v of Object.values(views)) v.update(evs); renderSearch(); paintAvatar(evs); updateDayLine(evs); notify.resyncSoon(); });
   store.setLockedHandler(showLock);
 }
 

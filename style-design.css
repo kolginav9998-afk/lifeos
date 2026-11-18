@@ -229,3 +229,32 @@ input[type=checkbox]:checked::after{transform:rotate(-45deg) scale(1)}
 #app[data-mode=finance]{--mode-accent:var(--md-fin)}
 #app[data-mode=analytics]{--mode-accent:var(--md-ana)}
 #app[data-mode=security]{--mode-accent:var(--md-sec)}
+
+/* ===== выбор акцентного цвета (Настройки → Внешний вид) ===== */
+/* Дефолт «Ирис» живёт в style.css без data-accent. Каждая пара проверена на контраст AA в обеих темах. */
+:root[data-accent=sage]{--accent:#3f7d4e;--accent2:#2e7d6b;--grad:linear-gradient(135deg,#3f7d4e,#2e7d6b);--grad-soft:linear-gradient(135deg,color-mix(in srgb,#3f7d4e 16%,transparent),color-mix(in srgb,#2e7d6b 11%,transparent));--glow1:color-mix(in srgb,#3f7d4e 8%,transparent);--glow2:color-mix(in srgb,#2e7d6b 5%,transparent)}
+@media (prefers-color-scheme: dark){:root:not([data-theme=light])[data-accent=sage]{--accent:#8fce9b;--accent2:#6fc4a8;--grad:linear-gradient(135deg,#8fce9b,#6fc4a8);--grad-soft:linear-gradient(135deg,color-mix(in srgb,#8fce9b 14%,transparent),color-mix(in srgb,#6fc4a8 8%,transparent));--glow1:color-mix(in srgb,#8fce9b 12%,transparent);--glow2:color-mix(in srgb,#6fc4a8 7%,transparent)}}
+:root[data-theme=dark][data-accent=sage]{--accent:#8fce9b;--accent2:#6fc4a8;--grad:linear-gradient(135deg,#8fce9b,#6fc4a8);--grad-soft:linear-gradient(135deg,color-mix(in srgb,#8fce9b 14%,transparent),color-mix(in srgb,#6fc4a8 8%,transparent));--glow1:color-mix(in srgb,#8fce9b 12%,transparent);--glow2:color-mix(in srgb,#6fc4a8 7%,transparent)}
+:root[data-accent=sea]{--accent:#0e7490;--accent2:#1268a8;--grad:linear-gradient(135deg,#0e7490,#1268a8);--grad-soft:linear-gradient(135deg,color-mix(in srgb,#0e7490 16%,transparent),color-mix(in srgb,#1268a8 11%,transparent));--glow1:color-mix(in srgb,#0e7490 8%,transparent);--glow2:color-mix(in srgb,#1268a8 5%,transparent)}
+@media (prefers-color-scheme: dark){:root:not([data-theme=light])[data-accent=sea]{--accent:#5cc8d8;--accent2:#6fb0e8;--grad:linear-gradient(135deg,#5cc8d8,#6fb0e8);--grad-soft:linear-gradient(135deg,color-mix(in srgb,#5cc8d8 14%,transparent),color-mix(in srgb,#6fb0e8 8%,transparent));--glow1:color-mix(in srgb,#5cc8d8 12%,transparent);--glow2:color-mix(in srgb,#6fb0e8 7%,transparent)}}
+:root[data-theme=dark][data-accent=sea]{--accent:#5cc8d8;--accent2:#6fb0e8;--grad:linear-gradient(135deg,#5cc8d8,#6fb0e8);--grad-soft:linear-gradient(135deg,color-mix(in srgb,#5cc8d8 14%,transparent),color-mix(in srgb,#6fb0e8 8%,transparent));--glow1:color-mix(in srgb,#5cc8d8 12%,transparent);--glow2:color-mix(in srgb,#6fb0e8 7%,transparent)}
+:root[data-accent=terra]{--accent:#b4502e;--accent2:#c06a2a;--grad:linear-gradient(135deg,#b4502e,#c06a2a);--grad-soft:linear-gradient(135deg,color-mix(in srgb,#b4502e 16%,transparent),color-mix(in srgb,#c06a2a 11%,transparent));--glow1:color-mix(in srgb,#b4502e 8%,transparent);--glow2:color-mix(in srgb,#c06a2a 5%,transparent)}
+@media (prefers-color-scheme: dark){:root:not([data-theme=light])[data-accent=terra]{--accent:#e08b6d;--accent2:#e8a35f;--grad:linear-gradient(135deg,#e08b6d,#e8a35f);--grad-soft:linear-gradient(135deg,color-mix(in srgb,#e08b6d 14%,transparent),color-mix(in srgb,#e8a35f 8%,transparent));--glow1:color-mix(in srgb,#e08b6d 12%,transparent);--glow2:color-mix(in srgb,#e8a35f 7%,transparent)}}
+:root[data-theme=dark][data-accent=terra]{--accent:#e08b6d;--accent2:#e8a35f;--grad:linear-gradient(135deg,#e08b6d,#e8a35f);--grad-soft:linear-gradient(135deg,color-mix(in srgb,#e08b6d 14%,transparent),color-mix(in srgb,#e8a35f 8%,transparent));--glow1:color-mix(in srgb,#e08b6d 12%,transparent);--glow2:color-mix(in srgb,#e8a35f 7%,transparent)}
+:root[data-accent=plum]{--accent:#8b3a7a;--accent2:#a03a92;--grad:linear-gradient(135deg,#8b3a7a,#a03a92);--grad-soft:linear-gradient(135deg,color-mix(in srgb,#8b3a7a 16%,transparent),color-mix(in srgb,#a03a92 11%,transparent));--glow1:color-mix(in srgb,#8b3a7a 8%,transparent);--glow2:color-mix(in srgb,#a03a92 5%,transparent)}
+@media (prefers-color-scheme: dark){:root:not([data-theme=light])[data-accent=plum]{--accent:#d494c4;--accent2:#e08ab0;--grad:linear-gradient(135deg,#d494c4,#e08ab0);--grad-soft:linear-gradient(135deg,color-mix(in srgb,#d494c4 14%,transparent),color-mix(in srgb,#e08ab0 8%,transparent));--glow1:color-mix(in srgb,#d494c4 12%,transparent);--glow2:color-mix(in srgb,#e08ab0 7%,transparent)}}
+:root[data-theme=dark][data-accent=plum]{--accent:#d494c4;--accent2:#e08ab0;--grad:linear-gradient(135deg,#d494c4,#e08ab0);--grad-soft:linear-gradient(135deg,color-mix(in srgb,#d494c4 14%,transparent),color-mix(in srgb,#e08ab0 8%,transparent));--glow1:color-mix(in srgb,#d494c4 12%,transparent);--glow2:color-mix(in srgb,#e08ab0 7%,transparent)}
+:root[data-accent=corn]{--accent:#2f5fb0;--accent2:#4a56c0;--grad:linear-gradient(135deg,#2f5fb0,#4a56c0);--grad-soft:linear-gradient(135deg,color-mix(in srgb,#2f5fb0 16%,transparent),color-mix(in srgb,#4a56c0 11%,transparent));--glow1:color-mix(in srgb,#2f5fb0 8%,transparent);--glow2:color-mix(in srgb,#4a56c0 5%,transparent)}
+@media (prefers-color-scheme: dark){:root:not([data-theme=light])[data-accent=corn]{--accent:#8faeef;--accent2:#a09af0;--grad:linear-gradient(135deg,#8faeef,#a09af0);--grad-soft:linear-gradient(135deg,color-mix(in srgb,#8faeef 14%,transparent),color-mix(in srgb,#a09af0 8%,transparent));--glow1:color-mix(in srgb,#8faeef 12%,transparent);--glow2:color-mix(in srgb,#a09af0 7%,transparent)}}
+:root[data-theme=dark][data-accent=corn]{--accent:#8faeef;--accent2:#a09af0;--grad:linear-gradient(135deg,#8faeef,#a09af0);--grad-soft:linear-gradient(135deg,color-mix(in srgb,#8faeef 14%,transparent),color-mix(in srgb,#a09af0 8%,transparent));--glow1:color-mix(in srgb,#8faeef 12%,transparent);--glow2:color-mix(in srgb,#a09af0 7%,transparent)}
+/* кольцо дня перекрашивается под выбранный акцент (у «Ириса» — фирменный градиент из index.html) */
+:root[data-accent] #ring-grad stop:first-child{stop-color:var(--accent)}
+:root[data-accent] #ring-grad stop:last-child{stop-color:var(--accent2)}
+
+/* ===== плотность интерфейса (Настройки → Внешний вид) ===== */
+:root[data-density=compact]{--s2:6px;--s3:9px;--s4:12px;--s5:18px;--s6:24px;--s7:36px;--s8:48px}
+:root[data-density=spacious]{--s2:10px;--s3:15px;--s4:20px;--s5:30px;--s6:40px;--s7:60px;--s8:80px}
+
+/* ===== линия прогресса дня: нижняя кромка липкой шапки ===== */
+#day-line{position:absolute;left:0;right:0;bottom:0;height:3px;background:var(--soft);overflow:hidden}
+#day-line>span{display:block;height:100%;width:calc(var(--w,0)*1%);background:var(--grad);transition:width .4s var(--ease)}
