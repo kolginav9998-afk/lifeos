@@ -269,3 +269,13 @@ input[type=checkbox]:checked::after{transform:rotate(-45deg) scale(1)}
 /* ===== линия прогресса дня: нижняя кромка липкой шапки ===== */
 #day-line{position:absolute;left:0;right:0;bottom:0;height:3px;background:var(--soft);overflow:hidden}
 #day-line>span{display:block;height:100%;width:calc(var(--w,0)*1%);background:var(--grad);transition:width .4s var(--ease)}
+
+/* ===== geek (w5) ===== */
+.geek{margin-top:var(--s4);border-top:1px solid var(--soft);padding-top:var(--s3)}
+.geek>summary{cursor:pointer;font-weight:600}
+.geek-pre{white-space:pre-wrap;font-family:ui-monospace,SFMono-Regular,Menlo,Consolas,monospace;font-size:.85em}
+.geek-line{margin:0}
+.geek-undo-row{justify-content:space-between;align-items:center;gap:var(--s3)}
+.geek-undo-text{flex:1 1 auto;min-width:0;overflow-wrap:anywhere}
+.geek-diff-row{border-top:1px solid var(--soft);padding-top:var(--s2)}
+.geek-diff-fields{margin:0 0 var(--s2) var(--s4)}

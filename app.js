@@ -381,10 +381,11 @@ document.addEventListener('keydown', e => {
   else if (e.key === 'n' || e.key === 'т') { e.preventDefault(); go('today'); views.today.focusAdd(); }
 });
 
-// ---------- ссылки: «поделиться» из других приложений и ярлыки ----------
+// ---------- ссылки: «поделиться» из других приложений, ярлыки и стабильные ссылки ----------
 function handleUrlParams() {
   const q = new URLSearchParams(location.search);
-  if (!q.toString()) return;
+  const noteHash = /^#\/note\/([A-Za-z0-9_-]{1,100})$/.exec(location.hash);      // стабильная ссылка на заметку
+  if (!q.toString() && !noteHash) return;
   const shared = [q.get('title'), q.get('text'), q.get('url')].filter(Boolean).join(' ').trim().slice(0, 500);
   const add = q.get('add');
   if (shared) {
@@ -392,6 +393,13 @@ function handleUrlParams() {
     toast('Получено из другого приложения. Проверь текст и нажми «+».');
   } else if (['task', 'habit', 'expense', 'note', 'diary', 'measure'].includes(add)) {
     go(FOCUS_TAB[add]); views[FOCUS_TAB[add]].focusAdd?.();
+  } else if (add && add.trim()) {
+    go('today'); views.today.prefill(add.trim().slice(0, 500));                  // ?add=текст: умный ввод с готовым черновиком
+    toast('Черновик готов. Проверь текст и нажми «+».');
+  } else if (noteHash) {
+    go('notes');                                                                 // #/note/<id>: экран заметок…
+    if (typeof views.notes.focusNote === 'function') views.notes.focusNote(noteHash[1]);   // …и фокус на записи, когда экран это умеет
+    else toast('Открыл заметки: нужная запись ищется по началу текста');
   }
   history.replaceState(null, '', location.pathname);       // не оставлять чужой текст в адресной строке
 }
