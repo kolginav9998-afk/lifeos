@@ -236,7 +236,7 @@ await tab(page, 'today'); assert.equal(await page.locator('#skills-chip').count(
 // список для копирования
 await tab(page, 'skills');
 await clearToast(); await page.click('#skills-copy'); await toast(/Список навыков скопирован/);
-const copied = await page.evaluate(() => navigator.clipboard.readText());
+const copied = (await page.evaluate(() => navigator.clipboard.readText())).replace(/\r\n/g, '\n');   // буфер Windows отдаёт CRLF
 assert.match(copied, /^Навыки\n\nАнглийский: быстро\n— Выбирать пять частотных слов на день и повторять их вечером \(знаю\)/); assert.match(copied, /Дом и быт\n— Менять колесо и проверять давление \(уверенно\)/);
 
 // «Задание выполнено» поднимает навык из урока до «Умею»

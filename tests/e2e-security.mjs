@@ -236,6 +236,11 @@ assert.equal(await page.locator('.item').count(), 0, 'с неверным пар
 await page.fill('#imp-pass', 'пароль-для-копии');
 await page.click('#imp-go');
 await until(page, () => /Восстановлено записей/.test(document.getElementById('toast').textContent), null, 10000);
+// Восстановление на пустое устройство по умолчанию применяет и настройки, а они через 1,5 с перезапускают страницу
+// (view-archive.js). На медленной машине расшифровка архива занимает секунды, и перезапуск может прийтись
+// на середину следующего шага — поэтому ждём его явно, пока страница не устаканится.
+await page.waitForNavigation({ waitUntil: 'load', timeout: 15000 });
+await appReady(page);
 await tab(page, 'today');
 await until(page, () => [...document.querySelectorAll('.item .text')].some(n => n.textContent === 'секретная задача про зарплату'));
 await tab(page, 'notes');

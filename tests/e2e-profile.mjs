@@ -164,7 +164,7 @@ assert.ok(!/₽|кг|Анна|Куртка|Зарядка|вес|сон|наст
 assert.match(await page.textContent('#pr-share-note'), /Денег, здоровья и названий в нём нет/);
 await page.click('#pr-share-copy');
 await waitToast(page, /Итог скопирован/);
-assert.equal(await page.evaluate(() => navigator.clipboard.readText()), shareText, 'в буфере именно тот текст, что на экране');
+assert.equal((await page.evaluate(() => navigator.clipboard.readText())).replace(/\r\n/g, '\n'), shareText.replace(/\r\n/g, '\n'), 'в буфере именно тот текст, что на экране');   // буфер Windows отдаёт CRLF
 const [file] = await Promise.all([page.waitForEvent('download'), page.click('#pr-share-save')]);
 assert.match(file.suggestedFilename(), /^itogi-\d{4}-\d{2}-\d{2}\.txt$/);
 assert.equal(fs.readFileSync(await file.path(), 'utf8'), shareText, 'в файле тот же текст');

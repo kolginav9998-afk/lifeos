@@ -27,6 +27,9 @@ async function ax(label) {
   if (!(await page.evaluate(() => typeof window.axe !== 'undefined'))) await page.addScriptTag({ content: AXE });
   for (const theme of ['light', 'dark']) {
     await page.emulateMedia({ colorScheme: theme, reducedMotion: 'reduce' }); await settleTheme(page, theme, 120);
+    // Дожидаемся двух кадров: иначе axe может замерить переходное состояние темы
+    // (цвет текста уже из новой темы, а развёрнутый фон — из старой) и ошибочно ругнуться на контраст.
+    await page.evaluate(() => new Promise(r => requestAnimationFrame(() => requestAnimationFrame(r))));
     const res = await page.evaluate(async tags => (await axe.run(document, { runOnly: { type: 'tag', values: tags }, resultTypes: ['violations'] })).violations.map(v => ({ id: v.id, impact: v.impact, nodes: v.nodes.map(n => `${n.target.join(' ')} :: ${n.html.replace(/\s+/g, ' ').slice(0, 110)}`) })), TAGS);
     for (const v of res) if (v.impact === 'serious' || v.impact === 'critical' || ZERO_RULES.has(v.id)) a11y.push(`${theme} / ${label}: [${v.impact}] ${v.id}: ${v.nodes.slice(0, 2).join(' | ')}`);
   }

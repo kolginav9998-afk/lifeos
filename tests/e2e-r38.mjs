@@ -122,7 +122,8 @@ if (mins <= 16 * 60) {
   assert.ok(!/null/.test(await text('#plan-day')), 'в карточке плана нет текста «null»');
   assert.match(await text('.plan-row[data-kind="task"] >> nth=0'), /^\d\d:\d\d–\d\d:\d\d Отчёт по складу/, 'важное идёт первым');
   await page.click('#plan-copy'); await toast(/План скопирован/);
-  assert.match(await page.evaluate(() => navigator.clipboard.readText()), /^План дня \d{4}-\d{2}-\d{2}\n\d\d:\d\d–\d\d:\d\d  Отчёт по складу/);
+  const clip = (await page.evaluate(() => navigator.clipboard.readText())).replace(/\r\n/g, '\n');   // буфер Windows отдаёт CRLF
+  assert.match(clip, /^План дня \d{4}-\d{2}-\d{2}\n\d\d:\d\d–\d\d:\d\d  Отчёт по складу/);
 } else console.log('поздний час: проверку плана дня пропускаем (блоки не помещаются до вечера)');
 
 assert.deepEqual(errors, [], 'нет ошибок в консоли:\n' + errors.join('\n'));

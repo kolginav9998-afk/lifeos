@@ -35,9 +35,10 @@ assert.equal(await page.locator('#day-summary').evaluate(d => d.open), true, 'р
 assert.match(await text('#day-summary'), /Осталось на сегодня и просрочено: 1 задача/);
 assert.ok(!/3\. Купить хлеб/.test(await text('#day-brief')), 'сделанное из брифа ушло');
 await clearToast(); await page.click('#brief-copy'); await toast(/Бриф скопирован/);
-assert.match(await page.evaluate(() => navigator.clipboard.readText()), /^Бриф на \d{4}-\d{2}-\d{2}\nГлавное:\n1\. ★ Позвонить маме/);
+const clip = async () => (await page.evaluate(() => navigator.clipboard.readText())).replace(/\r\n/g, '\n');   // буфер Windows отдаёт CRLF
+assert.match(await clip(), /^Бриф на \d{4}-\d{2}-\d{2}\nГлавное:\n1\. ★ Позвонить маме/);
 await clearToast(); await page.click('#summary-copy'); await toast(/Итог скопирован/);
-assert.match(await page.evaluate(() => navigator.clipboard.readText()), /^Итог дня \d{4}-\d{2}-\d{2}\nЗадач сделано: 1/);
+assert.match(await clip(), /^Итог дня \d{4}-\d{2}-\d{2}\nЗадач сделано: 1/);
 // простой режим прячет обе карточки
 await page.evaluate(async () => { (await import('./prefs.js')).setPref('simple', true); await (await import('./store.js')).refresh(); });
 await until(page, () => !document.getElementById('day-brief'));
