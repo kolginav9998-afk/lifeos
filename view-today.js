@@ -21,6 +21,8 @@ import { lightDayHint, overloadHint, caffeineHint, restDayHint } from './hints.j
 import { unseenChanges } from './changelog.js';
 import { VERSION } from './version.js';
 import { activeSick, startSick, endSick } from './sick.js';
+import { CHECKUP_AREAS, CHECKUP_MARKS, CHECKUP_MARK_TEXT, cleanCheckupMarks, checkupDue, sickReturnDay, sickLong, DOCTOR_TASK_TEXT, emergencyReviewDue, surviveTasks, nextWeekend, newTasksToday, INFLOW_NUDGE_FROM, BAD_PLAN_MAX } from './care.js';
+import { emergencyOf } from './emergency.js';
 import { checkupsDue } from './prevent.js';
 import { planDay, planText, rankTasks } from './planday.js';
 import { parkedDue, finishPark } from './parked.js';
@@ -124,12 +126,54 @@ export function createTodayView({ go }) {
   // мягкие подсказки: мало сил, слишком много дел, долго низкое настроение
   const hintsBox = el('div', { id: 'hints', class: 'quiet-hide' });
   function hintCard(id, text, ...buttons) { return el('div', { id, class: 'card calm hint-card' }, el('p', { textContent: text }), el('div', { class: 'row wrap' }, ...buttons)); }
+
+  // план на плохой день: текст, который человек заранее написал сам себе (хранится в настройках)
+  const badPlan = () => String(getPref('badDayPlan') || '').trim();
+  let editingPlan = false;
+  function planEditorCard() {
+    const ta = el('textarea', { id: 'badplan-text', rows: 4, maxLength: BAD_PLAN_MAX, placeholder: 'Например: отменить лишние встречи, суп, прогулка, позвонить близкому' });
+    ta.value = getPref('badDayPlan') || '';
+    return el('div', { id: 'badplan-editor', class: 'card calm hint-card' },
+      el('p', { textContent: 'План на плохой день — письмо себе в будущее: напиши заранее, что помогает, когда сил мало. Увидишь его рядом с подсказкой о долгом низком настроении.' }),
+      ta,
+      el('div', { class: 'row wrap' },
+        el('button', { type: 'button', id: 'badplan-save', class: 'chip', textContent: 'Сохранить', onclick: () => { setPref('badDayPlan', ta.value.trim().slice(0, BAD_PLAN_MAX)); editingPlan = false; toast('План на плохой день сохранён'); render(); } }),
+        el('button', { type: 'button', id: 'badplan-cancel', class: 'chip', textContent: 'Отмена', onclick: () => { editingPlan = false; render(); } })));
+  }
+
+  // «проверь себя» раз в две недели: три мягкие отметки без цифр — тело, голова, дела
+  let checkSel = null;
+  function checkupCard(today) {
+    checkSel = checkSel || {};
+    return el('div', { id: 'care-checkup', class: 'card calm hint-card' },
+      el('p', { textContent: 'Проверь себя — три мягкие отметки, без цифр. Как ты?' }),
+      ...CHECKUP_AREAS.map(([k, label]) => el('div', { class: 'row wrap', dataset: { area: k } },
+        el('span', { class: 'muted', textContent: `${label}: ` }),
+        ...CHECKUP_MARKS.map(mk => el('button', { type: 'button', class: 'chip' + (checkSel[k] === mk ? ' primary' : ''), 'aria-pressed': String(checkSel[k] === mk), textContent: CHECKUP_MARK_TEXT[mk],
+          onclick: () => { checkSel[k] = mk; render(); } })))),
+      el('div', { class: 'row wrap' },
+        el('button', { type: 'button', id: 'care-checkup-save', class: 'chip', disabled: !cleanCheckupMarks(checkSel), textContent: 'Записать', onclick: () => {
+          const marks = cleanCheckupMarks(checkSel);
+          if (!marks) return;
+          setPref('careCheckAt', today); setPref('careCheckMarks', marks); checkSel = null;
+          toast('Спасибо, что прислушался к себе');
+          render();
+        } }),
+        el('button', { type: 'button', id: 'care-checkup-plan', class: 'chip', textContent: badPlan() ? 'Мой план на плохой день' : 'Написать план на плохой день', onclick: () => { editingPlan = true; render(); } }),
+        el('button', { type: 'button', id: 'care-checkup-later', class: 'chip', textContent: 'Не сейчас', onclick: () => { setPref('careCheckSnooze', today); checkSel = null; render(); } })));
+  }
+
   function renderHints(today, heavy) {
     const out = [];
     const quietWeek = isQuietWeek(getPrefs(), today);              // неделя без нового: подсказка «проверить экспериментом» подождёт
     const sickEv = activeSick(events, today);
     if (sickEv) out.push(hintCard('sick-banner', 'Режим болезни: привычки и серии на паузе, пропуски не считаются срывом, проверки и напоминания о привычках отложены. Отдыхай.',
-      el('button', { type: 'button', id: 'sick-banner-end', class: 'chip', textContent: 'Я поправился', onclick: async () => { await store.save(endSick(sickEv)); toast('Рад, что стало лучше. Серии продолжатся.'); } })));
+      el('button', { type: 'button', id: 'sick-banner-end', class: 'chip', textContent: 'Я поправился', onclick: async () => {
+        const ended = endSick(sickEv);
+        await store.save(ended);
+        if (sickLong(ended)) toast('Рад, что стало лучше. Болезнь длилась дольше трёх дней — может, стоит показаться врачу?', { ms: 9000, actionLabel: 'Создать задачу', onAction: () => store.save(makeTask(DOCTOR_TASK_TEXT, Date.now(), {})) });
+        else toast('Рад, что стало лучше. Серии продолжатся.');
+      } })));
     const light = !heavy && !sickEv && getPref('lightDayAsked') !== today && lightDayHint(events, today);
     if (light) out.push(hintCard('hint-light', light.text,
       el('button', { type: 'button', id: 'hint-light-on', class: 'chip', textContent: 'Включить «Тяжёлый день»', onclick: () => { setPref('heavyDay', true); setPref('lightDayAsked', today); render(); } }),
@@ -147,9 +191,44 @@ export function createTodayView({ go }) {
     if (over) out.push(hintCard('hint-overload', over.text,
       el('button', { type: 'button', id: 'hint-overload-on', class: 'chip', textContent: 'Оставить три главных', onclick: () => { setPref('heavyDay', true); setPref('overloadAsked', today); render(); } }),
       el('button', { type: 'button', class: 'chip', textContent: 'Справлюсь', onclick: () => { setPref('overloadAsked', today); render(); } })));
-    if (lowMoodNotice(events, today) && (getPref('lowMoodUntil') || '') < today) out.push(hintCard('hint-lowmood', LOW_MOOD_TEXT,
-      el('button', { type: 'button', id: 'hint-lowmood-go', class: 'chip', textContent: 'Что меня заряжает', onclick: () => go('reflect') }),
-      el('button', { type: 'button', id: 'hint-lowmood-hide', class: 'chip', textContent: 'Понятно, напомнить через неделю', onclick: () => { setPref('lowMoodUntil', addDays(today, 7)); render(); } })));
+    if (lowMoodNotice(events, today) && (getPref('lowMoodUntil') || '') < today) {
+      const plan = badPlan();
+      out.push(el('div', { id: 'hint-lowmood', class: 'card calm hint-card' },
+        el('p', { textContent: LOW_MOOD_TEXT }),
+        plan ? el('p', { id: 'lowmood-plan', class: 'muted', textContent: `Твой план на такой день: ${plan}` }) : null,
+        el('div', { class: 'row wrap' },
+          el('button', { type: 'button', id: 'hint-lowmood-go', class: 'chip', textContent: 'Что меня заряжает', onclick: () => go('reflect') }),
+          el('button', { type: 'button', id: 'hint-lowmood-plan', class: 'chip', textContent: plan ? 'Изменить мой план' : 'Написать план на плохой день', onclick: () => { editingPlan = true; render(); } }),
+          el('button', { type: 'button', id: 'hint-lowmood-hide', class: 'chip', textContent: 'Понятно, напомнить через неделю', onclick: () => { setPref('lowMoodUntil', addDays(today, 7)); render(); } }))));
+    }
+    // забота и анти-перегрузка (care.js)
+    if (events.length >= 5 && getPref('careCheckSnooze') !== today && checkupDue(getPref('careCheckAt'), today)) out.push(checkupCard(today));   // новичку хватает онбординга
+    else checkSel = null;
+    if (editingPlan) out.push(planEditorCard());
+    const ret = sickReturnDay(events, today);
+    if (ret && getPref('sickReturnAuto') === today && getPref('sickReturnHandled') !== today && getPref('heavyDay'))
+      out.push(hintCard('sick-return', 'Болезнь позади — это радостно. На первый день я сам включил режим «тяжёлый день»: дела подождут, силы важнее.',
+        el('button', { type: 'button', id: 'sick-return-ok', class: 'chip', textContent: 'Нет, я в порядке', onclick: () => { setPref('heavyDay', false); setPref('sickReturnHandled', today); render(); } })));
+    if (emergencyOf(events) && emergencyReviewDue(getPref('emergencyCheckedAt'), today))
+      out.push(hintCard('hint-emergency', 'Прошло полгода: экстренные данные (группа крови, аллергии, контакт) всё ещё верны?',
+        el('button', { type: 'button', id: 'hint-emergency-ok', class: 'chip', textContent: 'Да, всё верно', onclick: () => { setPref('emergencyCheckedAt', today); render(); } }),
+        el('button', { type: 'button', id: 'hint-emergency-go', class: 'chip', textContent: 'Проверить данные', onclick: () => go('health') })));
+    const surv = !heavy && !sickEv && getPref('surviveAsked') !== today ? surviveTasks(events, today) : [];
+    if (surv.length >= 2)
+      out.push(hintCard('hint-survive', `Если день тяжёлый, можно одним нажатием перенести на завтра все необязательные дела (сейчас их ${surv.length}). Важное останется на месте.`,
+        el('button', { type: 'button', id: 'hint-survive-go', class: 'chip', textContent: 'Пережить день', onclick: async () => {
+          const list = surviveTasks(events, todayStr());
+          if (!list.length) return;
+          const tomorrow = addDays(todayStr(), 1);
+          await store.saveMany(list.map(e => updateTask(e, { text: e.payload.text, due: tomorrow, repeat: e.payload.repeat?.type || '', priority: e.payload.priority })));
+          toast(`Перенесено на завтра: ${list.length}. Береги себя.`, { actionLabel: 'Отменить', onAction: () => store.saveMany(list) });
+        } }),
+        el('button', { type: 'button', id: 'hint-survive-no', class: 'chip', textContent: 'Не надо', onclick: () => { setPref('surviveAsked', today); render(); } })));
+    if (newTasksToday(events, today) >= INFLOW_NUDGE_FROM && getPref('inflowAsked') !== today) {
+      setPref('inflowAsked', today);       // тихо и один раз в день
+      out.push(hintCard('hint-inflow', 'Сегодня прибавилось уже несколько новых задач. Может, что-то из них спокойно подождёт до завтра?',
+        el('button', { type: 'button', id: 'hint-inflow-ok', class: 'chip', textContent: 'Понял, спасибо', onclick: () => render() })));
+    }
     hintsBox.replaceChildren(...out);
   }
 
@@ -296,9 +375,10 @@ export function createTodayView({ go }) {
     sections[key] = { sec: el('section', { id: 'g-' + key, hidden: true }, el('h2', { class: cls, textContent: title }), ul), ul };
   }
   const minList = el('ul', { class: 'list open' });
+  const minPlan = el('p', { id: 'min-plan', class: 'muted', hidden: true });
   const minimum = el('div', { id: 'minimum', class: 'card', hidden: true }, el('div', { class: 'mini-head' }, el('h3', { textContent: 'Минимум на сегодня' }),
     el('button', { type: 'button', id: 'heavy-off', class: 'chip', textContent: 'Выйти из режима', onclick: () => { setPref('heavyDay', false); render(); } })),
-    el('p', { class: 'muted', textContent: 'Тяжёлый день: только самое важное. Три дела, остальное подождёт. Привычки — в минимальной версии.' }), minList);
+    el('p', { class: 'muted', textContent: 'Тяжёлый день: только самое важное. Три дела, остальное подождёт. Привычки — в минимальной версии.' }), minList, minPlan);
   const empty = emptyState({ id: 'empty', art: 'tasks', title: 'Задач пока нет', text: 'Здесь будет список дел: на сегодня, с датой и без срока. Напиши первую задачу в строку выше — кольцо начнёт заполняться.', tone: 'todo', action: { label: 'Добавить задачу', icon: 'plus', onClick: () => input.focus() } });
   empty.hidden = true;
   const doneList = el('ul', { id: 'done-list', class: 'list' });
@@ -353,7 +433,7 @@ export function createTodayView({ go }) {
     const cancel = el('button', { type: 'button', class: 'cancel', textContent: 'Отмена', onclick: () => stopEdit() });
     const form = el('form', { class: 'item editing', dataset: { id: ev.id } },
       text,
-      el('div', { class: 'chips' }, chip('Сегодня', today), chip('Завтра', addDays(today, 1)), chip('Через неделю', addDays(today, 7)), chip('Без срока', '')),
+      el('div', { class: 'chips' }, chip('Сегодня', today), chip('Завтра', addDays(today, 1)), chip('На выходные', nextWeekend(today)), chip('Через неделю', addDays(today, 7)), chip('Без срока', '')),
       el('div', { class: 'opts-row' }, el('label', {}, 'Срок ', d), el('label', {}, 'Повтор ', r), el('label', { class: 'check-label' }, pr, ' Важное')),
       el('div', { class: 'row' }, save, cancel));
     form.onsubmit = async e => {
@@ -478,9 +558,12 @@ export function createTodayView({ go }) {
   // три главных дела для тяжёлого дня: сначала «важное», затем по срокам (просроченное и сегодняшнее раньше)
   function renderMinimum(g, today, heavy) {
     minimum.hidden = !heavy;
-    if (!heavy) return;
+    if (!heavy) { minPlan.hidden = true; return; }
     const pick = rankTasks(events, today).slice(0, 3);
     minList.replaceChildren(...(pick.length ? pick.map(e => item(e, today)) : [el('li', { class: 'muted', textContent: 'Задач нет. Отдохни.' })]));
+    const plan = String(getPref('badDayPlan') || '').trim();      // план на плохой день, написанный заранее самим собой
+    minPlan.hidden = !plan;
+    minPlan.textContent = plan ? `Твой план на такой день: ${plan}` : '';
   }
   const moveOverdueToToday = async () => {
     const today = todayStr();
@@ -536,7 +619,10 @@ export function createTodayView({ go }) {
     renderWotd(today);
     renderQuiet(today);
     const g = groupTasks(events, today);
-    const heavy = !!getPref('heavyDay');
+    let heavy = !!getPref('heavyDay');
+    // мягкое возвращение после болезни: первый день режим «тяжёлый день» включается сам (один раз, с объяснением в подсказках)
+    const returnDay = sickReturnDay(events, today);
+    if (returnDay && !heavy && getPref('sickReturnAuto') !== today && getPref('sickReturnHandled') !== today) { setPref('heavyDay', true); setPref('sickReturnAuto', today); heavy = true; }
     renderWhatsNew(); renderIntention(today); renderHints(today, heavy); renderParked(today); moneyNudge.update(events); deviceHints.update(events); renderPlan(today); dayCards.update(events);
     renderMinimum(g, today, heavy);
     renderBestAction(today, heavy);
