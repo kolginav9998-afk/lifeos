@@ -303,6 +303,10 @@ export function createTodayView({ go }) {
     toast(`Удалено сделанных: ${ids.length}`, { actionLabel: 'Отменить', onAction: () => store.saveMany(old) });
   };
 
+  // «Самое полезное прямо сейчас»: одна большая кнопка под hero (или тёплая карточка, когда всё сделано).
+  // Объявляется до root.append: блок стоит вторым на экране «Сегодня».
+  const actionBox = el('div', { id: 'best-action', hidden: true });
+
   root.append(hero, actionBox, whatsNew, summary, hintsBox, deviceHints.root, parkedBox, moneyNudge.root, intentionBox, planCard, dayCards.root, onboarding, wotd, focusHost, form, minimum, review, journal, ...Object.values(sections).map(s => s.sec), empty, doneBlock);
 
   // ----- элементы списка -----
@@ -460,8 +464,7 @@ export function createTodayView({ go }) {
   const moveOverdue = el('button', { type: 'button', id: 'move-overdue', class: 'chip', textContent: 'Перенести всё на сегодня', onclick: moveOverdueToToday });
   sections.overdue.sec.insertBefore(moveOverdue, sections.overdue.ul);
 
-  // «Самое полезное прямо сейчас»: одна большая кнопка под hero (или тёплая карточка, когда всё сделано)
-  const actionBox = el('div', { id: 'best-action', hidden: true });
+  // Логика кнопки (объявление самого actionBox — выше, рядом со сборкой экрана).
   function runBestAction(a) {
     if (a.kind === 'overdue') return moveOverdueToToday();
     if (a.kind === 'morning' || a.kind === 'evening') return go('diary');
