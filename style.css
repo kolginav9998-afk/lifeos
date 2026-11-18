@@ -527,3 +527,6 @@ details[open]>summary::after{transform:rotate(-135deg) translateY(-1px)}
 /* уведомление не перехватывает нажатия по тому, что под ним (кроме своей кнопки «Отменить») */
 .toast{pointer-events:none}
 .toast button{pointer-events:auto}
+
+/* День тишины: без счётчиков, серий и подсказок — только дела. Прятать по классу на <body>, без анимаций. */
+body.quiet .quiet-hide{display:none!important}

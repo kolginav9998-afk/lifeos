@@ -1,4 +1,4 @@
-import { el, toast, setBusy, agoText, revealable } from './ui.js';
+import { el, toast, setBusy, agoText, revealable, dateRu } from './ui.js';
 import * as vault from './vault.js';
 import { startupText } from './perf.js';
 import { yearBook, diaryYears } from './writing.js';
@@ -9,7 +9,8 @@ import { createArchive } from './view-archive.js';
 import { expensesToCsv } from './money.js';
 import { toMarkdown } from './export.js';
 import { saveTextFile, isNative, platformName } from './platform.js';
-import { getPref, setPref } from './prefs.js';
+import { getPref, getPrefs, setPref } from './prefs.js';
+import { isQuietDay, isQuietWeek, toggleQuietDay, startQuietWeek } from './quiet.js';
 import { VERSION } from './version.js';
 import * as notify from './notify.js';
 import { log as errorLog } from './errlog.js';
@@ -27,7 +28,7 @@ const AUTOLOCK = [[0, 'сразу при сворачивании'], [1, 'чер
 function card(title, ...kids) { return el('section', { class: 'card settings-card' }, el('h3', { textContent: title }), ...kids); }
 function field(id, props) { return el('input', { id, autocomplete: 'off', ...props }); }
 
-export function createSettingsView({ lockNow, applyTheme, applyMode = () => {}, onVaultChange, openAccount = () => {}, openHelp = () => {} }) {
+export function createSettingsView({ lockNow, applyTheme, applyMode = () => {}, applyQuiet = () => {}, onVaultChange, openAccount = () => {}, openHelp = () => {} }) {
   let events = [];
   const root = el('section', { id: 'view-more', class: 'view' });
 
@@ -177,6 +178,32 @@ export function createSettingsView({ lockNow, applyTheme, applyMode = () => {}, 
   const hideAmounts = el('input', { id: 'pref-hide', type: 'checkbox', checked: !!getPref('hideAmounts') });
   hideAmounts.onchange = () => { setPref('hideAmounts', hideAmounts.checked); store.refresh(); };
 
+  // ---------- покой: день тишины и неделя без нового ----------
+  const quietDayBtn = el('button', { id: 'quiet-day-toggle', type: 'button', class: 'chip' });
+  const quietWeekBtn = el('button', { id: 'quiet-week-toggle', type: 'button', class: 'chip' });
+  const quietNote = el('p', { id: 'quiet-state', class: 'muted' });
+  function renderQuiet() {
+    const today = todayStr(), prefs = getPrefs();
+    const day = isQuietDay(prefs, today), week = isQuietWeek(prefs, today);
+    quietDayBtn.textContent = day ? 'День тишины: включён' : 'День тишины сегодня';
+    quietDayBtn.setAttribute('aria-pressed', String(day));
+    quietWeekBtn.textContent = week ? `Неделя без нового: до ${dateRu(prefs.quietWeekUntil)}` : 'Неделя без нового';
+    quietWeekBtn.setAttribute('aria-pressed', String(week));
+    quietNote.textContent = day ? 'Сегодня спрятаны счётчики, серии и подсказки — только дела. Завтра всё вернётся само.'
+      : week ? 'Семь дней без предложений новых курсов, экспериментов и функций. Всё начатое работает как обычно.'
+        : 'Если всего стало много, можно на время убрать цифры и предложения нового. Дела, записи и начатое остаются на месте.';
+  }
+  quietDayBtn.onclick = () => {
+    const on = toggleQuietDay(todayStr());
+    applyQuiet(); renderQuiet(); store.refresh().catch(() => {});      // применить сразу: класс на <body> и перерисовка «Сегодня»
+    toast(on ? 'День тишины включён: только дела, без счётчиков' : 'День тишины выключен');
+  };
+  quietWeekBtn.onclick = () => {
+    const on = startQuietWeek(todayStr());
+    applyQuiet(); renderQuiet(); store.refresh().catch(() => {});
+    toast(on ? 'Неделя без нового началась. Всё начатое продолжает работать.' : 'Неделя без нового отменена');
+  };
+
   // ---------- напоминания (только в приложении) ----------
   const remindBox = el('div', { id: 'remind-box', class: 'form-stack' });
   const hours = (values, off) => values.map(h => [h, h < 0 ? off : `в ${String(h).padStart(2, '0')}:00`]);
@@ -316,6 +343,9 @@ export function createSettingsView({ lockNow, applyTheme, applyMode = () => {}, 
       el('label', { class: 'check-label' }, simple, ' Простой режим: прячет лишние разделы и плашки, остаётся самое нужное на каждый день'),
       el('label', { class: 'check-label' }, parseDates, ' Понимать даты в тексте задачи («завтра», «10 числа»)'),
       el('label', { class: 'check-label' }, hideAmounts, ' Скрывать суммы на экране')),
+    card('Покой',
+      el('p', { class: 'muted', textContent: 'Режимы против перегрузки. «День тишины» прячет счётчики и подсказки на сегодня. «Неделя без нового» на 7 дней приостанавливает предложения новых курсов, экспериментов и функций.' }),
+      el('div', { class: 'row wrap' }, quietDayBtn, quietWeekBtn), quietNote),
     card('Напоминания', remindBox),
     card('Данные', stats, corrupt, checkBtn, checkOut),
     card('Приватность', privacy),
@@ -325,14 +355,15 @@ export function createSettingsView({ lockNow, applyTheme, applyMode = () => {}, 
   renderSecurity();
   renderReminders();
   renderAccountText();
+  renderQuiet();
 
   return {
     root,
-    show() { renderSecurity(); renderAccountText(); this.update(store.state.events); },
+    show() { renderSecurity(); renderAccountText(); renderQuiet(); this.update(store.state.events); },
     update(evs) {
       events = evs;
       if (document.activeElement !== nameInput) nameInput.value = profileOf(evs)?.payload.name || '';
-      renderStats(); renderDiag(); renderYearbook(); archive.update();
+      renderStats(); renderDiag(); renderYearbook(); archive.update(); renderQuiet();
     },
     reset() { archive.reset(); wipeConfirm.value = ''; wipeBtn.disabled = true; renderSecurity(); },
     renderSecurity,

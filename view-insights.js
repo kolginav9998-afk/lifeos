@@ -5,6 +5,8 @@ import { todayStr, daysBetween } from './events.js';
 import * as store from './store.js';
 import { METRICS, PRESETS, SAFETY, DAYS_OPTIONS, makeExperiment, experimentsOf, phaseOf, stateOf, endDate, evaluate } from './experiments.js';
 import { saveBinaryFile, saveTextFile } from './platform.js';
+import { getPrefs } from './prefs.js';
+import { isQuietWeek } from './quiet.js';
 import { TESTS, DOMAINS, runsOf, fmtPrimary, fmtNum } from './bt-core.js';
 import { analyzeRuns, insights, dailyRows, zText, zWord } from './bt-analytics.js';
 import { buildExport, toCsvExcel, buildTables } from './bt-export.js';
@@ -123,7 +125,10 @@ export function createInsightsView() {
       })), panel90Card(events, todayStr()));
     }
 
-    parts.push(el('h2', { textContent: 'Эксперименты' }), expForm, ...experimentNodes(dailyRows(events, runs, an)));
+    // Неделя без нового: форму нового эксперимента не предлагаем, начатые эксперименты идут как обычно.
+    parts.push(el('h2', { textContent: 'Эксперименты' }),
+      ...(isQuietWeek(getPrefs(), todayStr()) ? [el('p', { class: 'muted', id: 'exp-quiet', textContent: 'Неделя без нового: новые эксперименты подождут. Текущие идут как обычно.' })] : [expForm]),
+      ...experimentNodes(dailyRows(events, runs, an)));
 
     parts.push(el('h2', { textContent: 'Отчёты' }), el('div', { class: 'card', id: 'reports' },
       el('p', { class: 'muted', textContent: 'Готовые тексты (Markdown) из твоих данных. В них только числа и названия; тексты дневника и заметок не включаются.' }),

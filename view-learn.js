@@ -13,6 +13,8 @@ import { plateauInfo } from './practice.js';
 import { lessonSkillStatus, skillFromLesson, skillFromTask } from './skills.js';
 import { practiceCard } from './view-learn-extra.js';
 import { routeProgress } from './curriculum.js';
+import { getPrefs } from './prefs.js';
+import { isQuietWeek } from './quiet.js';
 
 const QUALITY_LABEL = { again: 'Забыл', hard: 'Трудно', good: 'Помню' };
 
@@ -93,25 +95,28 @@ export function createLearnView(ctx = {}) {
       bar(Math.min(sw.minutes, sw.goal), sw.goal),
       el('div', { class: 'row wrap' }, ...Object.entries(SPEAK_LANGS).map(([k, name]) => el('button', { type: 'button', id: `speak-${k}`, class: 'chip', textContent: name, onclick: () => startSpeaking(k) }))));
     const mine = userCards(events);
-    const cards = TRACKS.filter(t => !t.zero).map(t => {
-      const p = trackProgress(t, events, t0);
-      return el('button', { type: 'button', class: 'track-card', dataset: { track: t.id }, onclick: () => go({ name: 'track', id: t.id }) },
-        el('span', { class: 'track-ic', style: `background:${t.color}`, textContent: t.icon, 'aria-hidden': 'true' }),
-        el('span', { class: 'track-body' },
-          el('strong', { textContent: t.title }),
-          el('span', { class: 'muted', textContent: `Уроки ${p.lessons}/${p.lessonsTotal} · выучено ${p.mastered}/${p.total}` }),
-          bar(p.lessons, p.lessonsTotal)));
-    });
+    const quietWeek = isQuietWeek(getPrefs(), t0);                  // неделя без нового: предлагаем только начатые курсы, новые подождут
+    const quietNote = quietWeek ? el('p', { class: 'muted', id: 'learn-quiet', textContent: 'Неделя без нового: новые курсы подождут. Начатые — на месте, повторение работает как обычно.' }) : null;
+    const cards = TRACKS.filter(t => !t.zero).map(t => ({ t, p: trackProgress(t, events, t0) }))
+      .filter(({ p }) => !quietWeek || p.lessons > 0 || p.mastered > 0)
+      .map(({ t, p }) => {
+        return el('button', { type: 'button', class: 'track-card', dataset: { track: t.id }, onclick: () => go({ name: 'track', id: t.id }) },
+          el('span', { class: 'track-ic', style: `background:${t.color}`, textContent: t.icon, 'aria-hidden': 'true' }),
+          el('span', { class: 'track-body' },
+            el('strong', { textContent: t.title }),
+            el('span', { class: 'muted', textContent: `Уроки ${p.lessons}/${p.lessonsTotal} · выучено ${p.mastered}/${p.total}` }),
+            bar(p.lessons, p.lessonsTotal)));
+      });
     const my = el('button', { type: 'button', class: 'track-card', dataset: { track: 'my' }, onclick: () => go({ name: 'my' }) },
       el('span', { class: 'track-ic', style: `background:${MY_TRACK.color}`, textContent: MY_TRACK.icon, 'aria-hidden': 'true' }),
       el('span', { class: 'track-body' }, el('strong', { textContent: MY_TRACK.title }), el('span', { class: 'muted', textContent: mine.length ? `Карточек: ${mine.length}` : 'Добавляй свои вопросы и ответы' })));
     const note = el('p', { class: 'muted', textContent: 'Курсы — учебный материал, а не медицинская, юридическая или финансовая консультация.' });
     const zeroTracks = TRACKS.filter(t => t.zero);
-    const zeroCard = zeroTracks.length ? el('div', { class: 'card zero-entry', id: 'learn-zero' }, el('h3', { textContent: 'Курсы с нуля' }),
+    const zeroCard = zeroTracks.length && (!quietWeek || zeroTracks.some(z => routeProgress(z, events).done > 0)) ? el('div', { class: 'card zero-entry', id: 'learn-zero' }, el('h3', { textContent: 'Курсы с нуля' }),
       el('p', { class: 'muted', textContent: 'Английский, иврит и библейский иврит с самого начала: звуки, буквы, чтение. Уроки открываются по порядку, а «Освоено» ставится после проверки.' }),
       el('ul', { class: 'plain' }, ...zeroTracks.map(z => { const p = routeProgress(z, events); return el('li', { textContent: `${z.title}: освоено ${p.done} из ${p.total}` }); })),
       el('button', { type: 'button', id: 'learn-zero-open', class: 'primary', textContent: 'Открыть «С нуля»', onclick: () => ctx.openZero?.() })) : null;
-    mount(head, comeback, fifteen, revisit, speaking, practiceCard(events, t0), leech, el('h2', { textContent: 'Курсы' }), zeroCard, ...cards, my, note);
+    mount(head, comeback, fifteen, revisit, speaking, practiceCard(events, t0), leech, el('h2', { textContent: 'Курсы' }), quietNote, zeroCard, ...cards, my, note);
   }
 
   // ---------- конспект урока и открытие урока ----------

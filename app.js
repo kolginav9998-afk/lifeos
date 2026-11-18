@@ -5,7 +5,8 @@ installErrLog();
 import * as vault from './vault.js';
 import * as db from './db.js';
 import * as store from './store.js';
-import { getPref, setPref } from './prefs.js';
+import { getPref, getPrefs, setPref } from './prefs.js';
+import { isQuietDay, isQuietWeek } from './quiet.js';
 import { isNative } from './platform.js';
 import { searchEvents } from './search.js';
 import { searchAcademy } from './academy.js';
@@ -106,6 +107,14 @@ function applyTheme() {
   if (density && density !== 'normal') root.setAttribute('data-density', density); else root.removeAttribute('data-density');
   const bg = getComputedStyle(root).getPropertyValue('--bg').trim();
   if (bg) document.querySelector('meta[name=theme-color]')?.setAttribute('content', bg);
+}
+
+// ---------- режимы покоя: «день тишины» и «неделя без нового» ----------
+// Классы на <body>: quiet скрывает счётчики и подсказки (CSS), quiet-week приглушает предложения нового (проверяется в экранах).
+function applyQuiet() {
+  const today = todayStr(), prefs = getPrefs();
+  document.body.classList.toggle('quiet', isQuietDay(prefs, today));
+  document.body.classList.toggle('quiet-week', isQuietWeek(prefs, today));
 }
 
 // ---------- счётчик запусков (для диагностики) ----------
@@ -390,7 +399,7 @@ function handleUrlParams() {
 // ---------- сборка интерфейса ----------
 // Экраны создаются заново и при блокировке: в скрытых экранах и открытых окнах не должно оставаться личных данных.
 function buildViews() {
-  const main = $('view'), ctx = { go: navigate, lockNow, applyTheme, applyMode, onVaultChange: updateLockButton, openAccount: () => go('account'),
+  const main = $('view'), ctx = { go: navigate, lockNow, applyTheme, applyMode, applyQuiet, onVaultChange: updateLockButton, openAccount: () => go('account'),
     editProfile: () => { navigate('account'); const form = views.account.root.querySelector('#profile-edit'); if (form) form.open = true; },        // «Изменить профиль»: аккаунт с раскрытой формой имени, значка и цвета
     exportCsv: () => views.more.exportCsv(),
     openHelp, openZero: (trackId, lessonId) => { navigate('zero'); views.zero.open(trackId, lessonId); }, showTour: () => { window.scrollTo(0, 0); tour.show(); },
@@ -439,7 +448,7 @@ function build() {
   watchHeadings($('view')); watchHeadings($('gate'));     // уровни заголовков без пропусков
   keepFocusIn($('gate-body'), gatePick);
 
-  store.onChange(evs => { for (const v of Object.values(views)) v.update(evs); renderSearch(); paintAvatar(evs); updateDayLine(evs); notify.resyncSoon(); });
+  store.onChange(evs => { applyQuiet(); for (const v of Object.values(views)) v.update(evs); renderSearch(); paintAvatar(evs); updateDayLine(evs); notify.resyncSoon(); });
   store.setLockedHandler(showLock);
 }
 
@@ -449,6 +458,7 @@ addEventListener('offline', setStatus);
 
 // ---------- запуск ----------
 applyTheme();
+applyQuiet();
 bumpLaunch();
 build();
 setStatus();

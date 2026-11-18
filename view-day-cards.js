@@ -8,7 +8,7 @@ import { workLine } from './schedule.js';
 export function createDayCards() {
   let events = [];
   let briefOpen = null, summaryOpen = null, tenOpen = null;                         // выбор человека на время сессии; пока null — по времени суток
-  const root = el('div', { id: 'day-cards' });
+  const root = el('div', { id: 'day-cards', class: 'quiet-hide' });       // в день тишины бриф и итоги с цифрами не показываем
   const lines = text => text.split('\n').slice(1).map(t => el('p', { class: /^\d+\. /.test(t) ? 'brief-task' : '', textContent: t }));
 
   function render() {
