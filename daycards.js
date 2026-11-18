@@ -5,7 +5,7 @@ import { rankTasks } from './planday.js';
 import { activeHabits } from './habits.js';
 import { todayLoad } from './academy.js';
 import { reviewDue, pickSurprise } from './curriculum.js';
-import { upcomingBirthdays, dueContacts } from './people.js';
+import { upcomingBirthdays, upcomingImportant, dueContacts } from './people.js';
 import { checkupsDue } from './prevent.js';
 import { decisionsDue, intentionOf } from './reflect.js';
 import { parkedDue } from './parked.js';
@@ -41,6 +41,7 @@ export function dayBrief(events, today, { tasks = 3 } = {}) {
     zero: zeroToday(events, today),
     meds,
     birthdays: upcomingBirthdays(events, today, 1).map(b => ({ name: b.person.payload.name, inDays: b.inDays })),
+    important: upcomingImportant(events, today, 1).map(x => ({ name: x.person.payload.name, label: x.label, inDays: x.inDays })),
     contacts: dueContacts(events, today).slice(0, 3).map(c => c.person.payload.name),
     checkups: checkupsDue(events, today).length,
     decisions: decisionsDue(events, today).length,
@@ -59,6 +60,7 @@ export function briefText(b) {
   if (b.zero?.due || b.zero?.quick) L.push(`С нуля: ${[b.zero.due && `пора повторить уроков: ${b.zero.due}`, b.zero.quick && 'есть быстрая проверка'].filter(Boolean).join('; ')}`);
   if (b.meds.length) L.push(`Лекарства и добавки: ${b.meds.map(m => `${m.name} (${WHEN[m.when] ?? m.when})`).join(', ')}`);
   if (b.birthdays.length) L.push(`День рождения: ${b.birthdays.map(x => `${x.name} (${x.inDays === 0 ? 'сегодня' : 'завтра'})`).join(', ')}`);
+  if (b.important?.length) L.push(`Важный день: ${b.important.map(x => `${x.name}${x.label ? ` — ${x.label}` : ''} (${x.inDays === 0 ? 'сегодня' : 'завтра'})`).join(', ')}`);
   if (b.contacts.length) L.push(`Давно не общались: ${b.contacts.join(', ')}`);
   if (b.laundry) L.push(`Стирка: ${b.laundry} ${plural(b.laundry, 'вещь', 'вещи', 'вещей')} пора стирать`);
   const more = [b.checkups && `проверки здоровья: ${b.checkups}`, b.decisions && `решения, которые пора оценить: ${b.decisions}`, b.parked && `отложенные мысли: ${b.parked}`].filter(Boolean);

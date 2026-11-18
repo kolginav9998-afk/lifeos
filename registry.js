@@ -47,7 +47,7 @@ export const REGISTRY = {
   resource: { label: 'Отметка о внешнем курсе', group: 'Учёба', module: 'zero-resources.js', privacy: 'learning', analytics: false, fields: 'id, status (not_started|in_progress|completed|abandoned), note, date' },
   testrun: { label: 'Прохождение проверки', group: 'Проверки', module: 'bt-core.js', privacy: 'numbers', analytics: true, fields: 'date, mode, tests{metrics, trials}, state, startedAt, durationMs' },
   experiment: { label: 'Личный эксперимент', group: 'Проверки', module: 'experiments.js', privacy: 'text', analytics: false, fields: 'title, change, metric, days, blockDays, startDate, order, cancelled' },
-  person: { label: 'Человек', group: 'Люди и цели', module: 'people.js', privacy: 'people', analytics: false, fields: 'name, birthday, birthYear, cadenceDays, lastContact, note' },
+  person: { label: 'Человек', group: 'Люди и цели', module: 'people.js', privacy: 'people', analytics: false, fields: 'name, birthday, birthYear, cadenceDays, lastContact, note, importantDate (MM-DD ежегодная или YYYY-MM-DD разовая), importantLabel' },
   okr: { label: 'Цель квартала', group: 'Люди и цели', module: 'okr.js', privacy: 'text', analytics: false, fields: 'title, why, due, krs[text, target, current, unit, auto{kind (count|sum), type, field, from, to}], status' },
   intention: { label: 'Намерение дня', group: 'Рефлексия', module: 'reflect.js', privacy: 'text', analytics: false, fields: 'date, text' },
   dayreview: { label: 'Вечерний обзор', group: 'Рефлексия', module: 'reflect.js', privacy: 'text', analytics: false, fields: 'date, win, miss, learn' },

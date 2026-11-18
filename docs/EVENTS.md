@@ -96,7 +96,7 @@ _Файл создан из `registry.js` и сверяется с ним тес
 
 | Тип | Что это | Поля | Приватность | В выгрузке | Модуль |
 |---|---|---|---|---|---|
-| `person` | Человек | name, birthday, birthYear, cadenceDays, lastContact, note | люди | нет | `people.js` |
+| `person` | Человек | name, birthday, birthYear, cadenceDays, lastContact, note, importantDate (MM-DD ежегодная или YYYY-MM-DD разовая), importantLabel | люди | нет | `people.js` |
 | `okr` | Цель квартала | title, why, due, krs[text, target, current, unit, auto{kind (count|sum), type, field, from, to}], status | личный текст | нет | `okr.js` |
 
 ## Рефлексия

@@ -18,15 +18,33 @@ export function parseBirthday(input) {
   return { md: `${String(m).padStart(2, '0')}-${String(d).padStart(2, '0')}`, year: y };
 }
 
-export function makePerson({ name, birthday = '', cadenceDays = 0, note = '' }, now = Date.now()) {
+export function makePerson({ name, birthday = '', cadenceDays = 0, note = '', importantDate = '', importantLabel = '' }, now = Date.now()) {
   const n = clean(name, 60);
   if (!n) throw new Error('Напиши имя');
   const b = parseBirthday(birthday);
   const c = Number(cadenceDays) || 0;
   if (!CADENCES.some(([v]) => v === c)) throw new Error('Выбери, как часто общаться');
   return { id: `pp:${newId()}`, type: 'person', ts: now, source: 'manual', confidence: 1, evidence: [],
-    payload: { name: n, birthday: b?.md ?? null, birthYear: b?.year ?? null, cadenceDays: c, lastContact: null, note: clean(note, 500), createdDate: todayStr(now) } };
+    payload: { name: n, birthday: b?.md ?? null, birthYear: b?.year ?? null, cadenceDays: c, lastContact: null, note: clean(note, 500), createdDate: todayStr(now),
+      importantDate: parseImportant(importantDate), importantLabel: clean(importantLabel, 60) } };
 }
+
+// Важная дата близкого: «12.03» — ежегодная (хранится 'MM-DD'), «12.03.2020» или «2020-03-12» — разовая. Пустая строка — null.
+export function parseImportant(input) {
+  const s = String(input ?? '').trim();
+  if (!s) return null;
+  let d, m, y = null, mt;
+  if ((mt = /^(\d{1,2})[./-](\d{1,2})(?:[./-](\d{4}))?$/.exec(s))) { d = +mt[1]; m = +mt[2]; y = mt[3] ? +mt[3] : null; }
+  else if ((mt = /^(\d{4})-(\d{2})-(\d{2})$/.exec(s))) { y = +mt[1]; m = +mt[2]; d = +mt[3]; }
+  else throw new Error('Важная дата: например 12.03 или 12.03.2020');
+  const dim = new Date(2024, m, 0).getDate();                       // високосный год: 29 февраля допустим
+  if (!(m >= 1 && m <= 12) || !(d >= 1 && d <= dim)) throw new Error('Такой даты нет');
+  const md = `${String(m).padStart(2, '0')}-${String(d).padStart(2, '0')}`;
+  if (y === null) return md;
+  if (y < 1900 || y > 2100) throw new Error('Год указан неверно');
+  return `${y}-${md}`;
+}
+export const updateImportant = (p, date, label) => ({ ...p, payload: { ...p.payload, importantDate: parseImportant(date), importantLabel: clean(label, 60) } });
 export const markContact = (p, date) => { if (!isYmd(date)) throw new Error('bad date'); return { ...p, payload: { ...p.payload, lastContact: date } }; };
 export const updateNote = (p, note) => ({ ...p, payload: { ...p.payload, note: clean(note, 500) } });
 export const peopleOf = events => events.filter(e => e.type === 'person').sort((a, b) => a.payload.name.localeCompare(b.payload.name));
@@ -44,6 +62,22 @@ export function nextBirthday(p, today) {
 }
 export function upcomingBirthdays(events, today, days = 14) {
   return peopleOf(events).map(e => ({ person: e, ...nextBirthday(e.payload, today) })).filter(x => x.date && x.inDays <= days).sort((a, b) => a.inDays - b.inDays || a.person.payload.name.localeCompare(b.person.payload.name));
+}
+// Ближайшая важная дата не раньше today: ежегодная 'MM-DD' повторяется (29 февраля в невисокий год — 28-го), разовая 'YYYY-MM-DD' — только если ещё впереди.
+export function nextImportant(p, today) {
+  const raw = p.importantDate;
+  if (!raw) return null;
+  const label = p.importantLabel || '';
+  if (raw.length === 10) return raw >= today ? { date: raw, inDays: daysBetween(today, raw), label } : null;
+  const [y] = today.split('-').map(Number);
+  const [m, d] = raw.split('-').map(Number);
+  const at = yy => { const dim = new Date(yy, m, 0).getDate(); return `${yy}-${String(m).padStart(2, '0')}-${String(Math.min(d, dim)).padStart(2, '0')}`; };
+  let date = at(y);
+  if (date < today) date = at(y + 1);
+  return { date, inDays: daysBetween(today, date), label };
+}
+export function upcomingImportant(events, today, days = 14) {
+  return peopleOf(events).map(e => ({ person: e, ...nextImportant(e.payload, today) })).filter(x => x.date && x.inDays <= days).sort((a, b) => a.inDays - b.inDays || a.person.payload.name.localeCompare(b.person.payload.name));
 }
 // Кому пора написать: прошло не меньше периода с последнего контакта (или с добавления).
 export function dueContacts(events, today) {
