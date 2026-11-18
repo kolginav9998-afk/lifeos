@@ -11,6 +11,7 @@ erDiagram
   goal ||--o{ goalmove : "goalId"
   lesson ||--o{ lessonnote : "lesson"
   item ||--o{ itemlog : "item"
+  pet ||--o{ petvac : "pet"
   day ||--o{ checkin : "date"
   day ||--o{ diary : "date"
   day ||--o{ measure : "date"
@@ -44,6 +45,7 @@ erDiagram
 | `goal` | `goalmove` | `goalId` | взносы в копилку |
 | `lesson` | `lessonnote` | `lesson` | конспект к пройденному уроку |
 | `item` | `itemlog` | `item` | история вещи: надел, постирал, починил |
+| `pet` | `petvac` | `pet` | прививки питомца |
 
 ## Записи по дням
 

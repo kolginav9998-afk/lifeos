@@ -3,7 +3,7 @@ import { el, fill, icon, toast, dateRu, moneyText, focusNode } from './ui.js';
 import * as store from './store.js';
 import { STATUS_LABEL, KIND_LABEL, LOG_NOUN, quickLogs, logButton, statsLine, careOf, careText, washProgress, ageText, timesText, plural, makeLog, newLogId, moveItem, updateItem, fieldsOf, lastLog } from './home.js';
 
-const LOG_ORDER = ['wear', 'use', 'wash', 'repair', 'move', 'note'];
+const LOG_ORDER = ['wear', 'use', 'wash', 'water', 'repair', 'move', 'note'];
 
 export function createDetailWindow(H) {
   const host = el('div', { id: 'hm-detail', class: 'overlay', hidden: true, tabIndex: -1, role: 'dialog', 'aria-modal': 'true', 'aria-label': 'Вещь' });
@@ -75,6 +75,10 @@ export function createDetailWindow(H) {
       s.costPerWear !== null ? el('p', { textContent: `Цена за одно ${use}: ${moneyText(s.costPerWear)}` }) : null].filter(x => x && x.textContent !== '');
     const params = [['Вид', KIND_LABEL[p.kind]], ['Состояние', STATUS_LABEL[p.status]], ['Где лежит', p.place], ['Бренд', p.brand], ['Цвет', p.color], ['Размер', p.size], ['Материал', p.material], ['Количество', p.qty > 1 ? `${p.qty} шт.` : ''],
       ['Куплено', p.bought ? dt(p.bought) : ''], ['Цена', p.priceMinor !== null && p.priceMinor !== undefined ? moneyText(p.priceMinor) : ''], ['Гарантия до', p.warranty ? dt(p.warranty) : ''], ['Уход', acts.includes('wash') || c.how !== 'none' ? careText(c) : ''],
+      ['Действует до', p.validUntil ? dt(p.validUntil) : ''], ['Съесть до', p.useBy ? dt(p.useBy) : ''],
+      ['Полив', Number.isInteger(p.waterEveryDays) ? `раз в ${p.waterEveryDays} ${plural(p.waterEveryDays, 'день', 'дня', 'дней')}` : ''],
+      ['Обслуживание', Number.isInteger(p.serviceEveryDays) ? `раз в ${p.serviceEveryDays} ${plural(p.serviceEveryDays, 'день', 'дня', 'дней')}` : ''],
+      ['«Кончается» при остатке', Number.isInteger(p.lowAt) ? `${p.lowAt} шт.` : ''],
       ['Метки', (p.tags ?? []).join(', ')], ['Заметка', p.note]].filter(([, v]) => v);
     const shown = showAll ? logs : logs.slice(0, 12), last = lastLog(logs);
     const hist = logs.length ? [el('ul', { class: 'hm-hist' }, ...shown.map(l => {

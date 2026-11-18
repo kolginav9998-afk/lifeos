@@ -25,6 +25,7 @@ test('вещь: нужны только название и вид; осталь
   const e = mk({ name: '  Куртка   зимняя ' });
   assert.match(e.id, /^item:[0-9a-z]+$/); assert.equal(e.type, 'item'); assert.equal(e.id, `item:${e.ts.toString(36)}`); assert.equal(todayOf(e.ts), '2026-08-01');
   assert.deepEqual(e.payload, { name: 'Куртка зимняя', kind: 'clothes', place: '', brand: '', color: '', size: '', material: '', qty: 1, bought: null, priceMinor: null, currency: 'RUB', warranty: null,
+    validUntil: null, useBy: null, waterEveryDays: null, serviceEveryDays: null, lowAt: null,
     care: { how: 'machine', temp: null, washEveryWears: null, washEveryDays: null }, status: 'active', tags: [], note: '' });
   assert.equal(e.source, 'manual'); assert.equal(e.confidence, 1); assert.deepEqual(e.evidence, []);
   assert.equal(mk({ name: 'Х' }, '2026-08-01', 'item:fixed').id, 'item:fixed', 'идентификатор можно задать');
@@ -237,7 +238,7 @@ test('места, подписи и тексты: подсказки мест, �
   assert.equal(careText({ how: 'hand', temp: null, washEveryWears: 1, washEveryDays: null }), 'Ручная стирка, стирать после каждого надевания');
   assert.equal(careText({ how: 'dry', temp: null, washEveryWears: null, washEveryDays: 21 }), 'Химчистка, стирать раз в 21 день'); assert.equal(careText({ how: 'none' }), 'Не стирается');
   assert.equal(parsePrice(' 1 250,50 '), 125050); assert.equal(parsePrice(''), null); assert.equal(parsePrice('0'), 0); assert.equal(parsePrice('0,00'), 0); assert.throws(() => parsePrice('много'), /Сумма/);
-  assert.equal(KINDS.length, 11);
+  assert.equal(KINDS.length, 13);
 });
 
 test('«Сегодня»: в брифе одна строка про стирку, только когда есть что стирать', () => {

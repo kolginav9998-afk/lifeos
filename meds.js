@@ -49,3 +49,21 @@ export function adherence(events, today, n = 14) {
     return { med: m, taken: Math.min(taken, span), of: span };
   });
 }
+
+// Чек-лист «лекарства в дорогу»: активные лекарства, сгруппированные по времени приёма (утром, днём, вечером).
+// Текст копируется одним нажатием — его удобно вставить в заметку или отправить близким.
+export function travelList(events) {
+  const by = new Map(ORDER.map(w => [w, []]));
+  for (const m of medsOf(events)) if (m.payload.active) by.get(m.payload.when)?.push(m);
+  return ORDER.filter(w => by.get(w).length).map(w => ({ when: w, label: WHEN[w], meds: by.get(w) }));
+}
+export function travelText(events) {
+  const groups = travelList(events);
+  if (!groups.length) return '';
+  const L = ['Лекарства в дорогу:'];
+  for (const g of groups) {
+    L.push('', `${g.label[0].toUpperCase()}${g.label.slice(1)}:`);
+    for (const m of g.meds) L.push(`- ${m.payload.name}${m.payload.dose ? ` — ${m.payload.dose}` : ''}`);
+  }
+  return L.join('\n');
+}

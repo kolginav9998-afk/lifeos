@@ -4,19 +4,20 @@
 import { isYmd, daysBetween, todayStr } from './events.js';
 import { MAX_MINOR, parseAmount, shiftMonth } from './money.js';
 import { normalize } from './search.js';
+import { vaccinesDue } from './pet.js';
 
 export const KINDS = [['clothes', 'Одежда'], ['shoes', 'Обувь'], ['underwear', 'Бельё и носки'], ['bedding', 'Постельное бельё'], ['towels', 'Полотенца'], ['electronics', 'Техника'],
-  ['kitchen', 'Кухня и посуда'], ['tools', 'Инструменты'], ['furniture', 'Мебель'], ['documents', 'Документы'], ['other', 'Другое']];
+  ['kitchen', 'Кухня и посуда'], ['tools', 'Инструменты'], ['furniture', 'Мебель'], ['documents', 'Документы'], ['pantry', 'Кладовая и еда'], ['consumables', 'Расходники'], ['other', 'Другое']];
 export const KIND_LABEL = Object.fromEntries(KINDS);
 export const STATUS_LABEL = { active: 'В использовании', stored: 'Убрано на хранение', sold: 'Продано', gone: 'Выброшено или потеряно' };
 export const HOW_LABEL = { machine: 'Машинная стирка', hand: 'Ручная стирка', dry: 'Химчистка', none: 'Не стирается' };
 // Что можно отметить: кнопки на карточке зависят от вида вещи (одежду надевают, технику используют, мебель не отмечают).
-export const LOG_NOUN = { wear: 'Надевание', wash: 'Стирка', use: 'Использование', repair: 'Ремонт', move: 'Перемещение', note: 'Заметка' };
-const QUICK = { clothes: ['wear', 'wash'], shoes: ['wear', 'wash'], underwear: ['wear', 'wash'], towels: ['use', 'wash'], bedding: ['wash'], electronics: ['use'], kitchen: ['use'], tools: ['use'], furniture: [], documents: [], other: ['use'] };
+export const LOG_NOUN = { wear: 'Надевание', wash: 'Стирка', use: 'Использование', repair: 'Ремонт', move: 'Перемещение', water: 'Полив', note: 'Заметка' };
+const QUICK = { clothes: ['wear', 'wash'], shoes: ['wear', 'wash'], underwear: ['wear', 'wash'], towels: ['use', 'wash'], bedding: ['wash'], electronics: ['use'], kitchen: ['use'], tools: ['use'], furniture: [], documents: [], pantry: [], consumables: ['use'], other: ['use'] };
 export const quickLogs = kind => QUICK[kind] ?? ['use'];
-const BUTTON = { wear: 'Надел', use: 'Использовал', repair: 'Починил', move: 'Переложил', note: 'Заметка' };
+const BUTTON = { wear: 'Надел', use: 'Использовал', repair: 'Починил', move: 'Переложил', water: 'Полил', note: 'Заметка' };
 export const logButton = (log, kind) => (log === 'wash' ? (kind === 'shoes' ? 'Почистил' : 'Постирал') : BUTTON[log] ?? LOG_NOUN[log]);
-const KIND_WORDS = { clothes: 'одежда вещи гардероб', shoes: 'обувь ботинки', underwear: 'нижнее белье трусы', bedding: 'постель простыня одеяло наволочка', towels: 'полотенце', electronics: 'электроника гаджет', kitchen: 'посуда', tools: 'инструмент', furniture: 'интерьер', documents: 'бумаги', other: '' };
+const KIND_WORDS = { clothes: 'одежда вещи гардероб', shoes: 'обувь ботинки', underwear: 'нижнее белье трусы', bedding: 'постель простыня одеяло наволочка', towels: 'полотенце', electronics: 'электроника гаджет', kitchen: 'посуда', tools: 'инструмент', furniture: 'интерьер', documents: 'бумаги', pantry: 'еда крупа запас кладовая', consumables: 'батарейки лампочки расходники', other: '' };
 const TRACKED = new Set(['clothes', 'shoes', 'underwear', 'bedding', 'towels', 'electronics', 'kitchen', 'tools', 'other']);   // у мебели и документов «использование» не отмечают
 const USE = new Set(['wear', 'use']);
 export const NEVER_USED_DAYS = 60;
@@ -50,10 +51,13 @@ export const TEMPLATES = [
   { key: 'bedding', label: 'Постельное бельё', name: 'Комплект постельного белья', kind: 'bedding' },
   { key: 'towel', label: 'Полотенце', name: 'Полотенце', kind: 'towels' },
   { key: 'sneakers', label: 'Кроссовки', name: 'Кроссовки', kind: 'shoes' },
+  { key: 'plant', label: 'Растение', name: 'Растение', kind: 'other', extra: { waterEveryDays: 7 } },
+  { key: 'batteries', label: 'Батарейки', name: 'Батарейки AA', kind: 'consumables', extra: { qty: 4, lowAt: 2 } },
+  { key: 'grains', label: 'Крупа в кладовую', name: 'Гречка', kind: 'pantry' },
 ];
 export function templateFields(key) {
   const t = TEMPLATES.find(x => x.key === key);
-  return t ? { name: t.name, kind: t.kind, qty: t.qty ?? 1, care: { ...(t.care ?? defaultCare(t.kind)) } } : null;
+  return t ? { name: t.name, kind: t.kind, qty: t.qty ?? 1, care: { ...(t.care ?? defaultCare(t.kind)) }, ...(t.extra ?? {}) } : null;
 }
 
 // ---------- создание и правка ----------
@@ -98,9 +102,16 @@ function itemPayload(f, now = Date.now()) {
   if (!HOW_LABEL[c.how]) throw new Error('Выбери, как ухаживать за вещью');
   const status = f.status === undefined || f.status === null || f.status === '' ? 'active' : f.status;
   if (!STATUS_LABEL[status]) throw new Error('Выбери состояние вещи');
+  const validUntil = dateOrNull(f.validUntil, '«Действует до»: выбери день');
+  const useBy = dateOrNull(f.useBy, '«Съесть до»: выбери день');
+  const zeroOk = f.kind === 'pantry' || f.kind === 'consumables';                 // запас может кончиться: 0 — допустимый остаток
   return {
     name, kind: f.kind, place: clean(f.place, 60), brand: clean(f.brand, 40), color: clean(f.color, 30), size: clean(f.size, 20), material: clean(f.material, 40),
-    qty: intOrNull(f.qty ?? 1, 1, 9999, 'Количество: целое число от 1 до 9999') ?? 1, bought, priceMinor: price, currency: 'RUB', warranty,
+    qty: intOrNull(f.qty ?? 1, zeroOk ? 0 : 1, 9999, `Количество: целое число от ${zeroOk ? 0 : 1} до 9999`) ?? 1, bought, priceMinor: price, currency: 'RUB', warranty,
+    validUntil, useBy,
+    waterEveryDays: intOrNull(f.waterEveryDays, 1, 365, 'Поливать раз в: от 1 до 365 дней'),
+    serviceEveryDays: intOrNull(f.serviceEveryDays, 7, 3650, 'Обслуживание раз в: от 7 до 3650 дней'),
+    lowAt: intOrNull(f.lowAt, 0, 999, '«Кончается» при остатке: от 0 до 999'),
     care: { how: c.how, temp: intOrNull(c.temp, 0, 95, 'Температура: от 0 до 95 градусов'), washEveryWears: intOrNull(c.washEveryWears, 1, 365, 'Стирать после: от 1 до 365 надеваний'), washEveryDays: intOrNull(c.washEveryDays, 1, 365, 'Стирать раз в: от 1 до 365 дней') },
     status, tags: tagsOf(f.tags), note: cleanText(f.note, 500),
   };
@@ -290,4 +301,159 @@ export function placesOf(items) {
   const m = new Map();
   for (const i of items) if (i.payload.place) m.set(i.payload.place, (m.get(i.payload.place) || 0) + 1);
   return [...m].sort((a, b) => b[1] - a[1] || a[0].localeCompare(b[0], 'ru')).map(([p]) => p);
+}
+
+// ---------- растения ----------
+// Растение — вещь с правилом «поливать каждые N дней» (необязательное поле waterEveryDays). Отметка «полил» — запись itemlog вида water.
+export const isPlant = item => Number.isInteger(item?.payload?.waterEveryDays);
+export function waterState(item, logs, today) {
+  const every = item?.payload?.waterEveryDays;
+  if (!Number.isInteger(every) || !isYmd(today)) return null;
+  const days = logs.filter(l => l.payload?.kind === 'water' && isYmd(l.payload.date)).map(l => l.payload.date);
+  const last = days.length ? days.sort().pop() : null;
+  const base = last ?? item.payload.bought ?? (Number.isFinite(item.ts) ? todayStr(item.ts) : today);   // без отметок — от покупки или создания записи
+  const since = Math.max(0, daysBetween(base, today));
+  const left = every - since;
+  return { every, last, since, left, due: left <= 0 };
+}
+// Все растения с их состоянием: сначала те, что пора полить.
+export function plantsOf(m) {
+  const rows = [];
+  for (const item of m.items) {
+    if (item.payload.status !== 'active') continue;
+    const water = waterState(item, m.logs.get(item.id) ?? [], m.today);
+    if (water) rows.push({ item, water });
+  }
+  return rows.sort((a, b) => a.water.left - b.water.left || byName(a.item, b.item));
+}
+export const plantsDue = m => plantsOf(m).filter(r => r.water.due);
+export function waterText(w) {
+  if (w.due) return w.left < 0 ? `Полив просрочен на ${-w.left} дн.` : 'Полить сегодня';
+  return `Следующий полив через ${w.left} ${plural(w.left, 'день', 'дня', 'дней')}`;
+}
+
+// ---------- документы со сроком действия ----------
+// Необязательное поле validUntil (обычно у вида «Документы»: паспорт, права, страховка). Напоминания за 90 и за 30 дней:
+// warn — «пора готовиться», soon — «срок близко», expired — срок вышел.
+export const DOC_WARN_DAYS = 90, DOC_SOON_DAYS = 30;
+export function docState(item, today) {
+  const until = item?.payload?.validUntil;
+  if (!until || !isYmd(until) || !isYmd(today)) return null;
+  const left = daysBetween(today, until);
+  return { left, until, level: left < 0 ? 'expired' : left <= DOC_SOON_DAYS ? 'soon' : left <= DOC_WARN_DAYS ? 'warn' : 'ok' };
+}
+export function docsExpiring(items, today, days = DOC_WARN_DAYS) {
+  return items.filter(i => i.payload.status === 'active' || i.payload.status === 'stored')
+    .map(item => ({ item, doc: docState(item, today) }))
+    .filter(r => r.doc && r.doc.left <= days)
+    .sort((a, b) => a.doc.left - b.doc.left || byName(a.item, b.item));
+}
+export function docText(d) {
+  if (d.level === 'expired') return `Срок вышел ${-d.left} дн. назад`;
+  if (d.left === 0) return 'Срок действия кончается сегодня';
+  return `Действует ещё ${d.left} ${plural(d.left, 'день', 'дня', 'дней')}`;
+}
+
+// ---------- обслуживание техники ----------
+// Интервал ТО (необязательное поле serviceEveryDays) считается от последней записи «ремонт» (itemlog repair) в истории вещи;
+// если ремонта не было — от даты покупки или создания записи.
+export function serviceState(item, logs, today) {
+  const every = item?.payload?.serviceEveryDays;
+  if (!Number.isInteger(every) || !isYmd(today)) return null;
+  const days = logs.filter(l => l.payload?.kind === 'repair' && isYmd(l.payload.date)).map(l => l.payload.date);
+  const last = days.length ? days.sort().pop() : null;
+  const base = last ?? item.payload.bought ?? (Number.isFinite(item.ts) ? todayStr(item.ts) : today);
+  const since = Math.max(0, daysBetween(base, today));
+  const left = every - since;
+  return { every, last, since, left, due: left <= 0 };
+}
+export function serviceOf(m) {
+  const rows = [];
+  for (const item of m.items) {
+    if (item.payload.status !== 'active') continue;
+    const service = serviceState(item, m.logs.get(item.id) ?? [], m.today);
+    if (service) rows.push({ item, service });
+  }
+  return rows.sort((a, b) => a.service.left - b.service.left || byName(a.item, b.item));
+}
+export const serviceDue = m => serviceOf(m).filter(r => r.service.due);          // список «пора обслужить»
+export function serviceText(s) {
+  if (s.due) return s.left < 0 ? `Обслуживание просрочено на ${-s.left} дн.` : 'Обслужить сегодня';
+  return `Следующее ТО через ${s.left} ${plural(s.left, 'день', 'дня', 'дней')}`;
+}
+
+// ---------- кладовая и расходники ----------
+// Кладовая (вид pantry): остаток (qty, «пришло»/«ушло» меняет его на ±1) и «съесть до» (необязательное поле useBy).
+// Расходники (вид consumables: батарейки, лампочки): остаток и порог «кончается» (необязательное поле lowAt). Ноль — «кончилось».
+export const PANTRY_SOON_DAYS = 7;
+export function pantryState(item, today) {
+  if (item?.payload?.kind !== 'pantry') return null;
+  const qty = item.payload.qty ?? 1;
+  const useBy = item.payload.useBy && isYmd(item.payload.useBy) ? item.payload.useBy : null;
+  const left = useBy && isYmd(today) ? daysBetween(today, useBy) : null;
+  return { qty, useBy, left, out: qty === 0, expired: left !== null && left < 0, soon: left !== null && left >= 0 && left <= PANTRY_SOON_DAYS };
+}
+export function supplyState(item) {
+  if (item?.payload?.kind !== 'consumables') return null;
+  const qty = item.payload.qty ?? 1, lowAt = item.payload.lowAt;
+  return { qty, lowAt: Number.isInteger(lowAt) ? lowAt : null, out: qty === 0, low: qty > 0 && Number.isInteger(lowAt) && qty <= lowAt };
+}
+// «Пришло»/«ушло»: остаток на ±1, не ниже нуля у запасов и не ниже единицы у обычных вещей.
+export function adjustQty(ev, delta, now = Date.now()) {
+  const zeroOk = ev.payload.kind === 'pantry' || ev.payload.kind === 'consumables';
+  const qty = Math.max(zeroOk ? 0 : 1, (ev.payload.qty ?? 1) + Math.trunc(delta));
+  return updateItem(ev, { qty }, now);
+}
+export const pantryOf = items => items.filter(i => i.payload.kind === 'pantry' && (i.payload.status === 'active' || i.payload.status === 'stored'));
+export const suppliesOf = items => items.filter(i => i.payload.kind === 'consumables' && (i.payload.status === 'active' || i.payload.status === 'stored'));
+
+// ---------- сезоны ----------
+// Сезонная карточка дома: весной (март–апрель) и осенью (сентябрь–октябрь) — пять коротких дел, каждое превращается в задачу одним нажатием.
+export function homeSeason(today) {
+  const m = Number(String(today).slice(5, 7));
+  return m === 3 || m === 4 ? 'spring' : m === 9 || m === 10 ? 'autumn' : null;
+}
+export const SEASON_LABEL = { spring: 'Весна', autumn: 'Осень' };
+export const SEASON_CHORES = {
+  spring: ['Помыть окна', 'Разобрать балкон и убрать зимнее', 'Проверить и помыть фильтры (вода, вытяжка)', 'Проверить аптечку и сроки лекарств', 'Подготовить велосипед и сезонную обувь'],
+  autumn: ['Проверить обогреватели и увлажнитель', 'Поменять батарейки в датчиках и пультах', 'Достать тёплую одежду и одеяла', 'Проверить окна и уплотнители перед холодами', 'Запастись лампочками, батарейками и средством от наледи'],
+};
+// Дело уже в задачах (есть открытая задача с таким же текстом) — кнопка не нужна второй раз.
+export const choreOpen = (events, text) => events.some(e => e.type === 'task' && !e.payload.done && e.payload.text === text);
+
+// Смена гардероба: два раза в год (апрель и октябрь) — карточка со списком вещей «на хранении» и массовой сменой статуса.
+export const WARDROBE_MONTHS = [4, 10];
+export function wardrobeSwap(today) {
+  const m = Number(String(today).slice(5, 7));
+  return WARDROBE_MONTHS.includes(m) ? (m === 4 ? 'spring' : 'autumn') : null;
+}
+export const storedClothes = items => items.filter(i => (i.payload.kind === 'clothes' || i.payload.kind === 'shoes') && i.payload.status === 'stored').sort(byName);
+
+// ---------- гарантии ----------
+// Гарантии, которые истекают (по умолчанию — в ближайшие WARRANTY_DAYS дней): сначала самые короткие.
+export function warrantiesExpiring(items, today, days = WARRANTY_DAYS) {
+  return items.filter(i => i.payload.status === 'active' || i.payload.status === 'stored')
+    .map(item => ({ item, daysLeft: item.payload.warranty && isYmd(item.payload.warranty) && isYmd(today) ? daysBetween(today, item.payload.warranty) : null }))
+    .filter(r => r.daysLeft !== null && r.daysLeft >= 0 && r.daysLeft <= days)
+    .sort((a, b) => a.daysLeft - b.daysLeft || byName(a.item, b.item));
+}
+
+// ---------- общий бытовой список ----------
+// Всё, что просит внимания в доме, одним проходом: полив растений, документы, ТО техники, кладовая, расходники, прививки питомца.
+// count — сколько дел горит (для счётчика на вкладке «Быт»): просроченное и близкое, без дальних предупреждений.
+export function householdAlerts(events, today = todayStr()) {
+  const m = homeModel(events, today);
+  const plants = plantsOf(m);
+  const docs = docsExpiring(m.items, today);
+  const service = serviceOf(m);
+  const pantry = pantryOf(m.items).map(item => ({ item, pantry: pantryState(item, today) }));
+  const supplies = suppliesOf(m.items).map(item => ({ item, supply: supplyState(item) }));
+  const vaccines = vaccinesDue(events, today);
+  const count = plants.filter(r => r.water.due).length
+    + docs.filter(r => r.doc.level === 'soon' || r.doc.level === 'expired').length
+    + service.filter(r => r.service.due).length
+    + pantry.filter(r => r.pantry.expired || r.pantry.soon || r.pantry.out).length
+    + supplies.filter(r => r.supply.out || r.supply.low).length
+    + vaccines.length;
+  return { today, model: m, plants, docs, service, pantry, supplies, vaccines, count };
 }

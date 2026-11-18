@@ -4,7 +4,7 @@ _Файл создан из `registry.js` и сверяется с ним тес
 
 Все данные Life OS — журнал событий `{id, type, ts, payload, source, confidence, evidence}`. Новые типы только добавляются; записи прошлых версий читаются всегда, а незнакомые типы сохраняются и не мешают.
 
-Всего типов: 55. «В выгрузке» — попадают ли данные этой записи в ZIP для аналитики (числа и отметки, названия привычек и упражнений). Тексты дневника, заметок, мыслей и решений, а также деньги в выгрузку не входят.
+Всего типов: 57. «В выгрузке» — попадают ли данные этой записи в ZIP для аналитики (числа и отметки, названия привычек и упражнений). Тексты дневника, заметок, мыслей и решений, а также деньги в выгрузку не входят.
 
 ## Дела
 
@@ -38,8 +38,10 @@ _Файл создан из `registry.js` и сверяется с ним тес
 
 | Тип | Что это | Поля | Приватность | В выгрузке | Модуль |
 |---|---|---|---|---|---|
-| `item` | Вещь (дом, одежда) | name, kind (clothes|shoes|underwear|bedding|towels|electronics|kitchen|tools|furniture|documents|other), place, brand, color, size, material, qty, bought, priceMinor, currency, warranty, care{how, temp, washEveryWears, washEveryDays}, status (active|stored|sold|gone), tags, note | личный текст | нет | `home.js` |
-| `itemlog` | Отметка в истории вещи | item, kind (wear|wash|use|repair|move|note), date, note, place | числа и отметки | да | `home.js` |
+| `item` | Вещь (дом, одежда) | name, kind (clothes|shoes|underwear|bedding|towels|electronics|kitchen|tools|furniture|documents|pantry|consumables|other), place, brand, color, size, material, qty, bought, priceMinor, currency, warranty, validUntil, useBy, waterEveryDays, serviceEveryDays, lowAt, care{how, temp, washEveryWears, washEveryDays}, status (active|stored|sold|gone), tags, note | личный текст | нет | `home.js` |
+| `itemlog` | Отметка в истории вещи | item, kind (wear|wash|use|repair|move|water|note), date, note, place | числа и отметки | да | `home.js` |
+| `pet` | Питомец | name, kind (cat|dog|other), weightKg, vetName, vetPhone, note | личный текст | нет | `pet.js` |
+| `petvac` | Прививка питомца | pet, name, date, nextDue | личный текст | нет | `pet.js` |
 
 ## Заметки и дневник
 

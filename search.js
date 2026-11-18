@@ -34,7 +34,7 @@ export function searchable(e) {
     case 'skill': return { kind: 'Навык', title: p.title, text: [p.title, p.area, p.note, p.evidence].join(' ') };
     case 'parked': return { kind: 'Отложено', title: p.text, text: p.text };
     case 'wish': return { kind: 'Хочу купить', title: p.text, text: p.text };
-    case 'item': return { kind: 'Вещь', title: p.name, text: [p.name, p.place, p.brand, p.color, p.size, p.material, ...(p.tags ?? []), p.note].join(' ') };
+    case 'item': return { kind: 'Вещь', title: p.place ? `${p.name} — лежит: ${p.place}` : p.name, text: [p.name, p.place, p.brand, p.color, p.size, p.material, ...(p.tags ?? []), p.note].join(' ') };
     case 'debt': return { kind: 'Долг', title: `${p.who}${p.note ? ' — ' + p.note : ''}`, text: [p.who, p.note].join(' ') };
     case 'joy': return { kind: 'Радость', title: p.text, text: p.text };
     case 'checkin': return p.note ? { kind: p.slot === 'm' ? 'Утро' : 'Вечер', title: p.note, text: [p.note, p.date].join(' ') } : null;
