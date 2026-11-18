@@ -3,6 +3,7 @@
 // статус урока считается из записей `lesson` (прочитано) и `zcheck` (попытки проверки). Правила: docs/CURRICULUM_ENGINE.md, разделы 5 и 6.
 import { TRACKS } from './academy.js';
 import { checkOf, pickCheckItems, gradeDrill, lessonIndex, CHECK_DEFAULT, GRADED, shuffled, SPIRAL_MAX } from './zero-kit.js';
+import { decayState } from './adapt.js';
 import { todayStr } from './events.js';
 import { makeRng } from './stats.js';
 
@@ -45,7 +46,10 @@ function ledgerOf(events) {
 // Статус урока только по его собственным записям (без допуска). Последняя проверка решает: провал возвращает урок в «Просмотрено».
 function evaluate(lesson, led, now) {
   const ck = checkOf(lesson), mine = led.checks.get(lesson.id) ?? [], hasLesson = led.seen.has(lesson.id);
-  const decay = Math.min(3, Math.max(0.5, Number(lesson.decay) || 1));
+  const decayBase = Math.min(3, Math.max(0.5, Number(lesson.decay) || 1));
+  // Адаптация под реальное забывание (adapt.js): два подряд провала повторения — повторять чаще, два подряд успеха — вернуться к исходному.
+  const adapt = decayState(decayBase, mine.map(c => c.n >= (c.kind === 'surprise' ? SURPRISE_MIN_N : MIN_N) && enough(c.ok, c.n, ck.pass)));
+  const decay = adapt.decay;
   let passes = 0, masteredAt = null, countedAt = null, lastPassAt = null, confirmedAt = null, proof = null, best = null;
   for (const c of mine) {
     best = Math.max(best ?? 0, c.ok / c.n);
@@ -62,7 +66,9 @@ function evaluate(lesson, led, now) {
   let status;
   if (passes) status = now > dueAt ? 'review' : confirmedAt !== null ? 'confirmed' : 'mastered';
   else status = hasLesson || mine.some(c => c.kind !== 'placement') ? 'seen' : 'new';       // неудачная входная проверка урок «просмотренным» не делает
-  return { status, best, attempts: mine.length, lastAt: mine.length ? mine.at(-1).ts : null, dueAt, passes, masteredAt, lastPassAt, confirmedAt, seen: hasLesson, proof: proof && { kind: proof.kind, ok: proof.ok, n: proof.n, ts: proof.ts, date: proof.date ?? todayStr(proof.ts) } };
+  return { status, best, attempts: mine.length, lastAt: mine.length ? mine.at(-1).ts : null, dueAt, passes, masteredAt, lastPassAt, confirmedAt, seen: hasLesson,
+    decay, decayBase, failStreak: adapt.fails, winStreak: adapt.passes,      // опциональные поля адаптации: старые журналы читаются без изменений
+    proof: proof && { kind: proof.kind, ok: proof.ok, n: proof.n, ts: proof.ts, date: proof.date ?? todayStr(proof.ts) } };
 }
 
 function resolver(events, now, index) {
@@ -80,7 +86,8 @@ function resolver(events, now, index) {
 
 // ---------- статус урока и допуск ----------
 // → { status, best (лучшая доля верных 0..1 или null), attempts, lastAt (время последней проверки), dueAt (когда пора повторять, мс или null),
-//     passes (успешных проверок подряд), missing[] (не освоенные предпосылки), seen, masteredAt, confirmedAt, proof }
+//     passes (успешных проверок подряд), missing[] (не освоенные предпосылки), seen, masteredAt, confirmedAt, proof,
+//     decay (текущий коэффициент с адаптацией), decayBase (исходный из урока), failStreak и winStreak (серии подряд, см. adapt.js) }
 export function lessonStatus(lessonId, events, now = Date.now(), index = defaultIndex()) { return resolver(events, now, index).full(lessonId); }
 export const isUnlocked = (lessonId, events, now = Date.now(), index = defaultIndex()) => lessonStatus(lessonId, events, now, index).status !== 'locked';
 export const dueDate = st => (st?.dueAt ? todayStr(st.dueAt) : null);

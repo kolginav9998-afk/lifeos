@@ -1,6 +1,8 @@
 // Экран «Учёба»: курсы (уроки + наставник), повторение карточек, свои карточки.
 import { el, fill, toast, icon } from './ui.js';
 import { todayStr } from './events.js';
+import { getPref, setPref } from './prefs.js';
+import { MIN_QUEUE, minDayActive, trimQueue } from './adapt.js';
 import * as store from './store.js';
 import { TRACKS, trackById, trackProgress, doneLessons, makeLessonDone, lessonEventId, makeSrsEvent, makeUserCard, userCards, sessionQueue, todayLoad, studyDates, MY_TRACK,
   leeches, comebackInfo, fifteenPlan, lessonNoteOf, makeLessonNote, examQueue, quizFor, cardsOfTrack, cardFace, lessonToRevisit, markRevisited, lessonTitle, retentionByInterval, lessonGoal } from './academy.js';
@@ -48,14 +50,19 @@ export function createLearnView(ctx = {}) {
     const t0 = today();
     const load = todayLoad(events, t0);
     const streak = studyStreak(studyDates(events), t0);
-    const total = load.due + load.fresh;
+    const minOn = minDayActive(getPref('minDay'), t0);                    // «сегодня минимум»: бережный режим на один день
+    const shown = minOn ? { due: Math.min(load.due, MIN_QUEUE), fresh: 0 } : load;
+    const total = shown.due + shown.fresh;
     const head = el('div', { class: 'card', id: 'learn-today' },
       el('h3', { textContent: 'Повторение на сегодня' }),
       el('p', { class: 'big', id: 'learn-count', textContent: String(total) }),
-      el('p', { class: 'muted', textContent: total ? `к повторению: ${load.due} · новых: ${load.fresh}` : 'На сегодня всё повторено ✓' }),
+      el('p', { class: 'muted', textContent: total ? `к повторению: ${shown.due} · новых: ${shown.fresh}` : 'На сегодня всё повторено ✓' }),
       el('p', { class: 'muted', id: 'learn-streak', textContent: streak ? `Занятий подряд: ${streak} дн.` : 'Занимайся каждый день по чуть-чуть: серия растёт.' }),
       total ? el('button', { type: 'button', id: 'learn-start', class: 'primary', textContent: 'Начать повторение', onclick: () => startSession(null) })
         : el('p', { class: 'hint', textContent: 'Выбери курс ниже и пройди первый урок — его карточки появятся здесь.' }),
+      total && !minOn ? el('button', { type: 'button', id: 'learn-minday', class: 'chip', textContent: 'Сегодня минимум', onclick: () => { setPref('minDay', t0); render(); } }) : null,
+      minOn && (load.due + load.fresh) ? el('p', { class: 'muted', id: 'learn-minday-note', textContent: `Бережный режим: сегодня только до ${MIN_QUEUE} карточек на повторение, новых нет. Завтра очередь снова полная.` }) : null,
+      minOn ? el('button', { type: 'button', id: 'learn-minday-off', class: 'chip', textContent: 'Вернуть полную очередь', onclick: () => { setPref('minDay', ''); render(); } }) : null,
       examQueue({ events, n: 20, seed: 1 }).length >= 5 ? el('button', { type: 'button', id: 'exam-all', class: 'chip', textContent: 'Экзамен: 20 случайных карточек', onclick: () => startSession(null, { exam: true }) }) : null);
     const cb = comebackInfo(events, t0);
     const comeback = cb ? el('div', { class: 'card calm', id: 'comeback' }, el('strong', { textContent: 'С возвращением' }),
@@ -271,7 +278,8 @@ export function createLearnView(ctx = {}) {
   // ---------- сессия повторения ----------
   function startSession(trackId, opts = {}) {
     const t0 = today();
-    const queue = opts.queue ?? (opts.exam ? examQueue({ events, trackId, n: 20 }) : sessionQueue({ events, today: t0, trackId, max: opts.max ?? 30 }));
+    let queue = opts.queue ?? (opts.exam ? examQueue({ events, trackId, n: 20 }) : sessionQueue({ events, today: t0, trackId, max: opts.max ?? 30 }));
+    if (!opts.exam && !opts.queue && minDayActive(getPref('minDay'), t0)) queue = trimQueue(queue);   // «сегодня минимум»: до пяти повторений, без новых
     if (!queue.length) { toast('Сейчас повторять нечего'); return; }
     session = { queue, i: 0, shown: false, counts: { again: 0, hard: 0, good: 0 }, again: new Map(), today: t0, fresh: queue.filter(x => !x.state).length, startedAt: Date.now(), exam: !!opts.exam, missed: [], skillsBefore: new Set(lessonSkillStatus(events).ready.map(r => r.lesson.id)) };
     overlay.hidden = false;
