@@ -1,6 +1,8 @@
 // Вкладка «Ударения»: раунд из десяти слов, в которых часто ошибаются. Ошибки возвращаются в следующих раундах, пока не ответишь верно.
+// Слова из свежих промахов можно одной кнопкой отправить в свои карточки (miss-cards.js) — дальше их дожмёт интервальное повторение.
 import { el, fill, toast, announce } from './ui.js';
 import { stressQuiz, missedStress, makeDiction, stressById, fmtClock, plural, STRESS_WORDS } from './diction.js';
+import { missWordCards } from './miss-cards.js';
 
 const VOWEL = /[АЕЁИОУЫЭЮЯ]/;
 // Слово с подсвеченной ударной гласной: заглавная буква в записи превращается в жирную подчёркнутую строчную.
@@ -17,6 +19,12 @@ export function createStressTab(k) {
         el('p', { textContent: `В словаре тренажёра ${STRESS_WORDS.length} ${plural(STRESS_WORDS.length, ['слово', 'слова', 'слов'])}, в которых часто ошибаются. Раунд — десять вопросов. Ударная буква показана жирной и подчёркнутой.` }),
         el('p', { id: 'dic-st-miss', class: 'muted', textContent: miss.length ? `Ждут повторения слов с прошлых ошибок: ${miss.length}. Часть из них попадёт в раунд.` : 'Слов с прошлыми ошибками пока нет.' }),
         el('button', { type: 'button', id: 'dic-st-go', class: 'primary big-btn', textContent: 'Начать раунд', onclick: () => quiz() }),
+        miss.length ? el('button', { type: 'button', id: 'dic-st-cards', class: 'chip', textContent: 'Слова из промахов → в свои карточки', onclick: async () => {
+          const cards = missWordCards(k.events, { today: k.today() });
+          if (!cards.length) { toast('Все слова из промахов уже в твоих карточках'); return; }
+          await k.saveAll(cards);
+          k.done(`Добавлено в «Свои карточки»: ${cards.length}. Теперь они в общем повторении («Учёба»).`);
+        } }) : null,
         el('p', { class: 'muted', textContent: 'В тренажёре только слова, где современная норма однозначна. Сомневаешься в другом слове? Проверь по орфоэпическому словарю.' })));
     if (arg?.start) quiz();
   }

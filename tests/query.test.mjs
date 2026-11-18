@@ -121,6 +121,18 @@ test('runQuery: re: как условие запроса', () => {
   assert.deepEqual(runQuery(ALL, query, { now: NOW }).rows.map(r => r.ev), [expense]);
 });
 
+test('runQuery: re: с флагом g находит все подходящие записи, а не через одну', () => {
+  // Регрессия: у регулярки с флагом g каждый test двигал lastIndex, и записи пропускались через одну.
+  const many = [1, 2, 3, 4, 5].map(i => ev('note', { text: `кофе ${i}` }, at(2026, 11, 1) + i));
+  const { query } = parseQuery('re:/кофе/g');
+  assert.ok(query.re.global, 'флаг g сохраняется');
+  const { rows, total } = runQuery(many, query, { now: NOW });
+  assert.equal(total, 5, 'все подходящие записи найдены');
+  assert.equal(rows.length, 5);
+  // и повторный прогон тем же запросом даёт тот же результат
+  assert.equal(runQuery(many, query, { now: NOW }).total, 5);
+});
+
 test('runQuery: лимит строк и полный total', () => {
   const many = Array.from({ length: 30 }, (_, i) => ev('note', { text: 'кофе ' + i }, at(2026, 11, 1) + i));
   const { query } = parseQuery('кофе');

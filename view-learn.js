@@ -4,16 +4,16 @@ import { todayStr } from './events.js';
 import { getPref, setPref } from './prefs.js';
 import { MIN_QUEUE, minDayActive, trimQueue } from './adapt.js';
 import * as store from './store.js';
-import { TRACKS, trackById, trackProgress, doneLessons, makeLessonDone, lessonEventId, makeSrsEvent, makeUserCard, userCards, sessionQueue, todayLoad, studyDates, MY_TRACK,
-  leeches, comebackInfo, fifteenPlan, lessonNoteOf, makeLessonNote, examQueue, cardsOfTrack, cardFace, lessonToRevisit, markRevisited, lessonTitle, retentionByInterval, lessonGoal, statesOf } from './academy.js';
+import { TRACKS, trackById, trackProgress, doneLessons, makeLessonDone, lessonEventId, makeSrsEvent, makeUserCard, userCards, sessionQueue, todayLoad, studyStreakFlex, MY_TRACK,
+  leeches, leechMode, unpackHint, comebackInfo, fifteenPlan, lessonNoteOf, makeLessonNote, examQueue, cardsOfTrack, cardFace, lessonToRevisit, markRevisited, lessonTitle, retentionByInterval, lessonGoal, statesOf } from './academy.js';
 import { mixedLessonQuiz, gradeItem, keywordsOfCards, checkExplain, dictationItems, dictationWordsOf, stageReviewItems, stageLetters, stageNames, contrastPairsFor, doneStages, microFromLessons, CONTRAST_LATIN, CONTRAST_HEBREW } from './quiz.js';
-import { newState, grade, studyStreak, INTERVALS } from './srs.js';
+import { newState, grade, INTERVALS } from './srs.js';
 import { canSpeak, foreignSide, speak } from './speech.js';
 import { openSpeaking, hasRunningSpeak, speakWeek, SPEAK_LANGS } from './speaking.js';
 import { plateauInfo } from './practice.js';
 import { lessonSkillStatus, skillFromLesson, skillFromTask } from './skills.js';
 import { practiceCard } from './view-learn-extra.js';
-import { routeProgress } from './curriculum.js';
+import { routeProgress, bestStudyHours } from './curriculum.js';
 import { getPrefs } from './prefs.js';
 import { isQuietWeek } from './quiet.js';
 
@@ -54,15 +54,17 @@ export function createLearnView(ctx = {}) {
   function renderHome() {
     const t0 = today();
     const load = todayLoad(events, t0);
-    const streak = studyStreak(studyDates(events), t0);
+    const streak = studyStreakFlex(events, t0);                            // серия «5 из 7»: пропуск не рвёт, дни болезни считаются днями занятий
     const minOn = minDayActive(getPref('minDay'), t0);                    // «сегодня минимум»: бережный режим на один день
     const shown = minOn ? { due: Math.min(load.due, MIN_QUEUE), fresh: 0 } : load;
     const total = shown.due + shown.fresh;
+    const bestHours = bestStudyHours(events, { top: 2 });                  // тихая подсказка, только когда данных по проверкам достаточно
     const head = el('div', { class: 'card', id: 'learn-today' },
       el('h3', { textContent: 'Повторение на сегодня' }),
       el('p', { class: 'big', id: 'learn-count', textContent: String(total) }),
       el('p', { class: 'muted', textContent: total ? `к повторению: ${shown.due} · новых: ${shown.fresh}` : 'На сегодня всё повторено ✓' }),
-      el('p', { class: 'muted', id: 'learn-streak', textContent: streak ? `Занятий подряд: ${streak} дн.` : 'Занимайся каждый день по чуть-чуть: серия растёт.' }),
+      el('p', { class: 'muted', id: 'learn-streak', textContent: streak ? `Занятий подряд: ${streak} дн. Серия гибкая: достаточно пяти дней в неделю, болезнь её не рвёт.` : 'Занимайся каждый день по чуть-чуть: серия растёт. Достаточно пяти дней в неделю.' }),
+      bestHours.length ? el('p', { class: 'muted', id: 'learn-hours', textContent: `По твоим проверкам учёба лучше всего идёт около ${bestHours.map(h => `${h.hour}:00`).join(' и ')}.` }) : null,
       total ? el('button', { type: 'button', id: 'learn-start', class: 'primary', textContent: 'Начать повторение', onclick: () => startSession(null) })
         : el('p', { class: 'hint', textContent: 'Выбери курс ниже и пройди первый урок — его карточки появятся здесь.' }),
       total && !minOn ? el('button', { type: 'button', id: 'learn-minday', class: 'chip', textContent: 'Сегодня минимум', onclick: () => { setPref('minDay', t0); render(); } }) : null,
@@ -83,7 +85,7 @@ export function createLearnView(ctx = {}) {
       plan.next ? el('p', { class: 'muted', textContent: `3. Задание: ${plan.next.lesson.task}` }) : null) : null;
     const lcAll = leeches(events, 1000), lc = lcAll.slice(0, 5);
     const leech = lc.length ? el('div', { class: 'card', id: 'leeches' }, el('strong', { textContent: `Сложные карточки (${lcAll.length})` }),
-      el('p', { class: 'muted', textContent: 'Эти карточки ты забываешь чаще других. Помогает своя формулировка, пример или ассоциация: сделай по ним свою карточку.' }),
+      el('p', { class: 'muted', textContent: 'Эти карточки ты забываешь чаще других. В повторении они идут в режиме «разобрать»: подсказка показывается до ответа. А ещё помогает своя формулировка, пример или ассоциация: сделай по ним свою карточку.' }),
       ...lc.map(({ card }) => el('div', { class: 'row leech-row', dataset: { card: card.id } }, el('span', { class: 'grow' }, el('strong', { textContent: card.q })),
         el('button', { type: 'button', class: 'chip leech-own', textContent: 'Своя карточка', onclick: () => go({ name: 'my', prefill: { q: card.q, a: card.a } }) }))),
       el('button', { type: 'button', id: 'leech-start', class: 'chip', textContent: 'Повторить только их', onclick: () => startSession(null, { queue: lcAll.map(x => ({ card: x.card, state: x.state })).slice(0, 20) }) })) : null;
@@ -456,9 +458,12 @@ export function createLearnView(ctx = {}) {
     const fs = canSpeak() && (c.track === 'english' || c.track === 'hebrew') ? foreignSide(c, c.track) : null;
     const speakBtn = fs && (s.shown || (fs.side === 'q' && !face0.reversed)) ? el('button', { type: 'button', id: 'sess-speak', class: 'chip', 'aria-label': 'Произнести',
       onclick: () => { if (!speak(fs.text, c.track, () => toast('На телефоне нет голоса для этого языка. Установи голосовой движок в настройках телефона. Как поставить голос: «Ещё» → «Справка» → «Нет голоса для озвучки».'))) toast('Озвучка недоступна на этом устройстве'); } }, icon('volume', 20)) : null;
+    const unpack = !s.exam && leechMode(item.state) === 'unpack';     // «пиявка»: режим «разобрать» — подсказка до ответа, сначала разобраться, потом вспоминать
+    const unpackText = unpack ? unpackHint(c) : '';
     const face = el('div', { class: 'flash', id: 'sess-card' },
       el('span', { class: 'muted', textContent: (s.exam ? `Экзамен · ${tr?.title ?? ''}` : `${tr?.title ?? ''}${item.state ? '' : ' · новая'}`) + (face0.reversed ? ' · обратное направление' : '') }),
       el('p', { class: 'flash-q', id: 'sess-q', textContent: face0.front }), speakBtn,
+      unpack && !s.shown ? el('p', { class: 'muted', id: 'sess-unpack', textContent: `Сложная карточка, режим «разобрать».${unpackText ? ` Подсказка: ${unpackText}` : ''}` }) : null,
       s.shown ? el('p', { class: 'flash-a', id: 'sess-a', textContent: face0.back }) : null,
       s.shown && face0.translit ? (s.translit ? el('p', { class: 'muted', id: 'sess-translit', textContent: `Транскрипция: ${face0.translit}` })
         : el('button', { type: 'button', id: 'sess-translit-btn', class: 'chip', textContent: 'Показать транскрипцию', onclick: () => { s.translit = true; renderSession(); } })) : null,

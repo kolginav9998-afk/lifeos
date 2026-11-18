@@ -1,7 +1,9 @@
 // Экран «Тренировки»: идущая тренировка (подходы пишутся сразу), история, личные рекорды, недельная цель по силовым.
+// Пока тренировка идёт, экран не гаснет (Screen Wake Lock); где API нет, всё работает как раньше.
 import { el, toast, dateRu, icon } from './ui.js';
 import { todayStr } from './events.js';
 import * as store from './store.js';
+import { createWakeLock } from './wakelock.js';
 import { TEMPLATES, WEEKLY_STRENGTH_GOAL, startWorkout, addExercise, addSet, removeSet, finishWorkout, activeWorkout, doneWorkouts, strengthDays, setsOf, volumeOf, suggestion, lastSets, personalRecords, newRecords } from './workouts.js';
 
 const KIND_LABEL = { reps: 'повторения', time: 'секунды', cardio: 'минуты' };
@@ -13,6 +15,7 @@ export function createWorkoutsView() {
   let pendingFocus = null;
   let finishing = false;
   const root = el('section', { id: 'view-workouts', class: 'view' });
+  const wake = createWakeLock();                 // не гасить экран, пока идёт тренировка
   const bar = (v, total) => el('div', { class: 'bar', role: 'img', 'aria-label': `${v} из ${total}` }, el('span', { style: `width:${Math.min(100, Math.round((v / total) * 100))}%` }));
 
   // ---------- таймер отдыха ----------
@@ -114,6 +117,7 @@ export function createWorkoutsView() {
 
   function render() {
     const w = activeWorkout(events);
+    if (w) wake.acquire(); else wake.release();
     const nodes = w ? renderActive(w) : renderHome();
     root.replaceChildren(...nodes.filter(Boolean));
     if (w) paintRest();
@@ -121,7 +125,7 @@ export function createWorkoutsView() {
   }
   return {
     root,
-    update(evs) { events = evs; if (!root.hidden) render(); },
+    update(evs) { events = evs; if (!evs.length) wake.release(); if (!root.hidden) render(); },
     show() { finishing = false; render(); },
   };
 }

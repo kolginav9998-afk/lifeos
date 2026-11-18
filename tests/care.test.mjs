@@ -93,3 +93,13 @@ test('newTasksToday: считает задачи, созданные сегод�
   const three = [t1, t2, makeTask('три', noon(TODAY))];
   assert.ok(newTasksToday(three, TODAY) >= INFLOW_NUDGE_FROM, 'с третьей новой задачи — мягкий вопрос');
 });
+
+test('newTasksToday: правка старой задачи — не новая задача', () => {
+  // В журнале у одной задачи несколько версий с одним id: создание и правки. Считаем только создание.
+  const created = makeTask('старая задача', noon(addDays(TODAY, -3)));
+  const edited = { ...created, ts: noon(TODAY), payload: { ...created.payload, text: 'старая задача, поправленная сегодня' } };
+  assert.equal(newTasksToday([created, edited], TODAY), 0, 'правка сегодня не делает задачу новой');
+  const fresh = makeTask('новая задача', noon(TODAY));
+  const freshEdit = { ...fresh, ts: noon(TODAY) + 60000 };
+  assert.equal(newTasksToday([created, edited, fresh, freshEdit], TODAY), 1, 'одна настоящая новая, остальное — правки');
+});

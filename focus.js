@@ -1,6 +1,8 @@
 // Фокус-таймер: 25/50/90 минут без отвлечений. Сессия записывается событием `focus`; незавершённая короче 5 минут не сохраняется.
+// Пока идёт сессия, экран не гаснет (Screen Wake Lock); где API нет, таймер просто работает как раньше.
 import { el, toast } from './ui.js';
 import { todayStr, addDays, isYmd } from './events.js';
+import { createWakeLock } from './wakelock.js';
 import * as store from './store.js';
 
 export const MIN_SAVE_MIN = 5;
@@ -35,7 +37,8 @@ const writeRun = r => { try { if (r) localStorage.setItem(RUN_KEY, JSON.stringif
 export function openFocus(host, { tasks = [], resume = false } = {}) {
   host.hidden = false; host.tabIndex = -1;
   let timer = null, run = null, label = '';
-  const close = () => { clearTimeout(timer); host.hidden = true; host.replaceChildren(); };
+  const wake = createWakeLock();                                   // не гасить экран во время фокуса; без API — тихо ничего не делает
+  const close = () => { clearTimeout(timer); wake.release(); host.hidden = true; host.replaceChildren(); };
 
   function intro() {
     const pick = el('select', { id: 'focus-task', 'aria-label': 'Над чем работаешь' }, el('option', { value: '', textContent: 'Без привязки к задаче' }), ...tasks.slice(0, 30).map(t => el('option', { value: t, textContent: t.length > 50 ? t.slice(0, 47) + '…' : t })));
@@ -49,7 +52,7 @@ export function openFocus(host, { tasks = [], resume = false } = {}) {
         el('div', { class: 'row wrap' }, ...btns), pick, own,
         el('button', { type: 'button', id: 'focus-go', class: 'primary big-btn', textContent: 'Начать', onclick: () => { label = own.value.trim() || pick.value; start(minutes); } })));
   }
-  function start(minutes) { run = { startedAt: Date.now(), minutes }; writeRun(run); show(); }
+  function start(minutes) { run = { startedAt: Date.now(), minutes }; writeRun(run); wake.acquire(); show(); }
   function show() {
     const clock = el('div', { class: 'bt-problem focus-clock', id: 'focus-clock' });
     const sub = el('div', { class: 'muted', id: 'focus-sub', textContent: label || 'Сосредоточься на одном деле' });
@@ -70,6 +73,7 @@ export function openFocus(host, { tasks = [], resume = false } = {}) {
   }
   async function finish(completed) {
     clearTimeout(timer);
+    wake.release();                                   // время вышло или остановили — экрану снова можно гаснуть
     const f = focusLeft(run);
     const minutes = completed ? run.minutes : f.elapsedMin;
     if (minutes < MIN_SAVE_MIN) { writeRun(null); toast(`Меньше ${MIN_SAVE_MIN} минут — не записываю`); close(); return; }
@@ -83,7 +87,7 @@ export function openFocus(host, { tasks = [], resume = false } = {}) {
   }
 
   const saved = resume ? readRun() : null;
-  if (saved) { run = saved; show(); } else intro();
+  if (saved) { run = saved; wake.acquire(); show(); } else intro();
   return { close };
 }
 

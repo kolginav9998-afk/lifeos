@@ -125,6 +125,9 @@ export function createTodayView({ go }) {
 
   // мягкие подсказки: мало сил, слишком много дел, долго низкое настроение
   const hintsBox = el('div', { id: 'hints', class: 'quiet-hide' });
+  // Объяснение авто-«тяжёлого дня» после болезни живёт отдельно от подсказок и без quiet-hide:
+  // иначе в день тишины его никогда не видно, а назавтра оно уже не появится — человек не узнает, почему интерфейс «урезался».
+  const sickReturnBox = el('div', { id: 'sick-return-box' });
   function hintCard(id, text, ...buttons) { return el('div', { id, class: 'card calm hint-card' }, el('p', { textContent: text }), el('div', { class: 'row wrap' }, ...buttons)); }
 
   // план на плохой день: текст, который человек заранее написал сам себе (хранится в настройках)
@@ -206,9 +209,10 @@ export function createTodayView({ go }) {
     else checkSel = null;
     if (editingPlan) out.push(planEditorCard());
     const ret = sickReturnDay(events, today);
-    if (ret && getPref('sickReturnAuto') === today && getPref('sickReturnHandled') !== today && getPref('heavyDay'))
-      out.push(hintCard('sick-return', 'Болезнь позади — это радостно. На первый день я сам включил режим «тяжёлый день»: дела подождут, силы важнее.',
-        el('button', { type: 'button', id: 'sick-return-ok', class: 'chip', textContent: 'Нет, я в порядке', onclick: () => { setPref('heavyDay', false); setPref('sickReturnHandled', today); render(); } })));
+    fill(sickReturnBox, ret && getPref('sickReturnAuto') === today && getPref('sickReturnHandled') !== today && getPref('heavyDay')
+      ? hintCard('sick-return', 'Болезнь позади — это радостно. На первый день я сам включил режим «тяжёлый день»: дела подождут, силы важнее.',
+        el('button', { type: 'button', id: 'sick-return-ok', class: 'chip', textContent: 'Нет, я в порядке', onclick: () => { setPref('heavyDay', false); setPref('sickReturnHandled', today); render(); } }))
+      : null);
     if (emergencyOf(events) && emergencyReviewDue(getPref('emergencyCheckedAt'), today))
       out.push(hintCard('hint-emergency', 'Прошло полгода: экстренные данные (группа крови, аллергии, контакт) всё ещё верны?',
         el('button', { type: 'button', id: 'hint-emergency-ok', class: 'chip', textContent: 'Да, всё верно', onclick: () => { setPref('emergencyCheckedAt', today); render(); } }),
@@ -406,7 +410,7 @@ export function createTodayView({ go }) {
       el('button', { type: 'button', id: 'quiet-off', class: 'chip', textContent: 'Выключить', onclick: () => { toggleQuietDay(todayStr()); store.refresh().catch(() => {}); } }));
   }
 
-  root.append(hero, quietBox, actionBox, whatsNew, summary, hintsBox, deviceHints.root, parkedBox, moneyNudge.root, intentionBox, planCard, dayCards.root, onboarding, wotd, focusHost, form, minimum, review, journal, ...Object.values(sections).map(s => s.sec), empty, doneBlock);
+  root.append(hero, quietBox, actionBox, whatsNew, summary, hintsBox, sickReturnBox, deviceHints.root, parkedBox, moneyNudge.root, intentionBox, planCard, dayCards.root, onboarding, wotd, focusHost, form, minimum, review, journal, ...Object.values(sections).map(s => s.sec), empty, doneBlock);
 
   // ----- элементы списка -----
   async function removeTask(ev, li) {
@@ -647,7 +651,8 @@ export function createTodayView({ go }) {
 
   return {
     root,
-    update(evs) { events = evs; render(); },
+    // Скрытый экран не перерисовываем (это самый тяжёлый рендер приложения): при открытии show() всё перерисует.
+    update(evs) { events = evs; if (root.hidden) return; render(); },
     prefill(text) { input.value = String(text).slice(0, 500); updateHint(); input.focus(); },
     focusAdd() { input.focus(); },
     hasEditing: () => !!editingId,

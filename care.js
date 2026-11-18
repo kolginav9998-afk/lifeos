@@ -70,7 +70,16 @@ export function nextWeekend(today) {
 }
 
 // ---------- мягкий счётчик входящих ----------
-// Сколько новых задач появилось сегодня (по дате создания записи).
+// Сколько новых задач появилось сегодня. Считаем уникальные id по ПЕРВОЙ версии записи:
+// правка старой задачи создаёт событие с сегодняшним ts, но новой задачей она не является.
 export function newTasksToday(events, today) {
-  return events.filter(e => e.type === 'task' && todayStr(e.ts) === today).length;
+  const first = new Map();                                       // id задачи → время создания (самая ранняя версия)
+  for (const e of events ?? []) {
+    if (e?.type !== 'task') continue;
+    const ts = Number(e.ts) || 0;
+    if (!first.has(e.id) || ts < first.get(e.id)) first.set(e.id, ts);
+  }
+  let n = 0;
+  for (const ts of first.values()) if (todayStr(ts) === today) n++;
+  return n;
 }

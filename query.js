@@ -129,7 +129,8 @@ export function conditions(q, now = Date.now()) {
   }
   if (q.from) out.push({ label: `не раньше ${q.from}`, test: ev => eventDate(ev, now) >= q.from });
   if (q.to) out.push({ label: `не позже ${q.to}`, test: ev => eventDate(ev, now) <= q.to });
-  if (q.re) out.push({ label: `шаблон /${q.re.source}/`, test: ev => q.re.test(textOf(ev).slice(0, RE_TEXT_MAX)) });
+  // У регулярки с флагом g каждый test двигает lastIndex: без сброса подходящие записи пропускались бы через одну.
+  if (q.re) out.push({ label: `шаблон /${q.re.source}/`, test: ev => { q.re.lastIndex = 0; return q.re.test(textOf(ev).slice(0, RE_TEXT_MAX)); } });
   for (const t of q.text) out.push({ label: `текст «${t}»`, test: ev => normalize(textOf(ev)).includes(t) });
   return out;
 }
@@ -369,14 +370,19 @@ async function initQueryPanel() {
   renderViews();
 
   // --- регулярное выражение с предпросмотром ---
+  // Поиск идёт по всему журналу, поэтому не на каждое нажатие, а с паузой: подождём, пока человек допечатает.
+  let reTimer = null;
   reInput.oninput = () => {
+    clearTimeout(reTimer);
     const s = reInput.value.trim();
     if (!s) { fill(reBox); return; }
-    const r = regexSearch(store.state.events, s, 'i', { limit: 8 });
-    if (r.error) { fill(reBox, el('p', { class: 'error', textContent: r.error })); return; }
-    fill(reBox,
-      el('p', { class: 'muted', textContent: r.total ? `Совпадений: ${r.total}${r.total > r.matches.length ? `, показаны первые ${r.matches.length}` : ''}` : 'Совпадений нет' }),
-      r.matches.map(mo => el('div', { class: 'query-re-hit' }, el('span', { class: 'kind', textContent: mo.kind }), el('span', { textContent: mo.snippet }))));
+    reTimer = setTimeout(() => {
+      const r = regexSearch(store.state.events, reInput.value.trim(), 'i', { limit: 8 });
+      if (r.error) { fill(reBox, el('p', { class: 'error', textContent: r.error })); return; }
+      fill(reBox,
+        el('p', { class: 'muted', textContent: r.total ? `Совпадений: ${r.total}${r.total > r.matches.length ? `, показаны первые ${r.matches.length}` : ''}` : 'Совпадений нет' }),
+        r.matches.map(mo => el('div', { class: 'query-re-hit' }, el('span', { class: 'kind', textContent: mo.kind }), el('span', { textContent: mo.snippet }))));
+    }, 200);
   };
 
   // --- хроно-отчёт ---

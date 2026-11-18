@@ -5,8 +5,8 @@ import { el, fill, icon, ring, announce, focusNode, toast, dateRu } from './ui.j
 import { todayStr } from './events.js';
 import * as store from './store.js';
 import { TRACKS, trackById, doneLessons, makeLessonDone, lessonGoal } from './academy.js';
-import { STATUS_LABEL, SATISFIED, KIND_LABEL, lessonStatus, routeProgress, nextLessons, reviewDue, pickSurprise, surpriseDoneToday, makeCheck, gradeCheck, makeZcheckEvent,
-  placementTarget, openLessonIds, zeroLesson, lastRouteId, dueDate, spiralPool, weakKinds } from './curriculum.js';
+import { STATUS_LABEL, SATISFIED, KIND_LABEL, lessonStatus, routeProgress, nextLessons, reviewDue, pickSurprise, pickMixedSurprise, surpriseDoneToday, makeCheck, makeTransferCheck, gradeCheck, makeZcheckEvent,
+  placementTarget, placementChain, closedBookDue, openLessonIds, zeroLesson, lastRouteId, dueDate, spiralPool, weakKinds, DAY_MS } from './curriculum.js';
 import { lessonPage, lockedPage, runSequence } from './view-zero-lesson.js';
 import { checkIntro, resultPage } from './view-zero-check.js';
 import { createCatalog } from './view-zero-catalog.js';
@@ -95,7 +95,12 @@ export function createZeroView() {
   // ---------- закрытый урок и входная проверка ----------
   function showLocked(ref, st) {
     const missing = st.missing.map(id => { const r = zeroLesson(id); return r ? { lesson: r.lesson, status: lessonStatus(id, events, now()).status } : null; }).filter(Boolean);
-    setOverlay(ref.track.title, content(lockedPage({ lesson: ref.lesson, missing, labelOf: s => STATUS_LABEL[s], onPlacement: () => startPlacement(ref), onOpenMissing: id => openLesson(id) })));
+    // Каскадная проверка предпосылок: скажем заранее, сколько уроков предстоит проверить и с какого начнём.
+    const chain = placementChain(ref.lesson.id, events, now());
+    const chainNote = chain.length > 1
+      ? el('p', { class: 'muted', id: 'zero-chain-note', textContent: `Проверка пойдёт каскадом: сначала «${zeroLesson(chain[0])?.lesson.title ?? ''}», всего ${chain.length} ${plural(chain.length, 'урок', 'урока', 'уроков')}. Каждая пройденная проверка открывает следующий шаг.` })
+      : null;
+    setOverlay(ref.track.title, content(lockedPage({ lesson: ref.lesson, missing, labelOf: s => STATUS_LABEL[s], onPlacement: () => startPlacement(ref), onOpenMissing: id => openLesson(id) }), chainNote));
   }
   function startPlacement(origin) {
     const tid = placementTarget(origin.lesson.id, events, now());
@@ -112,10 +117,13 @@ export function createZeroView() {
       opts.spiral = spiralPool(ref.lesson, events, t);
       opts.weak = weakKinds(events.filter(e => e?.type === 'zcheck' && e.payload?.track === ref.track.id));
     }
-    const chk = makeCheck(ref.lesson, kind, t, opts);
+    // Проверка переноса: то, что освоено в одном формате (например, «выбор варианта»), проверяем в парном («вписать слово»).
+    const transfer = kind === 'quiz' ? makeTransferCheck(ref.lesson, events.filter(e => e?.type === 'zcheck' && e.payload?.lesson === ref.lesson.id), t) : null;
+    const chk = transfer ?? makeCheck(ref.lesson, kind, t, opts);
     if (chk.n < chk.minN) { toast('В этом уроке пока мало заданий для проверки'); return; }
     if (kind === 'surprise') return runCheck(ref, chk, origin);
-    setOverlay(kind === 'placement' ? 'Входная проверка' : 'Проверка', content(checkIntro({ kind, lesson: ref.lesson, chk, onStart: () => runCheck(ref, chk, origin) })));
+    setOverlay(kind === 'placement' ? 'Входная проверка' : 'Проверка', content(checkIntro({ kind, lesson: ref.lesson, chk, onStart: () => runCheck(ref, chk, origin) }),
+      transfer ? el('p', { class: 'muted', id: 'zero-transfer-note', textContent: 'Это проверка переноса: то, что ты выбирал из вариантов, теперь проверим в другом формате — так знание держится крепче.' }) : null));
   }
   function runCheck(ref, chk, origin) {
     const box = content();
@@ -152,9 +160,45 @@ export function createZeroView() {
     focusNode(box.querySelector('.zero-title'));
   }
   function quickCheck() {
-    const sp = pickSurprise(events, now(), now());
-    if (!sp) { toast(surpriseDoneToday(events, now()) ? 'Сегодня быстрая проверка уже была' : 'Пока проверять нечего: освой урок и вернись через сутки'); return; }
+    const t = now();
+    // Чередуем по дням: сегодня смешанная проверка (вопросы сразу нескольких освоенных уроков), завтра обычная. Чего сегодня нет — того нет.
+    const mixFirst = Math.floor(t / DAY_MS) % 2 === 0;
+    const first = mixFirst ? pickMixedSurprise(events, t, t) : pickSurprise(events, t, t);
+    const sp = first ?? (mixFirst ? pickSurprise(events, t, t) : pickMixedSurprise(events, t, t));
+    if (!sp) { toast(surpriseDoneToday(events, t) ? 'Сегодня быстрая проверка уже была' : 'Пока проверять нечего: освой урок и вернись через сутки'); return; }
+    if (sp.mixed) return runMixed(sp);
     runCheck({ track: sp.track, lesson: sp.lessonRef }, sp, null);
+  }
+  // Смешанная проверка: вопросы идут подряд, а результат записывается по частям — по одной записи на урок с флагом mixed (статусы уроков она не меняет).
+  function runMixed(mix) {
+    const box = content();
+    setOverlay('Быстрая проверка', box);
+    runSequence(box, mix.items, { seed: mix.seed, lang: mix.parts[0].track.lang, label: 'Вопрос', onFinish: results => finishMixed(mix, box, results) });
+  }
+  async function finishMixed(mix, box, results) {
+    const t = now();
+    const answers = results.map(r => r.answer), hints = results.map(r => r.hinted);
+    const grade = gradeCheck(mix.items, answers, hints, { minN: mix.minN });
+    let off = 0;
+    const parts = mix.parts.map(p => {
+      const g = gradeCheck(p.items, answers.slice(off, off + p.items.length), hints.slice(off, off + p.items.length));
+      off += p.items.length;
+      return { ...p, g };
+    });
+    try {
+      await store.saveMany(parts.map(p => makeZcheckEvent(p.track, p.lesson, 'surprise', { n: p.g.n, ok: p.g.ok, hints: p.g.hints, byKind: p.g.byKind, mixed: true }, t)));
+    } catch (e) { toast(`Не удалось сохранить результат: ${e.message}`); return; }
+    dirty = true;                                                              // карта обновится при закрытии окна
+    fill(box, el('div', { id: 'zero-mixed-result', class: `zero-lesson zero-result ${grade.passed ? 'passed' : 'failed'}`, dataset: { status: 'mixed', kind: 'surprise', passed: grade.passed ? 'yes' : 'no' } },
+      el('h3', { class: 'zero-title', tabIndex: -1 }, icon(grade.passed ? 'checkCircle' : 'alert', 22), ' ', grade.passed ? 'Ты это помнишь' : 'Надо повторить'),
+      el('p', { class: 'zero-score', textContent: `Верно без подсказок: ${grade.ok} из ${grade.n}` }),
+      el('p', { textContent: `Это была смешанная проверка сразу по нескольким урокам: ${parts.map(p => `«${p.lesson.title}»`).join(', ')}.` }),
+      el('ul', { class: 'plain' }, ...parts.map(p => el('li', { textContent: `${p.lesson.title} (${p.track.title}): верно без подсказок ${p.g.ok} из ${p.g.n}` }))),
+      el('p', { class: 'muted', textContent: 'Смешанная проверка — короткий срез: статусы уроков она не меняет, ни подтверждает, ни сбрасывает.' }),
+      actionRow(btn('К карте', closeOverlay, { id: 'zero-to-map', primary: true }))));
+    announce(`Быстрая проверка закончена. Верно без подсказок: ${grade.ok} из ${grade.n}.`);
+    overlay.scrollTop = 0;
+    focusNode(box.querySelector('.zero-title'));
   }
 
   // ---------- карта маршрута ----------
@@ -197,10 +241,21 @@ export function createZeroView() {
       due.length > 5 ? el('p', { class: 'muted', textContent: `И ещё ${due.length - 5} ${plural(due.length - 5, 'урок', 'урока', 'уроков')} в маршрутах ниже.` }) : null);
   }
   function quickCard() {
-    const t = now(), done = surpriseDoneToday(events, t), ready = !done && !!pickSurprise(events, t, t);
+    const t = now(), done = surpriseDoneToday(events, t), ready = !done && !!(pickSurprise(events, t, t) ?? pickMixedSurprise(events, t, t));
     return el('div', { class: 'card zero-quick' }, el('h3', { textContent: 'Быстрая проверка' }),
-      el('p', { class: 'muted', textContent: done ? 'Сегодня быстрая проверка уже была. Следующая будет завтра.' : ready ? 'Несколько случайных вопросов из того, что ты уже освоил. Не чаще одного раза в день.' : 'Пока проверять нечего: освой урок и вернись через сутки.' }),
+      el('p', { class: 'muted', textContent: done ? 'Сегодня быстрая проверка уже была. Следующая будет завтра.' : ready ? 'Несколько случайных вопросов из того, что ты уже освоил. Иногда — сразу по нескольким урокам. Не чаще одного раза в день.' : 'Пока проверять нечего: освой урок и вернись через сутки.' }),
       el('button', { type: 'button', id: 'zero-quick', class: ready ? 'primary' : '', disabled: !ready, textContent: 'Быстрая проверка', onclick: quickCheck }));
+  }
+  // «Закрытая книга»: через неделю после освоения предлагаем выполнить задание урока по памяти, не открывая текст.
+  function closedBookCard(t) {
+    const due = closedBookDue(events, t);
+    if (!due.length) return null;
+    return el('div', { class: 'card zero-closed-book', id: 'zero-closed-book' }, el('h3', { textContent: 'Проверь по памяти' }),
+      el('p', { class: 'muted', textContent: 'Прошла неделя после освоения. Выполни задание урока по памяти, не подглядывая в текст, — потом открой урок и сверься.' }),
+      el('ul', { class: 'plain' }, ...due.slice(0, 3).map(x => el('li', { class: 'row' },
+        el('span', { class: 'grow' }, el('strong', { textContent: x.lesson.title }), el('span', { class: 'muted', textContent: ` · ${x.track.title}` })),
+        el('button', { type: 'button', class: 'chip', dataset: { closed: x.lesson.id }, 'aria-label': `Открыть урок: ${x.lesson.title}`, textContent: 'Открыть урок', onclick: () => openLesson(x.lesson.id) })))),
+      due.length > 3 ? el('p', { class: 'muted', textContent: `И ещё ${due.length - 3} ${plural(due.length - 3, 'урок', 'урока', 'уроков')} ждут проверки по памяти.` }) : null);
   }
   function lessonRow(l, st, n) {
     return el('li', {}, el('button', { type: 'button', id: `zero-row-${l.id}`, class: `zero-row zero-row-${st.status}`, dataset: { lesson: l.id, status: st.status }, onclick: () => openLesson(l.id) },
@@ -219,7 +274,7 @@ export function createZeroView() {
   function render() {
     const track = routeTrack(), t = now(), p = routeProgress(track, events, t);
     let idx = 0;
-    fill(mapBox, introCard(), routeSwitch(), progressCard(track, p), (() => { const due = reviewDue(events, t); return due.length ? dueCard(due) : null; })(), quickCard(),
+    fill(mapBox, introCard(), routeSwitch(), progressCard(track, p), (() => { const due = reviewDue(events, t); return due.length ? dueCard(due) : null; })(), closedBookCard(t), quickCard(),
       btn('Внешние курсы и материалы', () => setPage('catalog'), { id: 'zero-catalog-open' }),
       ...p.stages.map(g => { const c = stageCard(track, g, p, idx); idx += g.lessons.length; return c; }));
     if (page === 'catalog') catalog.draw();
