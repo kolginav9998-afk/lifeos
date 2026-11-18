@@ -368,7 +368,7 @@ details.card{box-shadow:var(--shadow)}
 /* ===== вкладка «Запросы» в панели поиска (query.js) ===== */
 .search-tabs{display:flex;gap:6px;margin-bottom:8px}
 .search-tab{border:1px solid var(--line);background:var(--soft);border-radius:999px;padding:4px 14px;min-height:36px;font-size:.85rem;color:var(--muted)}
-.search-tab.on{background:var(--accent);border-color:var(--accent);color:#fff;font-weight:600}
+.search-tab.on{background:var(--accent);border-color:var(--accent);color:var(--on-accent);font-weight:600}
 .query-hint{font-size:.8rem;margin:2px 0 6px}
 .query-row{display:flex;gap:6px;flex-wrap:wrap;margin-top:8px;align-items:center}
 .query-row input{flex:1;min-width:140px}

@@ -11,8 +11,10 @@ const today = read('view-today.js');
 const money = read('view-money.js');
 const ui = read('ui.js');
 
-// блок polish живёт строго в конце style-design.css
-const polish = design.slice(design.indexOf('/* ===== polish (w5) ===== */'));
+// блок polish лежит в style-design.css; после него могут идти блоки следующих волн (geek, query) — режем по следующему маркеру
+const polishStart = design.indexOf('/* ===== polish (w5) ===== */');
+const polishNext = design.indexOf('/* =====', polishStart + 10);
+const polish = design.slice(polishStart, polishNext === -1 ? undefined : polishNext);
 
 test('блок polish дописан в конец файла после линии дня', () => {
   assert.ok(design.indexOf('/* ===== polish (w5) ===== */') > design.indexOf('#day-line'), 'маркер после блоков палитр и #day-line');
