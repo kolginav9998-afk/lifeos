@@ -95,3 +95,22 @@
 .pf-bar{height:10px;border-radius:999px;background:var(--soft);overflow:hidden}
 .pf-fill{display:block;height:100%;background:var(--accent);border-radius:999px}
 .pf-about,.pf-cmp{margin:0}
+
+/* ---- форматы заданий учёбы (quiz.js): мини-квиз, диктант, итог этапа, минутка ---- */
+.quiz-item{display:flex;flex-direction:column;gap:8px}
+.quiz-big{font-size:3rem;font-weight:800;text-align:center;margin:4px 0;line-height:1.2}
+.quiz-say{align-self:flex-start}
+.quiz-fb{margin:4px 0 0;font-weight:600}
+.quiz-fb.ok{color:var(--ok)}
+.quiz-fb.bad{color:var(--danger)}
+.quiz-fb-box{display:flex;flex-direction:column;gap:8px}
+.quiz-fb-box .quiz-next{align-self:flex-start}
+.quiz-phrase{display:flex;flex-wrap:wrap;gap:6px;margin:0}
+.quiz-word{min-height:44px;padding:6px 12px}
+.quiz-typed{display:flex;gap:8px;flex-wrap:wrap}
+.quiz-typed .quiz-input{flex:1 1 160px;min-height:44px}
+.quiz-explain-box{margin:8px 0;display:flex;flex-direction:column;gap:8px}
+.quiz-explain-box summary{cursor:pointer;color:var(--accent);min-height:36px;display:flex;align-items:center}
+.quiz-explain-out{margin:4px 0 0}
+.quiz-explain-out.ok{color:var(--ok)}
+.stage-review{margin:4px 8px 4px 0}

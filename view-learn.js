@@ -5,7 +5,8 @@ import { getPref, setPref } from './prefs.js';
 import { MIN_QUEUE, minDayActive, trimQueue } from './adapt.js';
 import * as store from './store.js';
 import { TRACKS, trackById, trackProgress, doneLessons, makeLessonDone, lessonEventId, makeSrsEvent, makeUserCard, userCards, sessionQueue, todayLoad, studyDates, MY_TRACK,
-  leeches, comebackInfo, fifteenPlan, lessonNoteOf, makeLessonNote, examQueue, quizFor, cardsOfTrack, cardFace, lessonToRevisit, markRevisited, lessonTitle, retentionByInterval, lessonGoal } from './academy.js';
+  leeches, comebackInfo, fifteenPlan, lessonNoteOf, makeLessonNote, examQueue, cardsOfTrack, cardFace, lessonToRevisit, markRevisited, lessonTitle, retentionByInterval, lessonGoal, statesOf } from './academy.js';
+import { mixedLessonQuiz, gradeItem, keywordsOfCards, checkExplain, dictationItems, dictationWordsOf, stageReviewItems, stageLetters, stageNames, contrastPairsFor, doneStages, microFromLessons, CONTRAST_LATIN, CONTRAST_HEBREW } from './quiz.js';
 import { newState, grade, studyStreak, INTERVALS } from './srs.js';
 import { canSpeak, foreignSide, speak } from './speech.js';
 import { openSpeaking, hasRunningSpeak, speakWeek, SPEAK_LANGS } from './speaking.js';
@@ -33,9 +34,11 @@ export function createLearnView(ctx = {}) {
   let events = [];
   let page = { name: 'home' };
   let session = null;
+  let extraClose = null;                                  // диктант или минутка заняли окно повторения (закрытие по Escape и при блокировке)
   const openLessons = new Set();
   const quizzes = new Map();                          // ход мини-квиза по урокам (не сохраняется)
   const noteDrafts = new Map();                       // несохранённые конспекты переживают перерисовку экрана
+  const explainDrafts = new Map();                    // черновики пересказа «объясни сам» тоже
   const root = el('section', { id: 'view-learn', class: 'view' });
   const overlay = el('div', { id: 'sess', class: 'overlay', hidden: true, tabIndex: -1, role: 'dialog', 'aria-modal': 'true', 'aria-label': 'Повторение' });
   const speakHost = el('div', { id: 'speak-host', class: 'overlay', hidden: true, tabIndex: -1, role: 'dialog', 'aria-modal': 'true', 'aria-label': 'Говорение вслух' });
@@ -115,8 +118,14 @@ export function createLearnView(ctx = {}) {
     const zeroCard = zeroTracks.length && (!quietWeek || zeroTracks.some(z => routeProgress(z, events).done > 0)) ? el('div', { class: 'card zero-entry', id: 'learn-zero' }, el('h3', { textContent: 'Курсы с нуля' }),
       el('p', { class: 'muted', textContent: 'Английский, иврит и библейский иврит с самого начала: звуки, буквы, чтение. Уроки открываются по порядку, а «Освоено» ставится после проверки.' }),
       el('ul', { class: 'plain' }, ...zeroTracks.map(z => { const p = routeProgress(z, events); return el('li', { textContent: `${z.title}: освоено ${p.done} из ${p.total}` }); })),
+      ...zeroTracks.flatMap(z => doneStages(routeProgress(z, events)).map(st => el('button', { type: 'button', class: 'chip stage-review', dataset: { stage: `${z.id}:${st}` }, textContent: `Итог этапа «${st}» (${z.title})`, onclick: () => go({ name: 'stage', trackId: z.id, stage: st }) }))),
       el('button', { type: 'button', id: 'learn-zero-open', class: 'primary', textContent: 'Открыть «С нуля»', onclick: () => ctx.openZero?.() })) : null;
-    mount(head, comeback, fifteen, revisit, speaking, practiceCard(events, t0), leech, el('h2', { textContent: 'Курсы' }), quietNote, zeroCard, ...cards, my, note);
+    const done = doneLessons(events);
+    const micro = TRACKS.flatMap(t => t.lessons).some(l => done.has(l.id) && (l.cards?.length ?? 0) >= 2) ? el('div', { class: 'card calm', id: 'micro' },
+      el('strong', { textContent: 'Минутка (90 секунд)' }),
+      el('p', { class: 'muted', textContent: 'Для дней, когда нет сил: один факт из пройденного и один вопрос. Этого достаточно.' }),
+      el('button', { type: 'button', id: 'micro-open', class: 'chip', textContent: 'Открыть минутку', onclick: openMicro })) : null;
+    mount(head, comeback, micro, fifteen, revisit, speaking, practiceCard(events, t0), leech, el('h2', { textContent: 'Курсы' }), quietNote, zeroCard, ...cards, my, note);
   }
 
   // ---------- конспект урока и открытие урока ----------
@@ -151,24 +160,86 @@ export function createLearnView(ctx = {}) {
       toast(old ? 'Карточка обновлена' : 'Карточка добавлена в «Свои карточки»', { actionLabel: 'Отменить', onAction: () => (old ? store.save(old) : store.remove(id)) });
     } catch (e) { toast(e.message); }
   }
+  // ---------- проигрыватель заданий новых форматов (quiz.js): варианты, вписанный ответ, «найди ошибку» ----------
+  function quizItemNode(item, { last = false, speakLang = 'english', onDone = () => {}, onNext = () => {} } = {}) {
+    const box = el('div', { class: 'quiz-item', dataset: { kind: item.t } });
+    let answered = false;
+    const fb = el('div', { class: 'quiz-fb-box' });
+    const rightText = item.t === 'error' ? `«${item.right}»` : item.t === 'typed' ? item.ok[0] : item.options[item.answer];
+    const done = ok => {
+      answered = true;
+      for (const b of box.querySelectorAll('.quiz-opt, .quiz-input, .quiz-check')) b.disabled = true;
+      fill(fb,
+        el('p', { class: `quiz-fb ${ok ? 'ok' : 'bad'}`, textContent: ok ? 'Верно' : `Неверно. Правильный ответ: ${rightText}` }),
+        item.explain ? el('p', { class: 'muted', textContent: item.explain }) : null,
+        el('button', { type: 'button', class: 'chip quiz-next', textContent: last ? 'Результат' : 'Дальше', onclick: onNext }));
+      fb.querySelector('.quiz-next')?.focus();
+      onDone(ok);
+    };
+    const head = [];
+    if (item.big) head.push(el('p', { class: 'quiz-big', lang: item.lang === 'hebrew' ? 'he' : item.lang === 'english' ? 'en' : undefined, dir: item.lang === 'hebrew' ? 'rtl' : undefined, textContent: item.big }));
+    head.push(el('p', { class: 'quiz-q', textContent: item.q }));
+    if (item.say) head.push(el('button', { type: 'button', class: 'chip quiz-say', onclick: () => { if (!speak(item.say, item.lang ?? speakLang, () => toast('Озвучка недоступна на этом устройстве'))) toast('Озвучка недоступна на этом устройстве'); } }, icon('volume', 16), 'Послушать'));
+    if (item.t === 'choice') {
+      box.append(...head, ...item.options.map((o, idx) => el('button', { type: 'button', class: 'quiz-opt', textContent: o, onclick: () => {
+        if (answered) return;
+        [...box.querySelectorAll('.quiz-opt')].forEach((b, i) => { b.classList.toggle('right', i === item.answer); b.classList.toggle('wrong', i === idx && idx !== item.answer); });
+        done(idx === item.answer);
+      } })), fb);
+    } else if (item.t === 'error') {
+      box.append(...head, el('p', { class: 'quiz-phrase' }, ...item.words.map((w, idx) => el('button', { type: 'button', class: 'quiz-opt quiz-word', textContent: w, onclick: () => {
+        if (answered) return;
+        [...box.querySelectorAll('.quiz-word')].forEach((b, i) => { b.classList.toggle('right', i === item.wrong); b.classList.toggle('wrong', i === idx && idx !== item.wrong); });
+        done(idx === item.wrong);
+      } }))), fb);
+    } else if (item.t === 'typed') {
+      const input = el('input', { type: 'text', class: 'quiz-input', autocomplete: 'off', 'aria-label': 'Твой ответ', dir: 'auto' });
+      input.setAttribute('autocapitalize', 'off'); input.setAttribute('spellcheck', 'false');
+      box.append(...head, el('form', { class: 'quiz-typed', onsubmit: e => { e.preventDefault(); if (!answered && input.value.trim()) done(gradeItem(item, input.value)); } }, input, el('button', { type: 'submit', class: 'primary quiz-check', textContent: 'Проверить' })), fb);
+    } else box.append(...head, fb);
+    return box;
+  }
+  // Небольшая серия заданий с итогом. Состояние st ({items, i, ok}) живёт снаружи и переживает перерисовку экрана.
+  function quizFlow(box, st, { speakLang, onFinish } = {}) {
+    if (st.i >= st.items.length) return onFinish(st);
+    fill(box, el('p', { class: 'muted', textContent: `Вопрос ${st.i + 1} из ${st.items.length}` }),
+      quizItemNode(st.items[st.i], { last: st.i + 1 === st.items.length, speakLang, onDone: good => { if (good) st.ok++; }, onNext: () => { st.i++; quizFlow(box, st, { speakLang, onFinish }); } }));
+  }
+  // Мини-квиз после урока: смесь форматов (выбор, «закончи фразу», «найди ошибку») из карточек урока.
   function quizNode(t, l) {
     const box = el('div', { class: 'quiz', dataset: { lesson: l.id } });
+    const others = () => cardsOfTrack(t).filter(c => c.lesson !== l.id).map(c => [c.q, c.a]);
     const draw = () => {
       const st = quizzes.get(l.id);
-      if (!st) { fill(box, el('button', { type: 'button', class: 'chip quiz-start', textContent: 'Мини-квиз', onclick: () => { quizzes.set(l.id, { qs: quizFor(t, l), i: 0, ok: 0, picked: null }); draw(); } })); return; }
-      if (st.i >= st.qs.length) {
-        fill(box, el('p', { class: 'quiz-result', textContent: `Верно: ${st.ok} из ${st.qs.length}. ${st.ok === st.qs.length ? 'Отлично!' : 'Что не получилось, вернётся в повторении карточек урока.'}` }),
-          el('button', { type: 'button', class: 'chip quiz-again', textContent: 'Ещё раз', onclick: () => { quizzes.delete(l.id); quizzes.set(l.id, { qs: quizFor(t, l, { seed: Date.now() }), i: 0, ok: 0, picked: null }); draw(); } }));
-        return;
-      }
-      const q = st.qs[st.i];
-      fill(box, el('p', { class: 'muted', textContent: `Вопрос ${st.i + 1} из ${st.qs.length}` }), el('p', { class: 'quiz-q', textContent: q.q }),
-        ...q.options.map((o, idx) => el('button', { type: 'button', class: `quiz-opt${st.picked === null ? '' : idx === q.answer ? ' right' : idx === st.picked ? ' wrong' : ''}`, dataset: { idx: String(idx) }, disabled: st.picked !== null, textContent: o,
-          onclick: () => { st.picked = idx; if (idx === q.answer) st.ok++; draw(); } })),
-        st.picked !== null ? el('button', { type: 'button', class: 'chip quiz-next', textContent: st.i + 1 < st.qs.length ? 'Дальше' : 'Результат', onclick: () => { st.i++; st.picked = null; draw(); } }) : null);
+      if (!st) { fill(box, el('button', { type: 'button', class: 'chip quiz-start', textContent: 'Мини-квиз', onclick: () => { quizzes.set(l.id, { items: mixedLessonQuiz(l.cards, others(), { seed: Date.now(), n: 4 }), i: 0, ok: 0 }); draw(); } })); return; }
+      quizFlow(box, st, {
+        onFinish: s => fill(box,
+          el('p', { class: 'quiz-result', textContent: `Верно: ${s.ok} из ${s.items.length}. ${s.ok === s.items.length ? 'Отлично!' : 'Что не получилось, вернётся в повторении карточек урока.'}` }),
+          el('button', { type: 'button', class: 'chip quiz-again', textContent: 'Ещё раз', onclick: () => { quizzes.set(l.id, { items: mixedLessonQuiz(l.cards, others(), { seed: Date.now(), n: 4 }), i: 0, ok: 0 }); draw(); } })),
+      });
     };
     draw();
     return box;
+  }
+  // «Объясни сам»: пересказ урока двумя предложениями, зачёт по опорным словам (правило, без ИИ, текст никуда не уходит).
+  function explainNode(l) {
+    const kws = keywordsOfCards(l.cards);
+    if (kws.length < 3) return null;
+    const ta = el('textarea', { class: 'lesson-note', rows: 2, maxLength: 1000, placeholder: 'Два предложения своими словами, не подглядывая', 'aria-label': 'Мой пересказ' });
+    ta.value = explainDrafts.get(l.id) ?? '';
+    ta.addEventListener('input', () => explainDrafts.set(l.id, ta.value));
+    const out = el('p', { class: 'muted quiz-explain-out' });
+    const check = () => {
+      const r = checkExplain(ta.value, kws);
+      out.className = `quiz-explain-out ${r.ok ? 'ok' : 'muted'}`;
+      out.textContent = !ta.value.trim() ? 'Напиши пару предложений — проверим по опорным словам.'
+        : r.ok ? `Зачёт: опорные слова на месте (${r.hits.length} из ${kws.length}). ${r.sentences < 2 ? 'Если получится, добавь второе предложение: так пересказ держится лучше.' : 'Хороший пересказ.'}`
+        : `Пока нашлись: ${r.hits.length ? r.hits.join(', ') : 'ничего из опорных'}. Добавь, например: ${r.missing.slice(0, 3).join(', ')}.`;
+    };
+    return el('details', { class: 'quiz-explain-box' },
+      el('summary', { textContent: 'Объясни сам' }),
+      el('p', { class: 'muted', textContent: 'Перескажи урок двумя предложениями своими словами. Зачёт — по опорным словам, без ИИ.' }),
+      ta, el('button', { type: 'button', class: 'chip quiz-explain-check', textContent: 'Проверить пересказ', onclick: check }), out);
   }
   function openLesson(trackId, lessonId) {
     if (trackById(trackId)?.zero) { ctx.openZero?.(trackId, lessonId); return; }                  // уроки «с нуля» открываются только на своём экране (допуск по ступеням)
@@ -187,6 +258,8 @@ export function createLearnView(ctx = {}) {
       ? el('button', { type: 'button', class: 'primary', id: 'track-start', textContent: `Повторять карточки курса (${load.due + load.fresh})`, onclick: () => startSession(t.id) })
       : el('p', { class: 'muted', textContent: 'Карточки курса на сегодня закончились. Пройди следующий урок — появятся новые.' });
     const examBtn = cardsOfTrack(t).length >= 10 ? el('button', { type: 'button', id: 'track-exam', class: 'chip', textContent: 'Экзамен: 20 случайных карточек', onclick: () => startSession(t.id, { exam: true }) }) : null;
+    const dictBtn = (t.id === 'english' || t.id === 'hebrew') && canSpeak() && dictationWords(t).length >= 5
+      ? el('button', { type: 'button', id: 'track-dictation', class: 'chip', textContent: 'Диктант на слух', onclick: () => startDictation(t) }) : null;
     const prompts = t.mentor.prompts.map((pr, i) => el('div', { class: 'prompt' },
       el('p', { textContent: pr }),
       el('button', { type: 'button', class: 'chip', dataset: { prompt: String(i) }, textContent: 'Копировать', onclick: () => copyText(pr) })));
@@ -215,6 +288,7 @@ export function createLearnView(ctx = {}) {
         el('label', { class: 'field' }, el('span', { class: 'rating-label', textContent: 'Мой конспект' }), noteBox(l)),
         el('div', { class: 'row wrap' }, el('button', { type: 'button', class: 'chip note-save', dataset: { note: l.id }, textContent: 'Сохранить конспект', onclick: () => saveNote(l) }),
           el('button', { type: 'button', class: 'chip note-card', dataset: { noteCard: l.id }, textContent: 'Конспект → карточка', onclick: () => noteToCard(l) })),
+        explainNode(l),
         quizNode(t, l),
         el('p', { class: 'muted', textContent: `Карточек в уроке: ${l.cards.length}` }),
         el('button', { type: 'button', class: 'chip', dataset: { aiCheck: l.id }, textContent: 'Проверить мой ответ с ИИ', onclick: () => copyText(`Я прохожу урок «${l.title}» из курса «${t.title}».\nЗадание: ${l.task}\nМой ответ: <вставь свой ответ>\n\nПроверь ответ как доброжелательный наставник: что верно, что неверно или неполно, один совет и один следующий шаг. Объясняй простыми словами и не выдумывай факты.`) }),
@@ -235,7 +309,7 @@ export function createLearnView(ctx = {}) {
         el('div', { class: 'row' }, el('span', { class: 'track-ic', style: `background:${t.color}`, textContent: t.icon, 'aria-hidden': 'true' }), el('h3', { textContent: t.title })),
         el('p', { textContent: t.intro }),
         el('p', { class: 'muted', textContent: `Уроки ${p.lessons}/${p.lessonsTotal} · выучено карточек ${p.mastered}/${p.total}` + (p.retention !== null ? ` · помню ${Math.round(p.retention * 100)}%` : '') }),
-        bar(p.lessons, p.lessonsTotal), startBtn, examBtn),
+        bar(p.lessons, p.lessonsTotal), startBtn, examBtn, dictBtn),
       plateau, mentor, curveBox, plan, el('h2', { textContent: 'Уроки' }), ...lessons, sources);
   }
 
@@ -278,6 +352,68 @@ export function createLearnView(ctx = {}) {
         el('div', { class: 'grow' }, el('strong', { textContent: c.q }), el('div', { class: 'muted', textContent: c.a }), c.hint ? el('div', { class: 'muted', textContent: `Ассоциация: ${c.hint}` }) : null),
         el('button', { type: 'button', class: 'chip danger', 'aria-label': 'Удалить карточку', textContent: 'Удалить', onclick: async () => { await store.removeMany([c.evId, `srs:${c.id}`]); toast('Карточка удалена'); } })))) : el('p', { class: 'muted', textContent: 'Пока нет своих карточек.' }),
       list.length ? el('button', { type: 'button', class: 'primary', textContent: 'Повторять свои карточки', onclick: () => startSession('my') }) : null);
+  }
+
+  // ---------- диктант на слух: слова только из области допуска (уже начатые в повторении иностранные слова) ----------
+  function dictationWords(t) {
+    const started = new Set(statesOf(events).map(s => s.card));
+    const foreign = t.id === 'hebrew' ? /[֐-׿]/ : /^[A-Za-z][A-Za-z'’-]*$/;
+    return cardsOfTrack(t).filter(c => c.kind === 'deck' && started.has(c.id) && foreign.test(c.q) && !/\s/.test(c.q.trim())).map(c => c.q);
+  }
+  function startDictation(t) {
+    const lang = t.id === 'hebrew' ? 'hebrew' : 'english';
+    const items = dictationItems(dictationWords(t), { seed: Date.now(), n: 8, lang });
+    if (!items.length) { toast('Пока нечего диктовать: сначала повтори слова в обычном повторении'); return; }
+    const close = () => { extraClose = null; overlay.hidden = true; overlay.replaceChildren(); render(); };
+    extraClose = close;
+    overlay.hidden = false;
+    const flowBox = el('div');
+    overlay.replaceChildren(
+      el('div', { class: 'sess-top' }, el('span', { class: 'muted', textContent: 'Диктант на слух' }),
+        el('button', { type: 'button', id: 'sess-close', class: 'link', textContent: 'Закончить', onclick: close })),
+      el('p', { class: 'muted', textContent: 'Слушай слово и вписывай его. Слова — только из тех, что ты уже повторял.' }), flowBox);
+    quizFlow(flowBox, { items, i: 0, ok: 0 }, { speakLang: lang, onFinish: s => fill(flowBox,
+      el('p', { class: 'quiz-result', textContent: `Диктант закончен: верно ${s.ok} из ${s.items.length}. Ошибки не страшны: слова вернутся в повторении.` }),
+      el('button', { type: 'button', class: 'primary big-btn', textContent: 'Готово', onclick: close })) });
+    overlay.focus({ preventScroll: true });
+  }
+  // ---------- минутка: один факт из пройденного и один вопрос (для дней, когда нет сил) ----------
+  function openMicro() {
+    const m = microFromLessons(TRACKS.flatMap(t => t.lessons).filter(l => doneLessons(events).has(l.id)), { seed: Date.now() });
+    if (!m) return;
+    const close = () => { extraClose = null; overlay.hidden = true; overlay.replaceChildren(); render(); };
+    extraClose = close;
+    overlay.hidden = false;
+    const flowBox = el('div');
+    overlay.replaceChildren(
+      el('div', { class: 'sess-top' }, el('span', { class: 'muted', textContent: 'Минутка' }),
+        el('button', { type: 'button', id: 'sess-close', class: 'link', textContent: 'Закончить', onclick: close })),
+      el('div', { class: 'flash' },
+        el('p', { class: 'muted', textContent: `Факт из урока «${m.fact.lesson}»` }),
+        el('p', { class: 'flash-q', textContent: m.fact.q }),
+        el('p', { class: 'flash-a', textContent: m.fact.a })),
+      flowBox);
+    quizFlow(flowBox, { items: [m.item], i: 0, ok: 0 }, { onFinish: () => fill(flowBox,
+      el('p', { class: 'quiz-result', textContent: 'Минутка закончилась. Этого вполне достаточно на сегодня.' }),
+      el('button', { type: 'button', class: 'primary big-btn', textContent: 'Готово', onclick: close })) });
+    overlay.focus({ preventScroll: true });
+  }
+  // ---------- итог этапа «с нуля»: обзорный урок без нового материала ----------
+  function renderStage(z, stage) {
+    const lessons = z.lessons.filter(l => l.stage === stage);
+    const lang = z.lang === 'hebrew' ? 'hebrew' : 'english';
+    const pairs = contrastPairsFor(stageLetters(lessons), z.lang === 'hebrew' ? CONTRAST_HEBREW : CONTRAST_LATIN);
+    const items = stageReviewItems(lessons, { seed: Date.now(), n: 8, pairs, dictation: canSpeak() ? dictationWordsOf(lessons) : [], lang });
+    const flowBox = el('div', { class: 'card' });
+    mount(
+      el('button', { type: 'button', id: 'learn-back', class: 'link back-link', onclick: () => go({ name: 'home' }) }, icon('chevL', 18), 'Все курсы'),
+      el('div', { class: 'card' }, el('h3', { textContent: `Итог этапа «${stage}»` }),
+        el('p', { class: 'muted', textContent: 'Обзорный урок: только то, что уже проходили. Нового материала нет, результаты никуда не записываются.' })),
+      flowBox);
+    if (!items.length) { fill(flowBox, el('p', { class: 'muted', textContent: 'В этом этапе пока нет заданий для обзора.' })); return; }
+    quizFlow(flowBox, { items, i: 0, ok: 0 }, { speakLang: lang, onFinish: s => fill(flowBox,
+      el('p', { class: 'quiz-result', textContent: `Верно: ${s.ok} из ${s.items.length}. ${s.ok === s.items.length ? 'Этап держится отлично!' : 'Что подзабылось, вернётся в проверках уроков.'}` }),
+      el('button', { type: 'button', class: 'chip', textContent: 'Ко всем курсам', onclick: () => go({ name: 'home' }) })) });
   }
 
   // ---------- сессия повторения ----------
@@ -369,7 +505,7 @@ export function createLearnView(ctx = {}) {
     overlay.focus({ preventScroll: true });
   }
   overlay.addEventListener('keydown', e => {
-    if (!session) return;
+    if (!session) { if (e.key === 'Escape' && extraClose) { e.stopPropagation(); extraClose(); } return; }
     e.stopPropagation();                              // чтобы не срабатывали глобальные клавиши приложения
     if (e.key === 'Escape') { closeSession(); return; }
     if (session.i >= session.queue.length) return;
@@ -380,6 +516,7 @@ export function createLearnView(ctx = {}) {
   // ---------- общий ----------
   function render() {
     if (page.name === 'track') { const t = trackById(page.id); if (t && !t.zero) return renderTrack(t); page = { name: 'home' }; }
+    if (page.name === 'stage') { const z = trackById(page.trackId); if (z?.zero && stageNames(z).includes(page.stage)) return renderStage(z, page.stage); page = { name: 'home' }; }
     if (page.name === 'my') return renderMy();
     renderHome();
   }
@@ -388,11 +525,12 @@ export function createLearnView(ctx = {}) {
     overlay,
     update(evs) {
       events = evs;
+      if (!evs.length && extraClose) extraClose();                                      // приложение заблокировано: закрыть диктант/минутку
       if (!evs.length) { speakHost.hidden = true; speakHost.replaceChildren(); }
       if (session && !evs.length) { session = null; overlay.hidden = true; overlay.replaceChildren(); }   // приложение заблокировано
-      if (!session) render();
+      if (!session && !extraClose) render();
     },
-    show() { if (!session) render(); if (speakHost.hidden && hasRunningSpeak()) startSpeaking('english', true); },
+    show() { if (!session && !extraClose) render(); if (speakHost.hidden && hasRunningSpeak()) startSpeaking('english', true); },
     // открыть курс (и урок) из поиска
     open(trackId, lessonId = null) {
       if (session) return;
