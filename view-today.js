@@ -13,7 +13,7 @@ import { parseCapture, captureLabel, buildCapture } from './capture.js';
 import { strengthDays, doneWorkouts, WEEKLY_STRENGTH_GOAL } from './workouts.js';
 import { openFocus, hasRunningFocus, focusMinutes } from './focus.js';
 import { makeNote, templateText } from './notes.js';
-import { upcomingBirthdays, dueContacts } from './people.js';
+import { upcomingBirthdays, upcomingImportant, dueContacts } from './people.js';
 import { okrsOf, okrPace } from './okr.js';
 import { makeIntention, intentionOf, decisionsDue, lowMoodNotice, LOW_MOOD_TEXT } from './reflect.js';
 import { lightDayHint, overloadHint, caffeineHint, restDayHint } from './hints.js';
@@ -400,8 +400,13 @@ export function createTodayView({ go }) {
     const skillsReady = lessonSkillStatus(events).ready.length;
     if (skillsReady) opt.push(el('button', { type: 'button', id: 'skills-chip', class: 'chip', textContent: `Новые навыки: ${skillsReady}`, onclick: () => go('skills') }));
     if (goalsOn.length) opt.push(el('button', { type: 'button', id: 'okr-chip', class: 'chip', textContent: `Цели: ${goalsOn.length}${goalsOn.some(g => okrPace(g, today).state === 'behind') ? ' ⚠' : ''}`, onclick: () => go('okr') }));
-    const bds = upcomingBirthdays(events, today, 7), dueP = dueContacts(events, today);
+    const bds = upcomingBirthdays(events, today, 7), dueP = dueContacts(events, today), imp = upcomingImportant(events, today, 7);
     if (bds.length) opt.push(el('button', { type: 'button', id: 'bday-chip', class: 'chip', textContent: `🎂 ${bds[0].person.payload.name}: ${bds[0].inDays === 0 ? 'сегодня' : bds[0].inDays === 1 ? 'завтра' : `через ${bds[0].inDays} дн.`}${bds.length > 1 ? ` (+${bds.length - 1})` : ''}`, onclick: () => go('people') }));
+    if (imp.length) {                    // важные даты близких: тот же паттерн, что у дня рождения — чип ведёт на экран «Люди», там кнопки «написать»
+      const x = imp[0], who = x.person.payload.name;
+      const when = x.inDays === 0 ? `Сегодня важный день у ${who}` : x.inDays === 1 ? `Завтра важный день у ${who}` : `Важный день у ${who} через ${x.inDays} дн.`;
+      opt.push(el('button', { type: 'button', id: 'imp-chip', class: 'chip', textContent: `📌 ${when}${x.label ? `: ${x.label}` : ''}${imp.length > 1 ? ` (+${imp.length - 1})` : ''}`, onclick: () => go('people') }));
+    }
     if (dueP.length) opt.push(el('button', { type: 'button', id: 'contact-chip', class: 'chip', textContent: `Написать: ${dueP.length}`, onclick: () => go('people') }));
     const chkDue = checkupsDue(events, today);
     if (chkDue.length) opt.push(el('button', { type: 'button', id: 'checkup-chip', class: 'chip', textContent: `Профилактика: ${chkDue.length}`, onclick: () => go('health') }));
