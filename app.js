@@ -100,11 +100,27 @@ function applyTheme() {
   document.documentElement.style.setProperty('--fs', String([1, 1.15, 1.3].includes(fs) ? fs : 1));
   const t = getPref('theme');
   const root = document.documentElement;
-  if (t === 'light' || t === 'dark') root.setAttribute('data-theme', t); else root.removeAttribute('data-theme');
+  const now = new Date(), hour = now.getHours(), night = hour >= 22 || hour < 6;
+  // Авто-вечер: с 22:00 до 6:00 тема становится тёмной сама (явно выбранная светлая не трогается)
+  if (t === 'dark' || (t !== 'light' && night && getPref('autoEvening'))) root.setAttribute('data-theme', 'dark');
+  else if (t === 'light') root.setAttribute('data-theme', 'light');
+  else root.removeAttribute('data-theme');
+  // True dark для OLED: действует только поверх тёмной темы (чёрный фон, без свечения и теней)
+  if (getPref('oledDark')) root.setAttribute('data-oled', ''); else root.removeAttribute('data-oled');
   const accent = getPref('accent');
   if (accent && accent !== 'iris') root.setAttribute('data-accent', accent); else root.removeAttribute('data-accent');
+  // Сезон нужен палитре «по сезону»: дата → winter/spring/summer/autumn
+  const mo = now.getMonth();
+  root.dataset.season = mo === 11 || mo < 2 ? 'winter' : mo < 5 ? 'spring' : mo < 8 ? 'summer' : 'autumn';
   const density = getPref('density');
   if (density && density !== 'normal') root.setAttribute('data-density', density); else root.removeAttribute('data-density');
+  // Время суток и ритм недели: тонкие классы на <body>, меняют только свечение фона
+  const cls = document.body.classList;
+  cls.toggle('tod-morning', hour >= 6 && hour < 11);
+  cls.toggle('tod-night', night);
+  const wd = now.getDay();
+  cls.toggle('week-sun-eve', wd === 0 && hour >= 18);
+  cls.toggle('week-mon-morning', wd === 1 && hour < 12);
   const bg = getComputedStyle(root).getPropertyValue('--bg').trim();
   if (bg) document.querySelector('meta[name=theme-color]')?.setAttribute('content', bg);
 }
@@ -458,6 +474,7 @@ addEventListener('offline', setStatus);
 
 // ---------- запуск ----------
 applyTheme();
+setInterval(applyTheme, 600000);        // авто-вечер, сезон и время суток подхватываются без перезагрузки
 applyQuiet();
 bumpLaunch();
 build();

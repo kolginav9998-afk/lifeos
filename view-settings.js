@@ -167,12 +167,16 @@ export function createSettingsView({ lockNow, applyTheme, applyMode = () => {}, 
   const fontSel = el('select', { id: 'font-select', 'aria-label': 'Размер текста' }, ...[['1', 'обычный'], ['1.15', 'крупный'], ['1.3', 'очень крупный']].map(([v, t]) => el('option', { value: v, textContent: t })));
   fontSel.value = String(getPref('fontScale'));
   fontSel.onchange = () => { setPref('fontScale', Number(fontSel.value)); applyTheme(); };
-  const accentSel = el('select', { id: 'accent-select', 'aria-label': 'Цвет приложения' }, ...[['iris', 'ирис'], ['sage', 'шалфей'], ['sea', 'море'], ['terra', 'терракота'], ['plum', 'слива'], ['corn', 'василёк']].map(([v, t]) => el('option', { value: v, textContent: t })));
+  const accentSel = el('select', { id: 'accent-select', 'aria-label': 'Цвет приложения' }, ...[['iris', 'ирис'], ['sage', 'шалфей'], ['sea', 'море'], ['terra', 'терракота'], ['plum', 'слива'], ['corn', 'василёк'], ['seasonal', 'по сезону']].map(([v, t]) => el('option', { value: v, textContent: t })));
   accentSel.value = getPref('accent') || 'iris';
   accentSel.onchange = () => { setPref('accent', accentSel.value); applyTheme(); };
   const densitySel = el('select', { id: 'density-select', 'aria-label': 'Плотность интерфейса' }, ...[['compact', 'компактно'], ['normal', 'обычно'], ['spacious', 'просторно']].map(([v, t]) => el('option', { value: v, textContent: t })));
   densitySel.value = getPref('density') || 'normal';
   densitySel.onchange = () => { setPref('density', densitySel.value); applyTheme(); };
+  const oled = el('input', { id: 'pref-oled', type: 'checkbox', checked: !!getPref('oledDark') });
+  oled.onchange = () => { setPref('oledDark', oled.checked); applyTheme(); };
+  const autoEve = el('input', { id: 'pref-auto-evening', type: 'checkbox', checked: !!getPref('autoEvening') });
+  autoEve.onchange = () => { setPref('autoEvening', autoEve.checked); applyTheme(); };
   const parseDates = el('input', { id: 'pref-parse', type: 'checkbox', checked: !!getPref('parseDates') });
   parseDates.onchange = () => setPref('parseDates', parseDates.checked);
   const hideAmounts = el('input', { id: 'pref-hide', type: 'checkbox', checked: !!getPref('hideAmounts') });
@@ -340,6 +344,8 @@ export function createSettingsView({ lockNow, applyTheme, applyMode = () => {}, 
       el('label', {}, 'Размер текста: ', fontSel),
       el('label', {}, 'Цвет приложения: ', accentSel),
       el('label', {}, 'Плотность: ', densitySel),
+      el('label', { class: 'check-label' }, oled, ' True dark для OLED: в тёмной теме чисто чёрный фон, без свечения и теней'),
+      el('label', { class: 'check-label' }, autoEve, ' Авто-вечер: после 22:00 тёмная тема включается сама'),
       el('label', { class: 'check-label' }, simple, ' Простой режим: прячет лишние разделы и плашки, остаётся самое нужное на каждый день'),
       el('label', { class: 'check-label' }, parseDates, ' Понимать даты в тексте задачи («завтра», «10 числа»)'),
       el('label', { class: 'check-label' }, hideAmounts, ' Скрывать суммы на экране')),
