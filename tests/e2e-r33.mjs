@@ -84,7 +84,7 @@ assert.match(await text('#review-health'), /Активность: 30 из 150 м
 // ---------- урок: запрос к ИИ ----------
 await tab(page, 'learn');
 await page.click('.track-card[data-track="data"]');
-await page.click('.lesson[data-lesson="ds-01"] summary');
+await page.click('.lesson[data-lesson="ds-01"] > summary');
 await page.click('button[data-ai-check="ds-01"]');
 await toast(/Скопировано/);
 const prompt = await page.evaluate(() => navigator.clipboard.readText());

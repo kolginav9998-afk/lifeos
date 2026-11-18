@@ -15,7 +15,7 @@ const day = n => page.evaluate(async k => { const ev = await import('./events.js
 // ---------- цели уроков и конспект → карточка ----------
 await tab(page, 'learn');
 await page.click('.track-card[data-track="english"]');
-await page.click('.lesson[data-lesson="en-01"] summary');
+await page.click('.lesson[data-lesson="en-01"] > summary');
 assert.equal(await text('.lesson[data-lesson="en-01"] .lesson-goal'), 'После урока я смогу: выбирать пять частотных слов на день и повторять их вечером');
 assert.match(await text('.lesson[data-lesson="en-13"] .lesson-goal'), /^После урока я смогу: заказать еду и напиток/);
 assert.equal(await page.locator('.lesson .lesson-goal').count(), 16, 'цель у каждого урока курса');

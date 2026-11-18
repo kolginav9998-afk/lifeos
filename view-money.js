@@ -319,5 +319,5 @@ export function createMoneyView({ exportCsv }) {
     document.documentElement.classList.toggle('amounts-hidden', !!getPref('hideAmounts'));
   }
 
-  return { root, update(evs) { events = evs; if (root.hidden) return; render(); }, focusAdd() { amount.focus(); } };   // скрытый экран не перерисовываем: при открытии update вызовется ещё раз (у экрана нет show)
+  return { root, update(evs) { events = evs; render(); }, focusAdd() { amount.focus(); } };
 }

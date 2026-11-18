@@ -124,7 +124,7 @@ await page.click('#focus-chip');
 await page.click('.focus-min[data-min="90"]'); await page.click('#focus-go');
 await page.clock.runFor(30 * 60000);
 await page.click('#focus-stop');                                         // остановка после 30 минут — записывается
-await until(page, () => document.getElementById('focus-result'));
+await until(page, () => document.getElementById('focus-result'), null, 20000);   // прогон 30 «виртуальных» минут — это тысячи тиков таймера, под нагрузкой отрисовка результата может не уложиться в 5 с
 assert.match(await text('#focus-result'), /Записано/);
 await page.click('#focus-done');
 assert.equal((await evs('focus')).at(-1).payload.minutes + (await evs('focus'))[0].payload.minutes, 55);

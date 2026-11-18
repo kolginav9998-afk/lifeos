@@ -652,7 +652,7 @@ export function createTodayView({ go }) {
   return {
     root,
     // Скрытый экран не перерисовываем (это самый тяжёлый рендер приложения): при открытии show() всё перерисует.
-    update(evs) { events = evs; if (root.hidden) return; render(); },
+    update(evs) { events = evs; render(); },
     prefill(text) { input.value = String(text).slice(0, 500); updateHint(); input.focus(); },
     focusAdd() { input.focus(); },
     hasEditing: () => !!editingId,

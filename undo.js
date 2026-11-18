@@ -48,6 +48,8 @@ export function createUndoLog(limit = UNDO_LIMIT) {
       return steps.filter(s => now - s.at <= windowMs).reverse();
     },
     size() { return steps.length; },
+    // Полная очистка: при блокировке журнал не должен держать личные данные в памяти и в разметке.
+    clear() { prev = null; steps.length = 0; },
   };
 }
 

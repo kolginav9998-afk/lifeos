@@ -66,18 +66,18 @@ await page.click('#sess-close');
 await tab(page, 'learn');
 if (await page.locator('#learn-back').count()) await page.click('#learn-back');
 await page.click('.track-card[data-track="english"]');
-await page.locator('.lesson').first().locator('summary').click();
+await page.locator('.lesson').first().locator(':scope > summary').click();
 await page.locator('.lesson').first().locator('.quiz-start').click();
 let right = 0;
-for (let i = 0; i < 3; i++) {
+for (let i = 0; i < 4; i++) {
   await until(page, () => document.querySelectorAll('.lesson[open] .quiz-opt').length === 4);
-  assert.match(await text(`.lesson[open] .quiz > p.muted`), new RegExp(`Вопрос ${i + 1} из 3`));
+  assert.match(await text(`.lesson[open] .quiz > p.muted`), new RegExp(`Вопрос ${i + 1} из 4`));
   await page.locator('.lesson[open] .quiz-opt').first().click();
   await until(page, () => document.querySelector('.lesson[open] .quiz-opt.right'));
   if (await page.locator('.lesson[open] .quiz-opt.wrong').count() === 0) right++;
   await page.click('.lesson[open] .quiz-next');
 }
-assert.match(await text('.lesson[open] .quiz-result'), new RegExp(`Верно: ${right} из 3`));
+assert.match(await text('.lesson[open] .quiz-result'), new RegExp(`Верно: ${right} из 4`));
 await page.click('.lesson[open] .quiz-again');
 await until(page, () => document.querySelectorAll('.lesson[open] .quiz-opt').length === 4);
 const before = JSON.stringify((await evs('srs')).map(e => e.payload).sort((a, b) => a.card.localeCompare(b.card)));

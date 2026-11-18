@@ -41,6 +41,14 @@ function getUndoLog() {
   return undoLog;
 }
 
+// Блокировка и выход: журнал отмены хранит названия записей в памяти — очищаем его вместе с остальными данными.
+export function resetUndoLog() {
+  if (!undoLog) return;
+  undoLog.clear();
+  undoPrev = store.state.events.slice();
+  undoLog.prime(undoPrev);
+}
+
 const field = (id, props) => el('input', { id, autocomplete: 'off', ...props });
 
 export function createArchive({ onSaved = () => {} } = {}) {

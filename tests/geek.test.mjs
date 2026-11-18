@@ -102,6 +102,21 @@ test('отмена: журнал держит только окно в час и
   assert.equal(log.size(), 5, 'журнал не разрастается');
 });
 
+test('отмена: clear() полностью очищает журнал (блокировка не должна оставлять личные данные)', () => {
+  const log = createUndoLog();
+  log.prime([]);
+  log.observe([task('t1', 'личная задача')]);
+  assert.equal(log.size(), 1);
+  log.clear();
+  assert.equal(log.size(), 0, 'шаги очищены');
+  assert.equal(log.recent().length, 0, 'недавних шагов нет');
+  log.observe([task('t1', 'личная задача'), task('t2', 'новая')]);      // после clear() без prime() первый проход — новая точка отсчёта
+  assert.equal(log.size(), 0, 'первый проход после очистки только запоминает состояние');
+  log.observe([task('t1', 'личная задача'), task('t2', 'новая'), task('t3', 'ещё')]);
+  assert.equal(log.size(), 1, 'дальше журнал снова работает с чистого листа');
+  assert.equal(log.recent()[0].after.id, 't3');
+});
+
 // ---------- diff.js ----------
 test('diff: стабильная сериализация, различия полей и сводка', () => {
   assert.equal(stableStringify({ b: 1, a: [2, { d: 3, c: 4 }] }), stableStringify({ a: [2, { c: 4, d: 3 }], b: 1 }));

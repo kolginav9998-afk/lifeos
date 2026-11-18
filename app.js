@@ -1,4 +1,4 @@
-import { install as installErrLog } from './errlog.js';
+import { install as installErrLog, log as errLog } from './errlog.js';
 import { $, el, icon, toast, clearToast, announce, watchDialogs, releaseDialogs, watchHeadings, focusNode, keepFocusIn } from './ui.js';
 
 installErrLog();
@@ -19,6 +19,7 @@ import { heroOf } from './daycards.js';
 import { todayStr } from './events.js';
 import { autoCheckUpdate } from './view-update.js';
 import { createLockQuick } from './view-lock-quick.js';
+import { resetUndoLog } from './view-archive.js';
 
 import { createTodayView } from './view-today.js';
 import { createHabitsView } from './view-habits.js';
@@ -274,6 +275,7 @@ function lockNow() {
   if (!vault.hasVault()) return;
   vault.lock();
   store.clear();
+  resetUndoLog();                                              // журнал отмены хранит названия записей — не оставляем их на заблокированном экране
   showLock();
 }
 
@@ -314,7 +316,15 @@ async function enterApp() {
   if (fromCover) focusNode($('title'));                  // пароль или вход введены: фокус не должен остаться на исчезнувшем экране
   paintAvatar(store.state.events);                       // кнопка профиля сразу с буквами логина, не пустая, пока грузятся записи
   try { const n = await db.sealPending(); if (n) toast(`Дошифровано записей: ${n}`); } catch (e) { console.error(e); }
-  await store.refresh();
+  try { await store.refresh(); }
+  catch (e) {
+    // Данные не прочитались: белый экран недопустим. Возвращаем экран блокировки и честно пишем, что случилось.
+    console.error(e);
+    errLog.push(`${new Date().toLocaleTimeString('ru')} вход: ${String(e?.message || e).slice(0, 200)}`);
+    $('app').hidden = true; $('lock').hidden = false;
+    $('lock-msg').textContent = `Не удалось прочитать данные: ${e?.message || e}. Попробуй ещё раз.`;
+    return;
+  }
   markData();
   updateLockButton();
   appSync.start().catch(e => console.error(e));
@@ -429,11 +439,40 @@ function buildViews() {
     openHelp, openZero: (trackId, lessonId) => { navigate('zero'); views.zero.open(trackId, lessonId); }, showTour: () => { window.scrollTo(0, 0); tour.show(); },
     onLoggedOut: () => { paintAvatar(store.state.events); if (REQUIRE_ACCOUNT) showGate(); } };
   for (const d of DEFS) {
-    const v = d.make(ctx);
+    const v = guardView(d, ctx);
     if (views[d.id]) views[d.id].root.replaceWith(v.root); else main.append(v.root);
     views[d.id] = v;
   }
   for (const v of Object.values(views)) v.update([]);
+}
+
+// Белый экран недопустим: если экран падает при создании или перерисовке, показываем спокойную карточку с текстом ошибки
+// (её можно сфотографировать и прислать) и кнопкой «Попробовать снова». Остальные экраны при этом продолжают работать.
+function guardView(d, ctx) {
+  const brokenCard = err => el('div', { class: 'card', style: 'margin:16px' },
+    el('h3', { textContent: 'Этот экран сломался' }),
+    el('p', { class: 'muted', textContent: 'Остальное приложение работает. Если повторяется — сфотографируй этот текст и пришли разработчику.' }),
+    el('p', { class: 'muted', style: 'font-family:monospace;word-break:break-all', textContent: `${d.id}: ${err?.message || err}` }),
+    el('button', { type: 'button', class: 'primary', textContent: 'Попробовать снова', onclick: () => views[d.id]?.update(store.state.events) }));
+  const crash = err => {
+    console.error(err);
+    errLog.push(`${new Date().toLocaleTimeString('ru')} экран ${d.id}: ${String(err?.message || err).slice(0, 200)}`);
+    if (errLog.length > 8) errLog.shift();
+  };
+  let v;
+  try { v = d.make(ctx); }
+  catch (err) {
+    crash(err);
+    const root = el('section', { id: 'view-' + d.id, class: 'view', hidden: true }, brokenCard(err));
+    return { root, update() {} };
+  }
+  const origUpdate = v.update?.bind(v);
+  const origShow = v.show?.bind(v);
+  return {
+    ...v,
+    update: origUpdate ? evs => { try { origUpdate(evs); } catch (err) { crash(err); v.root.replaceChildren(brokenCard(err)); } } : v.update,
+    show: origShow ? () => { try { origShow(); } catch (err) { crash(err); v.root.replaceChildren(brokenCard(err)); } } : v.show,
+  };
 }
 let navReady = false;
 function buildTabs() {
@@ -472,7 +511,9 @@ function build() {
   watchHeadings($('view')); watchHeadings($('gate'));     // уровни заголовков без пропусков
   keepFocusIn($('gate-body'), gatePick);
 
-  store.onChange(evs => { applyQuiet(); for (const v of Object.values(views)) v.update(evs); renderSearch(); paintAvatar(evs); updateDayLine(evs); notify.resyncSoon(); });
+  // Каждый шаг — под защитой: один упавший (например, шапка) не должен ронять перерисовку остальных экранов.
+  const safe = (name, fn) => { try { fn(); } catch (e) { console.error(name, e); } };
+  store.onChange(evs => { safe('quiet', applyQuiet); for (const v of Object.values(views)) v.update(evs); safe('search', renderSearch); safe('avatar', () => paintAvatar(evs)); safe('dayline', () => updateDayLine(evs)); safe('notify', () => notify.resyncSoon()); });
   store.setLockedHandler(showLock);
 }
 

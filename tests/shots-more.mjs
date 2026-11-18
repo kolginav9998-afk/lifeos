@@ -73,7 +73,7 @@ const scene = (name, fn, o = {}) => S.push({ name, fn, ...o });
 for (const id of ['today', 'habits', 'people', 'diary', 'health', 'workouts', 'notes', 'reflect', 'learn', 'skills', 'tests', 'insights', 'okr', 'money', 'plans', 'more', 'account']) scene(id, p => tab(p, id));
 const trackOpen = async p => { await tab(p, 'learn'); await p.click('.track-card[data-track="english"]'); await p.waitForSelector('.lesson'); };
 scene('learn-track', trackOpen, { after: p => p.click('#learn-back') });
-scene('learn-lesson', async p => { await trackOpen(p); await p.click('.lesson[data-lesson="en-02"] summary'); }, { after: p => p.click('#learn-back') });
+scene('learn-lesson', async p => { await trackOpen(p); await p.click('.lesson[data-lesson="en-02"] > summary'); }, { after: p => p.click('#learn-back') });
 scene('learn-flash-q', async p => { await trackOpen(p); await p.click('#track-start'); await p.waitForSelector('#sess-q'); }, { viewport: true, after: p => p.click('#sess-close').then(() => p.click('#learn-back')) });
 scene('learn-flash-a', async p => { await trackOpen(p); await p.click('#track-start'); await p.waitForSelector('#sess-q'); await p.click('#sess-show'); }, { viewport: true, after: p => p.click('#sess-close').then(() => p.click('#learn-back')) });
 const testStart = async (p, id) => { await tab(p, 'tests'); await p.click(`#bt-single-${id}`); await p.waitForSelector('#bt-state-skip'); };

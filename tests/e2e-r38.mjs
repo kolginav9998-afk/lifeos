@@ -14,8 +14,8 @@ const evs = type => page.evaluate(async ty => (await import('./store.js')).state
 await tab(page, 'learn');
 await page.click('.track-card[data-track="english"]');
 assert.equal(await page.locator('.lesson').count(), 16);
-assert.match(await text('.lesson[data-lesson="en-13"] summary'), /Диалог: в кафе/);
-assert.match(await text('.lesson[data-lesson="en-16"] summary'), /Диалог: у врача/);
+assert.match(await text('.lesson[data-lesson="en-13"] > summary'), /Диалог: в кафе/);
+assert.match(await text('.lesson[data-lesson="en-16"] > summary'), /Диалог: у врача/);
 await page.click('#learn-back');
 
 // ---------- возвращение к пройденным урокам ----------

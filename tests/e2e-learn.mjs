@@ -23,7 +23,7 @@ await page.click('#mentor summary');
 await page.click('#mentor button[data-prompt="0"]');
 await toast(/Скопировано/);
 assert.match(await page.evaluate(() => navigator.clipboard.readText()), /репетитор английского/);
-await page.click('.lesson[data-lesson="en-01"] summary');
+await page.click('.lesson[data-lesson="en-01"] > summary');
 assert.match(await text('.lesson[data-lesson="en-01"]'), /Задание/);
 await page.click('button[data-done="en-01"]');
 await toast(/Урок пройден/);
