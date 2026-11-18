@@ -502,6 +502,7 @@ export function createTodayView({ go }) {
     dateLine.textContent = ds.charAt(0).toUpperCase() + ds.slice(1);
     const hr = heroOf(events, today);
     heroCap.textContent = hr.caption;
+    hero.classList.toggle('done', hr.total > 0 && hr.left === 0);   // «день закрыт»: кольцо заполнено на 100%
     heroRing.replaceChildren(ring(hr.fraction, { size: 96, stroke: 11, label: hr.total ? `${hr.done}/${hr.total}` : '—', name: 'Дела на сегодня' }));
     renderOnboarding();
     renderWotd(today);

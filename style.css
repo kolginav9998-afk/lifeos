@@ -170,6 +170,8 @@ html.amounts-hidden .amount{letter-spacing:.1em}
 .sync-badge{min-height:32px;padding:2px 8px;border-radius:999px;border:1px solid var(--line);background:var(--card);font-size:.72rem;color:var(--muted)}
 .sync-badge[data-state=idle]{color:var(--ok)}
 .sync-badge[data-state=error],.sync-badge[data-state=needs-login]{color:var(--danger);border-color:var(--danger)}
+/* синхронизация идёт: значок мягко дышит, остальные состояния не трогаем */
+@media (prefers-reduced-motion: no-preference){.sync-badge[data-state=syncing]{animation:syncPulse 1.6s ease-in-out infinite}@keyframes syncPulse{0%,100%{opacity:1}50%{opacity:.55}}}
 .code{font:600 1.15rem/1.5 ui-monospace,monospace;letter-spacing:.06em;padding:14px;border:1px dashed var(--accent);border-radius:12px;text-align:center;user-select:all;overflow-wrap:anywhere}
 
 /* ---- дневник и здоровье ---- */
@@ -435,7 +437,7 @@ header.top h1{font-size:1.8rem;font-weight:800;letter-spacing:-.03em}
 /* нижняя панель: парящая «таблетка» */
 #tabs{left:12px;right:12px;bottom:calc(12px + env(safe-area-inset-bottom));max-width:656px;margin:0 auto;padding:6px;gap:2px;border:1px solid var(--line);border-radius:28px;background:var(--glass);box-shadow:var(--shadow-lg)}
 @supports (backdrop-filter:blur(1px)){#tabs{backdrop-filter:blur(22px) saturate(1.7);-webkit-backdrop-filter:blur(22px) saturate(1.7)}}
-#tabs button{gap:3px;min-height:56px;border-radius:22px;font-size:.7rem;transition:background .25s,color .25s}
+#tabs button{gap:3px;min-height:56px;border-radius:22px;font-size:.7rem;transition:background .25s,color .25s,transform .15s var(--ease)}
 #tabs button svg{transition:transform .25s cubic-bezier(.2,.8,.2,1)}
 #tabs button[aria-current=page]{color:var(--text);background:var(--grad-soft)}
 #tabs button[aria-current=page] svg{color:var(--accent);transform:translateY(-1px) scale(1.12)}
@@ -452,8 +454,11 @@ header.top h1{font-size:1.8rem;font-weight:800;letter-spacing:-.03em}
 .hello{font-size:1.3rem;font-weight:800;letter-spacing:-.02em}
 
 /* кнопки и поля */
-button,.btn{border-radius:14px;transition:transform .12s ease,background .2s,box-shadow .2s,border-color .2s}
-button:active:not(:disabled){transform:scale(.97)}
+button,.btn{border-radius:14px;transition:transform .15s var(--ease),background .2s,box-shadow .2s,border-color .2s}
+button:active:not(:disabled){transform:scale(.96)}
+/* единый отклик нажатия: чипы, вкладки, поднавигация и интерактивные карточки прижимаются так же, как кнопки */
+.chip,.subnav button,.track-card,.hist-row{transition:transform .15s var(--ease)}   /* у #tabs button транзишн задан рядом с самой панелью */
+.chip:active:not(.static):not(:disabled),#tabs button:active:not(:disabled),.subnav button:active:not(:disabled),.track-card:active:not(:disabled),.hist-row:active:not(:disabled){transform:scale(.96)}
 button.primary,.add-row button{background:var(--grad);color:var(--on-accent);border-color:transparent;box-shadow:0 10px 22px -8px color-mix(in srgb,var(--accent) 50%,transparent)}
 button.primary:active:not(:disabled){box-shadow:0 4px 12px -6px rgba(80,72,212,.45)}
 button.danger{background:transparent}

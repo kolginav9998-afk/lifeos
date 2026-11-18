@@ -50,6 +50,11 @@ header.top::after{content:"";position:absolute;left:var(--s4);right:var(--s4);bo
 .hero .hello{font-size:var(--t20)}
 .ring-track{stroke:color-mix(in srgb,var(--text) 10%,transparent)}
 .hero .ring-txt{font-size:20px}
+/* «день закрыт»: кольцо заполнено — hero становится тише, без лишнего блеска */
+.hero.done{background-image:linear-gradient(var(--tint-ok),var(--tint-ok));border-color:color-mix(in srgb,var(--ok) 30%,var(--line))}
+.hero.done .hero-cap{color:var(--ok)}
+@media (prefers-color-scheme: dark){:root:not([data-theme=light]) .hero.done{background-image:linear-gradient(color-mix(in srgb,var(--bg) 45%,transparent),color-mix(in srgb,var(--bg) 45%,transparent)),linear-gradient(color-mix(in srgb,var(--ok) 9%,transparent),color-mix(in srgb,var(--ok) 9%,transparent))}}
+:root[data-theme=dark] .hero.done{background-image:linear-gradient(color-mix(in srgb,var(--bg) 45%,transparent),color-mix(in srgb,var(--bg) 45%,transparent)),linear-gradient(color-mix(in srgb,var(--ok) 9%,transparent),color-mix(in srgb,var(--ok) 9%,transparent))}
 
 /* кнопки, чипы, поля */
 button,.btn{font-weight:500;background:var(--soft);border-color:transparent;border-radius:var(--r12)}
@@ -160,6 +165,9 @@ input[type=checkbox]:checked::after{transform:rotate(-45deg) scale(1)}
 .toast{display:flex;align-items:center;gap:10px;padding:12px 12px 14px 14px;border-radius:var(--r12);background:var(--toast-bg);color:var(--toast-fg);border:1px solid rgba(255,255,255,.1);box-shadow:var(--shadow-lg)}
 .toast-ic{display:grid;flex:none;color:var(--toast-act)}
 .toast[data-kind=error] .toast-ic{color:#f5a3a8}
+/* цветная кромка слева по типу сообщения: спокойно подтверждаем успех, мягко зовём при ошибке */
+.toast[data-kind=ok]{border-left:3px solid var(--ok)}
+.toast[data-kind=error]{border-left:3px solid var(--danger)}
 .toast-msg{flex:1;min-width:0;line-height:1.3}
 .toast button{flex:none;min-height:34px;padding:4px 12px;border-radius:10px;background:rgba(255,255,255,.12);color:var(--toast-act);font-weight:700}
 .toast-bar{position:absolute;left:14px;right:14px;bottom:5px;height:2px;border-radius:2px;background:currentColor;opacity:.28;transform-origin:left}
@@ -221,6 +229,9 @@ input[type=checkbox]:checked::after{transform:rotate(-45deg) scale(1)}
   @keyframes float{50%{transform:translateY(-5px)}}
   .streak.hot svg{animation:flick 2.4s ease-in-out infinite;transform-origin:50% 90%}
   @keyframes flick{50%{transform:scale(1.14) rotate(-4deg)}}
+  /* «день закрыт»: одно короткое тёплое свечение при заполнении кольца, без повторов */
+  .hero.done{animation:heroDone 1.4s var(--ease) 1}
+  @keyframes heroDone{0%{box-shadow:0 0 0 0 color-mix(in srgb,var(--ok) 38%,transparent),var(--shadow)}100%{box-shadow:0 0 0 22px transparent,var(--shadow)}}
 }
 
 /* режимы: у каждой группы экранов свой спокойный акцент; главный акцент (кнопки, кольцо дел) остаётся фирменным */
