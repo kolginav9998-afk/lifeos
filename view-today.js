@@ -2,7 +2,8 @@ import { APP_NAME } from './config.js';
 import { el, fill, toast, dateRu, moneyText, weekdayOf, ring, pressable, icon, emptyState } from './ui.js';
 import { makeTask, updateTask, completeTask, reopenTask, groupTasks, todayStr, addDays, dueLabel, repeatLabel, profileOf } from './events.js';
 import { parseQuick } from './quick.js';
-import { getPref, setPref } from './prefs.js';
+import { getPref, getPrefs, setPref } from './prefs.js';
+import { isQuietDay, isQuietWeek, toggleQuietDay } from './quiet.js';
 import { activeHabits } from './habits.js';
 import { weekReview } from './review.js';
 import { dayLog } from './journal.js';
@@ -52,9 +53,9 @@ export function createTodayView({ go }) {
 
   const hello = el('div', { class: 'hello' });
   const dateLine = el('div', { id: 'date', class: 'date' });
-  const heroCap = el('div', { id: 'hero-cap', class: 'hero-cap' }), heroRing = el('div', { id: 'hero-ring', class: 'hero-ring' });
+  const heroCap = el('div', { id: 'hero-cap', class: 'hero-cap quiet-hide' }), heroRing = el('div', { id: 'hero-ring', class: 'hero-ring quiet-hide' });
   const hero = el('section', { id: 'hero', class: 'hero' }, el('div', { class: 'hero-text' }, hello, dateLine, heroCap), heroRing);
-  const summary = el('div', { id: 'summary', class: 'chips' });
+  const summary = el('div', { id: 'summary', class: 'chips quiet-hide' });
 
   const obList = el('ul', { class: 'steps', id: 'ob-steps' });
   const onboarding = el('div', { id: 'onboarding', class: 'card', hidden: true },
@@ -83,7 +84,7 @@ export function createTodayView({ go }) {
   const startFocus = (resume = false) => { openFocus(focusHost, { tasks: events.filter(e => e.type === 'task' && !e.payload.done).map(e => e.payload.text), resume }); focusHost.focus({ preventScroll: true }); };
 
   // слово дня: английский и иврит, перевод по касанию
-  const wotd = el('div', { id: 'wotd', class: 'card tight', hidden: true });
+  const wotd = el('div', { id: 'wotd', class: 'card tight quiet-hide', hidden: true });
   function renderWotd(today) {
     const rows = ['english', 'hebrew'].map(id => wordOfDay(today, id)).filter(Boolean);
     wotd.hidden = !rows.length || getPref('wotdHidden') === today || !!getPref('simple');
@@ -120,10 +121,11 @@ export function createTodayView({ go }) {
   }
 
   // мягкие подсказки: мало сил, слишком много дел, долго низкое настроение
-  const hintsBox = el('div', { id: 'hints' });
+  const hintsBox = el('div', { id: 'hints', class: 'quiet-hide' });
   function hintCard(id, text, ...buttons) { return el('div', { id, class: 'card calm hint-card' }, el('p', { textContent: text }), el('div', { class: 'row wrap' }, ...buttons)); }
   function renderHints(today, heavy) {
     const out = [];
+    const quietWeek = isQuietWeek(getPrefs(), today);              // неделя без нового: подсказка «проверить экспериментом» подождёт
     const sickEv = activeSick(events, today);
     if (sickEv) out.push(hintCard('sick-banner', 'Режим болезни: привычки и серии на паузе, пропуски не считаются срывом, проверки и напоминания о привычках отложены. Отдыхай.',
       el('button', { type: 'button', id: 'sick-banner-end', class: 'chip', textContent: 'Я поправился', onclick: async () => { await store.save(endSick(sickEv)); toast('Рад, что стало лучше. Серии продолжатся.'); } })));
@@ -132,7 +134,7 @@ export function createTodayView({ go }) {
       el('button', { type: 'button', id: 'hint-light-on', class: 'chip', textContent: 'Включить «Тяжёлый день»', onclick: () => { setPref('heavyDay', true); setPref('lightDayAsked', today); render(); } }),
       el('button', { type: 'button', id: 'hint-light-sick', class: 'chip', textContent: 'Я заболел', onclick: async () => { try { setPref('lightDayAsked', today); await store.save(startSick(events)); } catch (e) { toast(e.message); } } }),
       el('button', { type: 'button', class: 'chip', textContent: 'Не сейчас', onclick: () => { setPref('lightDayAsked', today); render(); } })));
-    const caf = !sickEv && getPref('caffeineAsked') !== today && caffeineHint(events, today);
+    const caf = !sickEv && !quietWeek && getPref('caffeineAsked') !== today && caffeineHint(events, today);
     if (caf) out.push(hintCard('hint-caffeine', caf.text,
       el('button', { type: 'button', id: 'hint-caffeine-exp', class: 'chip', textContent: 'Проверить экспериментом', onclick: () => { setPref('caffeineAsked', today); go('insights'); } }),
       el('button', { type: 'button', class: 'chip', textContent: 'Понял', onclick: () => { setPref('caffeineAsked', today); render(); } })));
@@ -151,8 +153,9 @@ export function createTodayView({ go }) {
   }
 
   // что нового: один раз после обновления
-  const whatsNew = el('div', { id: 'whatsnew', class: 'card calm', hidden: true });
+  const whatsNew = el('div', { id: 'whatsnew', class: 'card calm quiet-hide', hidden: true });
   function renderWhatsNew() {
+    if (isQuietWeek(getPrefs(), todayStr())) { whatsNew.hidden = true; return; }        // неделя без нового: о новых функциях не рассказываем
     const last = getPref('lastSeenVersion');
     if (!last) { setPref('lastSeenVersion', VERSION); whatsNew.hidden = true; return; }       // первая установка: ничего не показываем
     const list = unseenChanges(last, VERSION);
@@ -164,7 +167,7 @@ export function createTodayView({ go }) {
   }
 
   // отложенное: то, что вчера записали «на потом»
-  const parkedBox = el('div', { id: 'parked', class: 'card calm', hidden: true });
+  const parkedBox = el('div', { id: 'parked', class: 'card calm quiet-hide', hidden: true });
   function renderParked(today) {
     const due = parkedDue(events, today);
     parkedBox.hidden = !due.length;
@@ -179,9 +182,10 @@ export function createTodayView({ go }) {
   const moneyNudge = createMoneyNudge({ go });
   const deviceHints = createDeviceHints({ go });
   const dayCards = createDayCards();
+  moneyNudge.root.classList.add('quiet-hide'); deviceHints.root.classList.add('quiet-hide');   // в день тишины проактивные подсказки молчат
 
   // план дня: предложение по порядку и времени (не сохраняется)
-  const planCard = el('details', { id: 'plan-day', class: 'card', hidden: true });
+  const planCard = el('details', { id: 'plan-day', class: 'card quiet-hide', hidden: true });
   function renderPlan(today) {
     const d = new Date(), plan = planDay(events, today, { nowMinutes: d.getHours() * 60 + d.getMinutes() });
     planCard.hidden = !plan.items.length || !!getPref('simple');
@@ -263,7 +267,7 @@ export function createTodayView({ go }) {
 
   // ----- итоги недели -----
   const reviewBody = el('div', { class: 'review-body' });
-  const review = el('details', { id: 'review', class: 'card' }, el('summary', { textContent: 'Итоги недели' }), reviewBody);
+  const review = el('details', { id: 'review', class: 'card quiet-hide' }, el('summary', { textContent: 'Итоги недели' }), reviewBody);
 
   // ----- журнал дня -----
   const jDate = el('input', { id: 'journal-date', type: 'date', value: todayStr(), 'aria-label': 'Дата записи в журнале' });
@@ -305,9 +309,19 @@ export function createTodayView({ go }) {
 
   // «Самое полезное прямо сейчас»: одна большая кнопка под hero (или тёплая карточка, когда всё сделано).
   // Объявляется до root.append: блок стоит вторым на экране «Сегодня».
-  const actionBox = el('div', { id: 'best-action', hidden: true });
+  const actionBox = el('div', { id: 'best-action', class: 'quiet-hide', hidden: true });
 
-  root.append(hero, actionBox, whatsNew, summary, hintsBox, deviceHints.root, parkedBox, moneyNudge.root, intentionBox, planCard, dayCards.root, onboarding, wotd, focusHost, form, minimum, review, journal, ...Object.values(sections).map(s => s.sec), empty, doneBlock);
+  // Плашка «День тишины»: напоминание о режиме и выключение одним нажатием.
+  const quietBox = el('div', { id: 'quiet-banner', class: 'card calm', hidden: true });
+  function renderQuiet(today) {
+    const on = isQuietDay(getPrefs(), today);
+    quietBox.hidden = !on;
+    if (!on) { quietBox.replaceChildren(); return; }
+    fill(quietBox, el('p', { textContent: 'День тишины: только дела, без счётчиков.' }),
+      el('button', { type: 'button', id: 'quiet-off', class: 'chip', textContent: 'Выключить', onclick: () => { toggleQuietDay(todayStr()); store.refresh().catch(() => {}); } }));
+  }
+
+  root.append(hero, quietBox, actionBox, whatsNew, summary, hintsBox, deviceHints.root, parkedBox, moneyNudge.root, intentionBox, planCard, dayCards.root, onboarding, wotd, focusHost, form, minimum, review, journal, ...Object.values(sections).map(s => s.sec), empty, doneBlock);
 
   // ----- элементы списка -----
   async function removeTask(ev) {
@@ -505,6 +519,7 @@ export function createTodayView({ go }) {
     heroRing.replaceChildren(ring(hr.fraction, { size: 96, stroke: 11, label: hr.total ? `${hr.done}/${hr.total}` : '—', name: 'Дела на сегодня' }));
     renderOnboarding();
     renderWotd(today);
+    renderQuiet(today);
     const g = groupTasks(events, today);
     const heavy = !!getPref('heavyDay');
     renderWhatsNew(); renderIntention(today); renderHints(today, heavy); renderParked(today); moneyNudge.update(events); deviceHints.update(events); renderPlan(today); dayCards.update(events);
