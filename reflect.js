@@ -43,11 +43,29 @@ export function makeWeekReflection(date, fields, now = Date.now(), prev = null) 
   const week = weekStart(date);
   const payload = { week };
   for (const [k] of WEEK_QUESTIONS) { const v = clean(fields?.[k], 600); if (v) payload[k] = v; }
+  if (Array.isArray(prev?.payload?.words)) payload.words = prev.payload.words;        // подпись «неделя в трёх словах» не теряется при правке ответов
   if (Object.keys(payload).length === 1) throw new Error('Ответь хотя бы на один вопрос');
   return base(weekReflectionId(date), 'weekreflect', payload, now, prev);
 }
 export const weekReflectionOf = (events, date) => events.find(e => e.type === 'weekreflect' && e.id === weekReflectionId(date)) ?? null;
 export const weekReflections = events => events.filter(e => e.type === 'weekreflect').sort((a, b) => b.payload.week.localeCompare(a.payload.week));
+
+// ---------- неделя в трёх словах ----------
+// Тёплая подпись уходящей недели: три слова — свои или из подсказок. Хранится необязательным полем words в итогах недели,
+// поэтому старые записи читаются как раньше, а лента года собирается из тех же итогов.
+export const WEEK_WORD_IDEAS = ['спокойная', 'тёплая', 'бодрая', 'уставшая', 'светлая', 'домашняя', 'быстрая', 'непростая', 'благодарная', 'особенная'];
+export function makeWeekWords(date, words, now = Date.now(), prev = null) {
+  const ws = (Array.isArray(words) ? words : []).map(w => clean(w, 24)).filter(Boolean);
+  if (ws.length !== 3) throw new Error('Нужны ровно три слова');
+  const keep = {};                                                                    // правка подписи не стирает ответы на вопросы недели
+  for (const [k] of WEEK_QUESTIONS) if (prev?.payload?.[k]) keep[k] = prev.payload[k];
+  return base(weekReflectionId(date), 'weekreflect', { week: weekStart(date), ...keep, words: ws }, now, prev);
+}
+export const weekWordsOf = (events, date) => weekReflectionOf(events, date)?.payload.words ?? null;
+// Лента года из подписанных недель: от новых к старым.
+export const yearRibbon = (events, year) => weekReflections(events)
+  .filter(e => Array.isArray(e.payload.words) && e.payload.week.startsWith(String(year) + '-'))
+  .map(e => ({ week: e.payload.week, words: e.payload.words }));
 
 // ---------- журнал решений ----------
 export const VERDICTS = { better: 'вышло лучше, чем ждал', asExpected: 'вышло примерно как ждал', worse: 'вышло хуже, чем ждал' };
