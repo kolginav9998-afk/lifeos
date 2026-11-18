@@ -18,8 +18,10 @@ export const REGISTRY = {
   sub: { label: 'Подписка', group: 'Деньги', module: 'planning.js', privacy: 'money', analytics: false, fields: 'name, amountMinor, period, day, month, active' },
   wish: { label: 'Хочу купить (отсрочка на сутки)', group: 'Деньги', module: 'wishes.js', privacy: 'money', analytics: false, fields: 'text, amountMinor, date, until, status, resolvedDate' },
   debt: { label: 'Долг или заём', group: 'Деньги', module: 'debts.js', privacy: 'money', analytics: false, fields: 'who, amountMinor, direction, due, note, date, paidMinor, settled, settledDate' },
-  item: { label: 'Вещь (дом, одежда)', group: 'Дом', module: 'home.js', privacy: 'text', analytics: false, fields: 'name, kind (clothes|shoes|underwear|bedding|towels|electronics|kitchen|tools|furniture|documents|other), place, brand, color, size, material, qty, bought, priceMinor, currency, warranty, care{how, temp, washEveryWears, washEveryDays}, status (active|stored|sold|gone), tags, note' },
-  itemlog: { label: 'Отметка в истории вещи', group: 'Дом', module: 'home.js', privacy: 'numbers', analytics: true, fields: 'item, kind (wear|wash|use|repair|move|note), date, note, place' },
+  item: { label: 'Вещь (дом, одежда)', group: 'Дом', module: 'home.js', privacy: 'text', analytics: false, fields: 'name, kind (clothes|shoes|underwear|bedding|towels|electronics|kitchen|tools|furniture|documents|pantry|consumables|other), place, brand, color, size, material, qty, bought, priceMinor, currency, warranty, validUntil, useBy, waterEveryDays, serviceEveryDays, lowAt, care{how, temp, washEveryWears, washEveryDays}, status (active|stored|sold|gone), tags, note' },
+  itemlog: { label: 'Отметка в истории вещи', group: 'Дом', module: 'home.js', privacy: 'numbers', analytics: true, fields: 'item, kind (wear|wash|use|repair|move|water|note), date, note, place' },
+  pet: { label: 'Питомец', group: 'Дом', module: 'pet.js', privacy: 'text', analytics: false, fields: 'name, kind (cat|dog|other), weightKg, vetName, vetPhone, note' },
+  petvac: { label: 'Прививка питомца', group: 'Дом', module: 'pet.js', privacy: 'text', analytics: false, fields: 'pet, name, date, nextDue' },
   note: { label: 'Заметка', group: 'Заметки и дневник', module: 'notes.js', privacy: 'text', analytics: false, fields: 'text' },
   diary: { label: 'Запись дневника', group: 'Заметки и дневник', module: 'diary.js', privacy: 'text', analytics: false, fields: 'date, text, highlight, gratitude, tags' },
   checkin: { label: 'Отметка дня (утро/вечер)', group: 'Здоровье', module: 'diary.js', privacy: 'health', analytics: true, fields: 'date, slot (m|e), оценки 1–5, сон, кофе, нагрузка, питание (veg, protein, sweets), note' },
@@ -96,6 +98,7 @@ export const RELATIONS = [
   ['goal', 'goalmove', 'goalId', 'взносы в копилку'],
   ['lesson', 'lessonnote', 'lesson', 'конспект к пройденному уроку'],
   ['item', 'itemlog', 'item', 'история вещи: надел, постирал, починил'],
+  ['pet', 'petvac', 'pet', 'прививки питомца'],
 ];
 // Типы, привязанные к календарному дню полем date (в диаграмме идут от узла «день»).
 export const BY_DAY = ['checkin', 'diary', 'measure', 'workout', 'focus', 'thought', 'intention', 'dayreview', 'joy', 'ritual', 'parked', 'speak', 'breath', 'diction', 'dictself', 'testrun', 'expense', 'income', 'medlog', 'habit_log', 'lesson', 'workday'];

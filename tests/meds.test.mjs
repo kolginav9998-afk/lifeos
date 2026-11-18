@@ -1,7 +1,7 @@
 // Лекарства: список в аптеку (флаг runningOut) и курс с концом (endDate) — чистая логика без DOM.
 import test from 'node:test';
 import assert from 'node:assert/strict';
-import { makeMed, medsOf, pharmacyList, pharmacyText, daysLeft, courseDone } from '../meds.js';
+import { makeMed, medsOf, pharmacyList, pharmacyText, daysLeft, courseDone, travelList, travelText } from '../meds.js';
 
 const T = 1763000000000; // фиксированный момент для стабильных id/дат
 
@@ -53,4 +53,20 @@ test('medsOf и флаг: порядок сортировки не зависи�
   const a = makeMed({ name: 'Бета', when: 'evening', endDate: '2026-12-01' }, T);
   const b = { ...makeMed({ name: 'Альфа', when: 'morning' }, T), payload: { ...makeMed({ name: 'Альфа', when: 'morning' }, T).payload, runningOut: true } };
   assert.deepEqual(medsOf([a, b]).map(m => m.payload.name), ['Альфа', 'Бета']);
+});
+
+// Чек-лист «лекарства в дорогу»: активные, по времени приёма; неактивные и пустой список.
+test('чек-лист в дорогу: активные лекарства по времени приёма, с дозами', () => {
+  const a = makeMed({ name: 'Витамин D', dose: '2000 МЕ', when: 'morning' }, T);
+  const b = makeMed({ name: 'Магний', when: 'evening' }, T);
+  const c = makeMed({ name: 'Йод', dose: '150 мкг', when: 'morning' }, T);
+  const off = { ...makeMed({ name: 'Курс прошёл', when: 'day' }, T), payload: { ...makeMed({ name: 'Курс прошёл', when: 'day' }, T).payload, active: false } };
+  const prn = makeMed({ name: 'Обезбол', when: 'asneeded' }, T);
+  const evs = [a, b, c, off, prn];
+  const groups = travelList(evs);
+  assert.deepEqual(groups.map(g => [g.when, g.meds.map(m => m.payload.name)]), [['morning', ['Витамин D', 'Йод']], ['evening', ['Магний']], ['asneeded', ['Обезбол']]],
+    'на паузе не попадает; порядок — утро, день, вечер, в любое время, по необходимости');
+  assert.equal(travelText(evs), 'Лекарства в дорогу:\n\nУтром:\n- Витамин D — 2000 МЕ\n- Йод — 150 мкг\n\nВечером:\n- Магний\n\nПо необходимости:\n- Обезбол');
+  assert.equal(travelText([]), '');
+  assert.equal(travelText([off]), '', 'все на паузе — чек-листа нет');
 });

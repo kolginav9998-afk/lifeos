@@ -25,16 +25,18 @@ export function createEditWindow(H) {
   const setValues = f => {
     const c = f.care ?? defaultCare(f.kind ?? 'clothes');
     const v = { name: f.name ?? '', kind: f.kind ?? 'clothes', place: f.place ?? '', brand: f.brand ?? '', color: f.color ?? '', size: f.size ?? '', material: f.material ?? '', qty: f.qty && f.qty !== 1 ? String(f.qty) : '', price: money(f.priceMinor),
-      bought: f.bought ?? '', warranty: f.warranty ?? '', how: c.how, temp: c.temp ?? '', wears: c.washEveryWears ?? '', days: c.washEveryDays ?? '', status: f.status ?? 'active', tags: (f.tags ?? []).join(', '), note: f.note ?? '' };
+      bought: f.bought ?? '', warranty: f.warranty ?? '', validUntil: f.validUntil ?? '', useBy: f.useBy ?? '', water: f.waterEveryDays ?? '', service: f.serviceEveryDays ?? '', low: f.lowAt ?? '',
+      how: c.how, temp: c.temp ?? '', wears: c.washEveryWears ?? '', days: c.washEveryDays ?? '', status: f.status ?? 'active', tags: (f.tags ?? []).join(', '), note: f.note ?? '' };
     for (const [k, x] of Object.entries(v)) F[k].value = String(x);
     syncCare();
   };
   function syncCare() { const none = F.how.value === 'none'; for (const k of ['temp', 'wears', 'days']) F[k].disabled = none; }
-  const hasExtra = f => ['place', 'brand', 'color', 'size', 'material', 'bought', 'warranty', 'note'].some(k => f[k]) || (f.tags ?? []).length > 0 || f.priceMinor !== null && f.priceMinor !== undefined || (f.qty ?? 1) > 1;
+  const hasExtra = f => ['place', 'brand', 'color', 'size', 'material', 'bought', 'warranty', 'note'].some(k => f[k]) || f.validUntil || f.useBy || f.waterEveryDays || f.serviceEveryDays || (f.lowAt ?? null) !== null || (f.tags ?? []).length > 0 || f.priceMinor !== null && f.priceMinor !== undefined || (f.qty ?? 1) > 1;
 
   function collect() {
     const v = k => F[k].value, none = v('how') === 'none';
     return { name: v('name'), kind: v('kind'), place: v('place'), brand: v('brand'), color: v('color'), size: v('size'), material: v('material'), qty: v('qty') === '' ? 1 : v('qty'), bought: v('bought'), warranty: v('warranty'),
+      validUntil: v('validUntil'), useBy: v('useBy'), waterEveryDays: v('water'), serviceEveryDays: v('service'), lowAt: v('low'),
       priceMinor: parsePrice(v('price')), status: v('status'), tags: v('tags'), note: v('note'), care: { how: v('how'), temp: none ? null : v('temp'), washEveryWears: none ? null : v('wears'), washEveryDays: none ? null : v('days') } };
   }
   function close() { host.hidden = true; fill(host); item = null; }
@@ -79,7 +81,8 @@ export function createEditWindow(H) {
     F.how.addEventListener('change', syncCare);
     more = el('details', { id: 'hm-more', class: 'card hm-more' }, el('summary', { textContent: 'Ещё параметры' }),
       text('place', 'Где лежит', { max: 60, list: 'hm-places', ph: 'Шкаф, комод, балкон…' }), places,
-      el('div', { class: 'hm-grid' }, text('brand', 'Бренд'), text('color', 'Цвет', { max: 30 }), text('size', 'Размер', { max: 20 }), text('material', 'Материал'), num('qty', 'Количество', 1, 9999), text('price', 'Цена, ₽ (за всё количество)', { max: 14, inputMode: 'decimal' }), date('bought', 'Куплено'), date('warranty', 'Гарантия до')),
+      el('div', { class: 'hm-grid' }, text('brand', 'Бренд'), text('color', 'Цвет', { max: 30 }), text('size', 'Размер', { max: 20 }), text('material', 'Материал'), num('qty', 'Количество', 0, 9999), text('price', 'Цена, ₽ (за всё количество)', { max: 14, inputMode: 'decimal' }), date('bought', 'Куплено'), date('warranty', 'Гарантия до')),
+      el('div', { class: 'hm-grid' }, date('validUntil', 'Действует до (документ)'), date('useBy', 'Съесть до (кладовая)'), num('water', 'Поливать раз в (дней)', 1, 365), num('service', 'Обслуживание раз в (дней)', 7, 3650), num('low', '«Кончается» при остатке', 0, 999)),
       care, select('status', 'Состояние', Object.entries(STATUS_LABEL)), text('tags', 'Метки через запятую', { max: 120, ph: 'зима, работа' }),
       field('Заметка', note));
     const chips = !existing && !preset ? el('div', { class: 'hm-tpl' }, el('p', { class: 'muted', textContent: 'Быстрый старт: подставит название и правила стирки.' }),
