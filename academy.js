@@ -14,8 +14,8 @@ import ai from './c-ai.js';
 import diction from './c-diction.js';
 import { LESSON_GOALS } from './c-goals.js';
 import { summary, srsId, buildQueue, newState, isDue, MASTERED_BOX } from './srs.js';
-import { daysBetween } from './events.js';
-import { isSick } from './sick.js';
+import { daysBetween, addDays } from './events.js';
+import { isSick, sickDays } from './sick.js';
 import { makeRng } from './stats.js';
 
 const english = { ...englishBase, deck: [...(englishBase.deck || []), ...englishWords] };   // колода слов лежит в отдельном файле (бюджет размера файла)
@@ -91,6 +91,28 @@ export function studyDates(events) {
   }
   return [...set];
 }
+
+// ---------- гибкая серия занятий «пять из семи» ----------
+// Серия жива, пока в любом окне из семи дней подряд есть хотя бы пять дней занятий: пропусков в окне не больше двух,
+// и они не обязаны идти подряд. День болезни считается днём занятия: недомогание серию не рвёт.
+// Как и обычная серия, сегодняшний день можно ещё не закрыть: серия не сгорает до конца дня.
+export const FLEX_WINDOW = 7, FLEX_NEED = 5;
+export function flexStudyStreak(dates, today, { window = FLEX_WINDOW, need = FLEX_NEED, sick = null } = {}) {
+  const act = new Set(dates ?? []), ill = sick instanceof Set ? sick : new Set(sick ?? []);
+  const ok = d => act.has(d) || ill.has(d);
+  const maxSkips = Math.max(0, window - need);
+  let day = ok(today) ? today : addDays(today, -1), n = 0, kept = 0;
+  let skips = [];                                                // дни пропуска внутри текущего окна
+  for (let guard = 0; guard < 4000; guard++) {
+    if (ok(day)) { n++; if (act.has(day)) kept = n; day = addDays(day, -1); continue; }
+    const recent = skips.filter(s => daysBetween(day, s) < window);
+    if (recent.length >= maxSkips) break;                        // в окне из семи дней стало меньше пяти занятий
+    skips = [...recent, day]; n++; day = addDays(day, -1);
+  }
+  return kept;                                                   // серия считается по дням занятий: дни отдыха и болезни её держат, но не наращивают сами
+}
+// Гибкая серия по журналу целиком: дни уроков и ответов на карточки плюс дни болезни.
+export const studyStreakFlex = (events, today) => flexStudyStreak(studyDates(events), today, { sick: sickDays(events, today) });
 
 // Проверка содержимого треков (используется тестами): возвращает список проблем.
 export function validateTrack(t) {
@@ -175,6 +197,15 @@ export function leeches(events, limit = 20) {
   return statesOf(events).filter(s => (s.lapses || 0) >= LEECH_LAPSES && s.box < MASTERED_BOX && pool.has(s.card))
     .map(s => ({ card: pool.get(s.card), state: s })).sort((a, b) => b.state.lapses - a.state.lapses || a.card.q.localeCompare(b.card.q)).slice(0, limit);
 }
+// Режим «разобрать» для «пиявки»: подсказка показывается до ответа, а не после — сначала разобраться, потом вспоминать.
+export const leechMode = s => ((s?.lapses || 0) >= LEECH_LAPSES && (s?.box ?? 0) < MASTERED_BOX ? 'unpack' : null);
+// Подсказка до ответа: своя пометка к карточке, а если её нет — бережный набросок: первая буква и длина первого слова ответа.
+export function unpackHint(card) {
+  const own = String(card?.hint ?? '').trim();
+  if (own) return own;
+  const first = String(card?.a ?? '').trim().split(/\s+/)[0] ?? '';
+  return first ? `Начинается на «${[...first][0]}…», букв в первом слове: ${[...first].length}` : '';
+}
 
 // ---------- возвращение после пропуска ----------
 // Не занимался несколько дней, а повторений накопилось много: предложить начать с малого, без «долга».
@@ -250,10 +281,28 @@ export function cardFace(card, state, today) {
 
 // ---------- возвращение к пройденным урокам ----------
 // Через 30 дней после прохождения (или прошлого повторения) предлагаем вернуться к уроку. Берём самый давний.
+// Если в проверках урока подсказками пользовались чаще чем в трети ответов, возвращаемся раньше — через две недели.
 export const REVISIT_DAYS = 30;
+export const HINT_SHARE = 0.3;            // доля ответов с подсказкой выше этой — урок стоит перечитать раньше
+export const HINT_REVISIT_DAYS = 14;      // …настолько раньше обычных тридцати дней
+// Доля подсказок в проверках урока (записи zcheck): → { n (ответов), hints, share } или null, если проверок не было.
+export function lessonHintShare(events, lessonId) {
+  let n = 0, hints = 0;
+  for (const e of events ?? []) {
+    const p = e?.payload;
+    if (e?.type !== 'zcheck' || p?.lesson !== lessonId || !Number.isInteger(p.n) || p.n <= 0) continue;
+    n += p.n;
+    hints += Number.isInteger(p.hints) ? p.hints : 0;
+  }
+  return n ? { n, hints, share: hints / n } : null;
+}
 export function lessonToRevisit(events, today) {
   const due = events.filter(e => e.type === 'lesson' && lessonTitle(e.payload.lesson))
-    .map(e => ({ ev: e, since: e.payload.revisited || e.payload.date })).filter(x => daysBetween(x.since, today) >= REVISIT_DAYS)
+    .map(e => ({ ev: e, since: e.payload.revisited || e.payload.date }))
+    .filter(x => {
+      const share = lessonHintShare(events, x.ev.payload.lesson)?.share ?? 0;
+      return daysBetween(x.since, today) >= (share > HINT_SHARE ? HINT_REVISIT_DAYS : REVISIT_DAYS);
+    })
     .sort((a, b) => a.since.localeCompare(b.since) || a.ev.payload.lesson.localeCompare(b.ev.payload.lesson));
   if (!due.length) return null;
   const { ev, since } = due[0];
