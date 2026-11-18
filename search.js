@@ -6,7 +6,8 @@ export function normalize(s) {
   return String(s ?? '').normalize('NFKC').toLowerCase().replace(/ё/g, 'е');
 }
 
-function searchable(e) {
+// Какую подпись и текст показывать для записи в поиске и запросах (экспорт нужен query.js).
+export function searchable(e) {
   const p = e.payload;
   switch (e.type) {
     case 'task': return { kind: 'Задача', title: p.text, text: p.text };
